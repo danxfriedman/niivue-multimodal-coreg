@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuroCoreg — Single-Subject Multimodal Brain Viewer (niivue/mono)</title>
+  <link rel="stylesheet" href="./styles.css?v=10" />
+  <script type="importmap">
+    {
+      "imports": {
+        "@niivue/niivue": "https://cdn.jsdelivr.net/npm/@niivue/niivue@0.69.0/dist/index.js",
+        "@niivue/nv-ext-dcm2niix": "https://cdn.jsdelivr.net/npm/@niivue/nv-ext-dcm2niix@0.1.3/+esm"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div class="app-shell">
+    <!-- Top Header & Primary Action Bar -->
+    <header class="top-bar">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+            <path
+              d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04Z" />
+            <path
+              d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04Z" />
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">
+            NeuroCoreg Studio
+            <span class="mono-badge" title="Powered by https://github.com/niivue/mono">niivue/mono</span>
+          </div>
+          <div class="brand-subtitle">Single-Subject Multimodal Brain Visualization &amp; Coregistration</div>
+        </div>
+      </div>
+
+      <!-- Patient Workspace, Project Save/Open & Data Loading Controls -->
+      <div class="top-actions">
+        <div class="patient-project-group" role="group" aria-label="Patient and Project Actions">
+          <label class="patient-id-box" for="patientIdInput"
+            title="Active Patient / Subject Identifier (used to name the saved project folder)">
+            <span class="patient-id-label">Patient:</span>
+            <input id="patientIdInput" type="text" class="patient-id-input" value="sub-01" placeholder="sub-01"
+              spellcheck="false" />
+          </label>
+
+          <button id="btnNewPatient" class="btn btn-danger-soft"
+            title="Clear all loaded volumes, transformations, and metrics to start a New Patient workspace">
+            <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor">
+              <path
+                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" />
+            </svg>
+            New Patient
+          </button>
+
+          <button id="btnSaveProject" class="btn btn-save-project"
+            title="Save the complete workspace (project.json + coregistered NIfTIs + .mat transforms) into a folder of your choice">
+            <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor">
+              <path
+                d="M5 4a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V7.414A2 2 0 0016.414 6L14 3.586A2 2 0 0012.586 3H5zm2 2h5v3H7V6zm3 5a2 2 0 110 4 2 2 0 010-4z" />
+            </svg>
+            Save Project
+          </button>
+
+          <button id="btnOpenProject" class="btn btn-secondary"
+            title="Open a previously saved NeuroCoreg project folder">
+            <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor">
+              <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v1H8a3 3 0 00-3 3v1.5a1.5 1.5 0 01-3 0V6z" />
+              <path d="M6 12a2 2 0 012-2h8a2 2 0 012 2v2a2 2 0 01-2 2H2h2a2 2 0 002-2v-2z" />
+            </svg>
+            Open Project
+          </button>
+          <input id="openProjectFolderInput" type="file" webkitdirectory directory multiple hidden />
+        </div>
+
+        <span class="header-divider" aria-hidden="true"></span>
+
+        <button id="btnLoadSampleSubject" class="btn btn-primary"
+          title="Load single-subject multimodal dataset (T1w + Misaligned Post-Op CT + Child SEEG Mask + T2-FLAIR + DTI FA)">
+          Sample Subject
+        </button>
+
+        <label class="btn btn-secondary" for="niftiFileInput"
+          title="Load one or more NIfTI (.nii, .nii.gz) files from disk">
+          + NIfTI
+          <input id="niftiFileInput" type="file" multiple accept=".nii,.nii.gz,.hdr,.img,.nrrd,.mgz" hidden />
+        </label>
+
+        <label class="btn btn-secondary" for="dicomFolderInput"
+          title="Select a local DICOM folder to convert via dcm2niix (WASM / Native) and load into NiiVue">
+          + DICOM
+          <input id="dicomFolderInput" type="file" webkitdirectory directory multiple hidden />
+        </label>
+
+        <button id="btnLoadSampleDicom" class="btn btn-outline"
+          title="Convert &amp; load the generated 91-slice sample DICOM series (sample_data/dicom_t2_flair)">
+          Sample DICOM
+        </button>
+      </div>
+
+      <!-- View Mode Switcher & Coregistration Panel Toggle -->
+      <div class="right-header-controls">
+        <div class="view-toolbar" role="group" aria-label="Slice Orientation">
+          <button class="view-btn active" data-slicetype="multiplanar"
+            title="Multiplanar (Axial + Coronal + Sagittal + 3D)">MPR</button>
+          <button class="view-btn" data-slicetype="axial" title="Axial View">Axial</button>
+          <button class="view-btn" data-slicetype="coronal" title="Coronal View">Coronal</button>
+          <button class="view-btn" data-slicetype="sagittal" title="Sagittal View">Sagittal</button>
+          <button class="view-btn" data-slicetype="render" title="3D Volume Render">3D</button>
+          <button id="btnToggleCrosshair" class="view-btn active" title="Toggle Crosshairs">Crosshair</button>
+          <button id="btnToggleInterp" class="view-btn active"
+            title="Toggle Trilinear / Nearest Interpolation">Smooth</button>
+        </div>
+
+        <button id="btnToggleLayersPanel" class="btn btn-coreg-toggle active" aria-expanded="true"
+          aria-controls="layersPanel" title="Toggle Left Layer Stack &amp; Neuro Tools Panel ON / OFF (Shortcut: L)">
+          <span class="dot-indicator"></span>
+          Layers (<kbd>L</kbd>)
+        </button>
+
+        <button id="btnToggleCoregPanel" class="btn btn-coreg-toggle" aria-expanded="false" aria-controls="coregPanel"
+          title="Toggle Coregistration Studio Panel ON / OFF (Shortcut: C)">
+          <span class="dot-indicator"></span>
+          Coregistration Panel (<kbd>C</kbd>)
+        </button>
+
+        <button id="btnCloseApp" class="btn btn-close-app"
+          title="Save project (optional), shut down the NeuroCoreg server, and close this browser tab">
+          <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd"
+              d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z"
+              clip-rule="evenodd" />
+            <path fill-rule="evenodd"
+              d="M6 10a.75.75 0 01.75-.75h9.546l-1.048-.943a.75.75 0 111.004-1.114l2.5 2.25a.75.75 0 010 1.114l-2.5 2.25a.75.75 0 11-1.004-1.114l1.048-.943H6.75A.75.75 0 016 10z"
+              clip-rule="evenodd" />
+          </svg>
+          Close
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workstation Layout (Fluid columns that scale to browser window) -->
+    <main id="workstationGrid" class="workstation coreg-collapsed">
+      <!-- Left Sidebar: Multimodal Layer Stack + FSL BET Skull Strip + FastSurfer DKT Atlas -->
+      <aside id="layersPanel" class="panel panel-left" aria-label="Multimodal Image Layers">
+        <div class="panel-header">
+          <h2>Multimodal Image Stack</h2>
+          <div class="panel-header-actions">
+            <button id="btnShowAllLayers" class="btn-xs" title="Turn all loaded volumes ON">All On</button>
+            <button id="btnHideOverlays" class="btn-xs" title="Show only Reference volume">Ref Only</button>
+            <button id="btnCloseLayersPanel" class="icon-btn"
+              title="Hide Left Layer Stack Panel (Shortcut: L)">✕</button>
+          </div>
+        </div>
+
+        <div class="drop-hint">
+          Drop <strong>.nii / .nii.gz</strong> or a <strong>DICOM folder</strong>. Assign <strong>REF</strong>,
+          <strong>MOV</strong>, or <strong>CHILD</strong> (linked to Moving).
+        </div>
+
+        <div id="layerList" class="layer-list" role="list">
+          <!-- Dynamically populated volume cards -->
+        </div>
+
+        <!-- Standalone Module 1: T1w Skull Stripping (FSL BET) — Separately Minimizable (Minimized by Default) -->
+        <div id="betModuleSection" class="panel-section neuro-module-section is-minimized">
+          <div id="betModuleHeader" class="neuro-module-header" role="button" tabindex="0" aria-expanded="false"
+            aria-controls="betModuleBody" title="Click to expand or minimize Skull Stripping (FSL BET) module">
+            <div class="neuro-module-title-wrap">
+              <span class="neuro-module-chevron" aria-hidden="true">▸</span>
+              <h3>Skull Stripping (FSL BET)</h3>
+            </div>
+            <div class="neuro-module-header-actions">
+              <span id="betStatusBadge" class="tool-mini-badge ready">FSL BET Ready</span>
+              <button id="btnToggleBetModule" type="button" class="icon-btn module-min-btn"
+                aria-label="Toggle Skull Stripping (FSL BET) module"
+                title="Expand / Minimize Skull Stripping (FSL BET)">+</button>
+            </div>
+          </div>
+
+          <div id="betModuleBody" class="neuro-module-body" hidden>
+            <div class="form-row" style="margin-bottom:6px;">
+              <label for="selectBetT1Vol">Target T1w Structural MRI:</label>
+              <select id="selectBetT1Vol" class="select-full"></select>
+            </div>
+            <div class="neuro-bet-controls">
+              <label class="bet-frac-label" for="betFracInput"
+                title="FSL BET fractional intensity threshold (-f, default 0.50; smaller values give larger brain outline)">
+                <span>-f</span>
+                <input id="betFracInput" type="number" min="0.1" max="0.9" step="0.05" value="0.50"
+                  class="bet-frac-input" />
+              </label>
+              <button id="btnRunBet" class="btn btn-primary btn-sm" style="flex:1;"
+                title="Run FSL BET (/usr/local/fsl/bin/bet) on the selected T1w MRI and automatically add the skull-stripped brain under the Reference image">
+                Run FSL BET Skull Strip
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Standalone Module 2: FastSurfer & DKT Cortical/Subcortical Parcellation — Separately Minimizable (Minimized by Default) -->
+        <div id="dktModuleSection" class="panel-section neuro-module-section is-minimized">
+          <div id="dktModuleHeader" class="neuro-module-header" role="button" tabindex="0" aria-expanded="false"
+            aria-controls="dktModuleBody" title="Click to expand or minimize FastSurfer &amp; DKT Atlas module">
+            <div class="neuro-module-title-wrap">
+              <span class="neuro-module-chevron" aria-hidden="true">▸</span>
+              <h3>FastSurfer &amp; DKT Atlas</h3>
+            </div>
+            <div class="neuro-module-header-actions">
+              <span id="fastsurferStatusBadge" class="tool-mini-badge checking"
+                title="Local FastSurfer status">Checking...</span>
+              <button id="btnCheckFastSurfer" type="button" class="btn-xs"
+                title="Check local availability of FSL BET and FastSurfer segmentation">
+                Check
+              </button>
+              <button id="btnToggleDktModule" type="button" class="icon-btn module-min-btn"
+                aria-label="Toggle FastSurfer &amp; DKT Atlas module"
+                title="Expand / Minimize FastSurfer &amp; DKT Atlas">+</button>
+            </div>
+          </div>
+
+          <div id="dktModuleBody" class="neuro-module-body" hidden>
+            <div id="fastsurferDetailNote" class="neuro-tool-note">
+              Checks /Applications/FastSurfer* (macos_setup_fastsurfer.sh) and runs 104-region DKT parcellation for
+              interactive cursor hover.
+            </div>
+            <div class="form-row" style="margin-bottom:5px;">
+              <label for="selectDktT1Vol">Target T1w Structural MRI:</label>
+              <select id="selectDktT1Vol" class="select-full"></select>
+            </div>
+            <div class="form-row" style="margin-bottom:5px;">
+              <label for="selectDktMode">DKT Pipeline Mode:</label>
+              <select id="selectDktMode" class="select-full"
+                title="Choose between FastSurferVINN DKT-Only (--seg_only --no_cereb --no_hypothal --no_cc --no_biasfield), Full FastSurfer (--seg_only), or Quick Template DKT">
+                <option value="fastsurfer_vinn" selected>FastSurferVINN DKT-Only (Fast, Recommended)</option>
+                <option value="fastsurfer_full">Full FastSurfer (--seg_only + Cereb/HypVINN)</option>
+                <option value="template_flirt">Quick Template DKT (FSL FLIRT ~2s)</option>
+              </select>
+            </div>
+            <div class="neuro-bet-controls">
+              <button id="btnRunDktAtlas" class="btn btn-dkt-seg btn-sm" style="flex:1;"
+                title="Segment selected T1w MRI into the Desikan-Killiany-Tourville (DKT) anatomical atlas and enable interactive hover display">
+                Generate DKT Atlas
+              </button>
+              <label class="btn btn-secondary btn-sm" for="dktFileInput"
+                title="Load an existing FastSurfer / FreeSurfer aparc.DKTatlas+aseg (.mgz or .nii.gz) segmentation file">
+                Load DKT
+                <input id="dktFileInput" type="file" accept=".nii,.nii.gz,.mgz" hidden />
+              </label>
+            </div>
+            <!-- Segmentation Color Overlay Toggle + Inline Opacity Slider (keeps cursor hover active when OFF) -->
+            <div id="dktOverlayControlRow" class="dkt-overlay-toggle-row">
+              <label class="vis-switch-label" for="chkDktColorOverlay"
+                title="Toggle DKT segmentation color overlay ON / OFF on the brain slices (cursor hover region readout remains active even when color overlay is OFF)">
+                <input type="checkbox" role="switch" class="vis-switch" id="chkDktColorOverlay" checked disabled />
+                <span class="dkt-overlay-label">Color Overlay</span>
+              </label>
+              <div class="dkt-overlay-slider-wrap">
+                <input type="range" id="sliderDktOverlayOpacity" min="0" max="100" value="35" disabled
+                  title="Adjust DKT segmentation color overlay opacity" />
+                <span id="valDktOverlayOpacity" class="opacity-pct">35%</span>
+              </div>
+            </div>
+            <!-- Atlas Overlay Windowing Adjustment (cal_min / cal_max + Auto Reset) -->
+            <div id="dktOverlayWindowRow" class="layer-window-row dkt-overlay-window-row">
+              <label for="inputDktCalMin" class="dkt-window-label">Window:</label>
+              <input type="number" id="inputDktCalMin" class="window-input" step="any" value="0.5" disabled
+                title="Atlas Overlay Intensity / Label Min (cal_min)" />
+              <span>–</span>
+              <input type="number" id="inputDktCalMax" class="window-input" step="any" value="2035.0" disabled
+                title="Atlas Overlay Intensity / Label Max (cal_max)" />
+              <button type="button" id="btnDktAutoWindow" class="btn-xs" disabled
+                title="Reset DKT Atlas window to full brain label range (0.5 – 2035)">Auto</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Standalone Module 3: Crosshair, Voxel & DKT Hover Inspector — Separately Minimizable -->
+        <div id="inspectorModuleSection" class="panel-section neuro-module-section coord-inspector is-minimized">
+          <div id="inspectorModuleHeader" class="neuro-module-header" role="button" tabindex="0" aria-expanded="false"
+            aria-controls="inspectorModuleBody" title="Click to expand or minimize Crosshair &amp; DKT Hover Inspector">
+            <div class="neuro-module-title-wrap">
+              <span class="neuro-module-chevron" aria-hidden="true">▸</span>
+              <h3>Crosshair &amp; DKT Inspector</h3>
+            </div>
+            <div class="neuro-module-header-actions">
+              <span id="rasCoordsBadge" class="coord-badge">RAS: 0.0, 0.0, 0.0 mm</span>
+              <button id="btnToggleInspectorModule" type="button" class="icon-btn module-min-btn"
+                aria-label="Toggle Crosshair &amp; DKT Inspector module"
+                title="Expand / Minimize Crosshair &amp; DKT Inspector">+</button>
+            </div>
+          </div>
+          <div id="inspectorModuleBody" class="neuro-module-body" hidden>
+            <!-- DKT Anatomical Area Readout Box -->
+            <div id="dktInspectorBox" class="dkt-inspector-box">
+              <span id="dktColorSwatch" class="dkt-swatch" style="background:#475569;"></span>
+              <div class="dkt-inspector-text">
+                <div id="dktRegionTitle" class="dkt-region-title">DKT Atlas: Not Loaded</div>
+                <div id="dktRegionSub" class="dkt-region-sub">Click "Generate DKT Atlas" above, then hover cursor over
+                  brain</div>
+              </div>
+            </div>
+            <div id="voxelReadoutTable" class="voxel-table">
+              <div class="voxel-empty">Move crosshair on canvas to inspect multimodal intensities</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center Viewport: NiiVue Canvas + Verification HUD Bar -->
+      <section class="viewport-area" id="viewportDropZone">
+        <!-- Coregistration Verification Quick-Bar -->
+        <div id="verificationBar" class="verification-bar" hidden>
+          <div class="verif-group">
+            <span class="verif-label">Verify Alignment:</span>
+            <button id="btnBlinkToggle" class="btn-chip"
+              title="Alternate visibility between Reference and Moving images (Shortcut: Spacebar)">
+              <span class="dot-indicator" id="blinkIndicator"></span>
+              Blink Ref ↔ Mov (<kbd>Space</kbd>)
+            </button>
+            <select id="blinkSpeedSelect" class="select-compact" title="Auto-blink frequency">
+              <option value="0">Manual (Spacebar)</option>
+              <option value="800">Auto 1.2 Hz</option>
+              <option value="500" selected>Auto 2.0 Hz</option>
+              <option value="300">Auto 3.3 Hz</option>
+            </select>
+          </div>
+
+          <div class="verif-group">
+            <label for="crossfadeSlider" class="verif-label">Ref/Mov Blend:</label>
+            <input id="crossfadeSlider" type="range" min="0" max="100" value="65" class="slider-compact"
+              title="Cross-fade between Reference (0%) and Moving (100%) volume" />
+            <span id="crossfadeValue" class="verif-val">65%</span>
+          </div>
+
+          <div class="verif-group">
+            <button id="btnEdgeOverlay" class="btn-chip"
+              title="Generate a 3D Sobel anatomical edge map of the Moving volume to verify sulcal &amp; cranial boundaries">
+              3D Edge Contours
+            </button>
+            <button id="btnCheckerboard" class="btn-chip"
+              title="Generate a 3D RAS Checkerboard fusion volume interleaving Reference and Moving cubes">
+              3D Checkerboard
+            </button>
+            <select id="checkerSizeSelect" class="select-compact" title="3D Checkerboard tile size in voxels">
+              <option value="6">Fine (12mm)</option>
+              <option value="9" selected>Med (18mm)</option>
+              <option value="14">Coarse (28mm)</option>
+            </select>
+            <button id="btnAnaglyphMode" class="btn-chip"
+              title="Apply complementary Red/Green colormaps to Reference and Moving volumes">
+              Red/Green Fusion
+            </button>
+            <button id="btnPinHud" class="btn-chip"
+              title="Keep Verification &amp; Metrics HUD bars visible even when the Coregistration Panel is collapsed">
+              📌 Pin HUD
+            </button>
+          </div>
+        </div>
+
+        <!-- NiiVue WebGL2 / WebGPU Canvas Container -->
+        <div id="canvasWrapper" class="canvas-wrapper">
+          <canvas id="niivueCanvas"></canvas>
+          <div id="dktHudPill" class="dkt-hud-pill" hidden></div>
+          <div id="dktHoverTooltip" class="dkt-hover-tooltip" hidden></div>
+          <div id="statusToast" class="status-toast" hidden></div>
+        </div>
+
+        <!-- Quantitative Alignment Metrics Footer Bar -->
+        <div id="metricsBar" class="metrics-bar" hidden>
+          <div class="metric-item">
+            <span class="metric-label">Normalized Mutual Info (NMI):</span>
+            <span id="metricNMI" class="metric-value">—</span>
+            <span id="metricNMIDelta" class="metric-delta"></span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Cross-Correlation (|NCC|):</span>
+            <span id="metricNCC" class="metric-value">—</span>
+            <span id="metricNCCDelta" class="metric-delta"></span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">3D Edge Overlap:</span>
+            <span id="metricEdge" class="metric-value">—</span>
+            <span id="metricEdgeDelta" class="metric-delta"></span>
+          </div>
+          <div class="metric-actions">
+            <button id="btnCaptureBaseline" class="btn-xs"
+              title="Bookmark current alignment metrics as baseline for comparison">Set Baseline</button>
+            <button id="btnRecomputeMetrics" class="btn-xs" title="Recompute 3D overlap similarity metrics">Refresh
+              Metrics</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Sidebar: Toggleable Image Coregistration Workbench (Closed by Default) -->
+      <aside id="coregPanel" class="panel panel-right" aria-label="Image Coregistration Controls" hidden>
+        <div class="panel-header">
+          <h2>Coregistration Studio</h2>
+          <div class="panel-header-actions">
+            <button id="btnUndoClearTransform" class="btn-xs btn-danger-outline"
+              title="Undo registration and clear the transform on Moving and linked Child volumes back to original headers">
+              ↺ Undo / Clear Transform
+            </button>
+            <span class="status-pill" id="coregStatusPill">Ready</span>
+            <button id="btnCloseCoregPanel" class="icon-btn" title="Hide Coregistration Panel (Shortcut: C)">✕</button>
+          </div>
+        </div>
+
+        <div class="coreg-scroll">
+          <!-- 1. Reference & Moving Image Selection -->
+          <div class="panel-section">
+            <h3>1. Reference &amp; Moving Volumes</h3>
+            <div class="form-row">
+              <label for="selectRefVol">Reference (Fixed Target):</label>
+              <select id="selectRefVol" class="select-full"></select>
+            </div>
+            <div class="form-row">
+              <label for="selectMovVol">Moving (Floating Parent):</label>
+              <select id="selectMovVol" class="select-full"></select>
+            </div>
+          </div>
+
+          <!-- 2. Automated Registration Section -->
+          <div class="panel-section">
+            <h3>2. Automated Coregistration</h3>
+            <div class="form-row-inline">
+              <div class="form-col">
+                <label for="selectAutoMethod">Algorithm / Cost:</label>
+                <select id="selectAutoMethod" class="select-full">
+                  <option value="browser_nmi">In-Browser 3D NMI + Edge Powell</option>
+                  <option value="server_nmi">Fast Multi-Res 3D NMI (SciPy)</option>
+                  <option value="fsl_flirt_corratio">FSL FLIRT (Correlation Ratio)</option>
+                  <option value="fsl_flirt_mutualinfo">FSL FLIRT (Mutual Information)</option>
+                </select>
+              </div>
+              <div class="form-col-sm">
+                <label for="selectAutoDOF">DOF:</label>
+                <select id="selectAutoDOF" class="select-full">
+                  <option value="6" selected>6-DOF Rigid</option>
+                  <option value="9">9-DOF +Scale</option>
+                  <option value="12">12-DOF Affine</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="auto-btn-grid">
+              <button id="btnRunAutoCoreg" class="btn btn-accent">
+                <svg viewBox="0 0 20 20" width="15" height="15" fill="currentColor">
+                  <path fill-rule="evenodd"
+                    d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"
+                    clip-rule="evenodd" />
+                </svg>
+                Auto-Coregister Moving (+ Linked Children)
+              </button>
+              <div class="auto-sub-btns">
+                <button id="btnAlignCenters" class="btn btn-secondary btn-sm"
+                  title="Align 3D intensity centers of mass in RAS world coordinates">
+                  Align Centers of Mass
+                </button>
+                <button id="btnApplyKnownDemoMisalign" class="btn btn-secondary btn-sm"
+                  title="Introduce a synthetic rigid offset (+10mm X, -8mm Y, +5mm Z, +10° Yaw) to test coregistration">
+                  Simulate Misalignment
+                </button>
+                <button id="btnUndoAutoCoreg" class="btn btn-secondary btn-sm"
+                  title="Undo registration and clear the current transform back to the original image header">
+                  ↺ Undo Transform
+                </button>
+              </div>
+            </div>
+
+            <div id="coregProgressBox" class="progress-box" hidden>
+              <div class="progress-label-row">
+                <span id="coregProgressText">Optimizing 3D Mutual Information...</span>
+                <span id="coregProgressPct">0%</span>
+              </div>
+              <div class="progress-track">
+                <div id="coregProgressBar" class="progress-fill" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Interactive 6-DOF / 9-DOF Manual Affine Transform -->
+          <div class="panel-section">
+            <div class="section-title-row">
+              <h3>3. Manual Rigid / Affine Transform</h3>
+              <button id="btnResetTransform" class="btn-xs btn-danger-outline"
+                title="Reset Moving volume &amp; linked children to their original file headers">
+                Reset Header
+              </button>
+            </div>
+
+            <div class="transform-group">
+              <div class="transform-group-title">Translation (World RAS mm)</div>
+
+              <div class="param-control" data-param="tx">
+                <div class="param-header">
+                  <span>Tx (Left ↔ Right)</span>
+                  <span class="param-readout"><span id="val_tx">0.0</span> mm</span>
+                </div>
+                <div class="param-slider-row">
+                  <button class="nudge-btn" data-param="tx" data-step="-1">-1</button>
+                  <button class="nudge-btn" data-param="tx" data-step="-0.2">-.2</button>
+                  <input type="range" id="slider_tx" min="-40" max="40" step="0.1" value="0" />
+                  <button class="nudge-btn" data-param="tx" data-step="0.2">+.2</button>
+                  <button class="nudge-btn" data-param="tx" data-step="1">+1</button>
+                </div>
+              </div>
+
+              <div class="param-control" data-param="ty">
+                <div class="param-header">
+                  <span>Ty (Post ↔ Ant)</span>
+                  <span class="param-readout"><span id="val_ty">0.0</span> mm</span>
+                </div>
+                <div class="param-slider-row">
+                  <button class="nudge-btn" data-param="ty" data-step="-1">-1</button>
+                  <button class="nudge-btn" data-param="ty" data-step="-0.2">-.2</button>
+                  <input type="range" id="slider_ty" min="-40" max="40" step="0.1" value="0" />
+                  <button class="nudge-btn" data-param="ty" data-step="0.2">+.2</button>
+                  <button class="nudge-btn" data-param="ty" data-step="1">+1</button>
+                </div>
+              </div>
+
+              <div class="param-control" data-param="tz">
+                <div class="param-header">
+                  <span>Tz (Inf ↔ Sup)</span>
+                  <span class="param-readout"><span id="val_tz">0.0</span> mm</span>
+                </div>
+                <div class="param-slider-row">
+                  <button class="nudge-btn" data-param="tz" data-step="-1">-1</button>
+                  <button class="nudge-btn" data-param="tz" data-step="-0.2">-.2</button>
+                  <input type="range" id="slider_tz" min="-40" max="40" step="0.1" value="0" />
+                  <button class="nudge-btn" data-param="tz" data-step="0.2">+.2</button>
+                  <button class="nudge-btn" data-param="tz" data-step="1">+1</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="transform-group">
+              <div class="transform-group-title">Rotation (Degrees around Center)</div>
+
+              <div class="param-control" data-param="rx">
+                <div class="param-header">
+                  <span>Rx (Pitch)</span>
+                  <span class="param-readout"><span id="val_rx">0.0</span>°</span>
+                </div>
+                <div class="param-slider-row">
+                  <button class="nudge-btn" data-param="rx" data-step="-1">-1°</button>
+                  <button class="nudge-btn" data-param="rx" data-step="-0.2">-.2°</button>
+                  <input type="range" id="slider_rx" min="-35" max="35" step="0.1" value="0" />
+                  <button class="nudge-btn" data-param="rx" data-step="0.2">+.2°</button>
+                  <button class="nudge-btn" data-param="rx" data-step="1">+1°</button>
+                </div>
+              </div>
+
+              <div class="param-control" data-param="ry">
+                <div class="param-header">
+                  <span>Ry (Roll)</span>
+                  <span class="param-readout"><span id="val_ry">0.0</span>°</span>
+                </div>
+                <div class="param-slider-row">
+                  <button class="nudge-btn" data-param="ry" data-step="-1">-1°</button>
+                  <button class="nudge-btn" data-param="ry" data-step="-0.2">-.2°</button>
+                  <input type="range" id="slider_ry" min="-35" max="35" step="0.1" value="0" />
+                  <button class="nudge-btn" data-param="ry" data-step="0.2">+.2°</button>
+                  <button class="nudge-btn" data-param="ry" data-step="1">+1°</button>
+                </div>
+              </div>
+
+              <div class="param-control" data-param="rz">
+                <div class="param-header">
+                  <span>Rz (Yaw)</span>
+                  <span class="param-readout"><span id="val_rz">0.0</span>°</span>
+                </div>
+                <div class="param-slider-row">
+                  <button class="nudge-btn" data-param="rz" data-step="-1">-1°</button>
+                  <button class="nudge-btn" data-param="rz" data-step="-0.2">-.2°</button>
+                  <input type="range" id="slider_rz" min="-35" max="35" step="0.1" value="0" />
+                  <button class="nudge-btn" data-param="rz" data-step="0.2">+.2°</button>
+                  <button class="nudge-btn" data-param="rz" data-step="1">+1°</button>
+                </div>
+              </div>
+            </div>
+
+            <details class="scale-details">
+              <summary>Scale Factors (Sx, Sy, Sz)</summary>
+              <div class="transform-group">
+                <div class="param-control" data-param="sx">
+                  <div class="param-header"><span>Sx</span><span class="param-readout" id="val_sx">1.00</span></div>
+                  <input type="range" id="slider_sx" min="0.8" max="1.2" step="0.005" value="1" />
+                </div>
+                <div class="param-control" data-param="sy">
+                  <div class="param-header"><span>Sy</span><span class="param-readout" id="val_sy">1.00</span></div>
+                  <input type="range" id="slider_sy" min="0.8" max="1.2" step="0.005" value="1" />
+                </div>
+                <div class="param-control" data-param="sz">
+                  <div class="param-header"><span>Sz</span><span class="param-readout" id="val_sz">1.00</span></div>
+                  <input type="range" id="slider_sz" min="0.8" max="1.2" step="0.005" value="1" />
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <!-- 4. Child Images & Applying Existing Transformations -->
+          <div class="panel-section">
+            <div class="section-title-row">
+              <h3>4. Child Images &amp; Transform Propagation</h3>
+              <button id="btnSaveTransformSnapshot" class="btn-xs"
+                title="Save current Moving volume transform to the session library">
+                + Save Transform
+              </button>
+            </div>
+            <div class="helper-note">
+              <strong>Live Link (CHILD)</strong> moves child layers in real time with Moving. Or check target layers
+              below to apply a saved/imported transform on demand:
+            </div>
+
+            <div id="childVolumesList" class="child-list">
+              <!-- Populated dynamically with non-REF, non-MOV volumes -->
+            </div>
+
+            <div class="child-actions-grid">
+              <button id="btnApplyMovTransformToChildren" class="btn btn-secondary btn-sm btn-full"
+                title="Apply the Moving volume's current 4x4 World RAS transformation matrix to all checked child volumes">
+                Apply Moving Transform to Checked Children
+              </button>
+              <button id="btnResetCheckedChildren" class="btn btn-secondary btn-sm btn-full"
+                title="Reset checked child volumes to their original header orientation">
+                Reset Checked Children to Original Header
+              </button>
+            </div>
+
+            <!-- Saved Session Transform Snapshots + External .mat Import -->
+            <div class="saved-transforms-box">
+              <div class="form-row-inline" style="margin-bottom:6px;">
+                <div class="form-col">
+                  <label for="selectSavedTransform">Saved / Imported Transforms:</label>
+                  <select id="selectSavedTransform" class="select-full">
+                    <option value="__current_mov__">Current Moving Volume Transform</option>
+                  </select>
+                </div>
+                <div class="form-col-sm">
+                  <label for="selectApplyTarget">Apply To:</label>
+                  <select id="selectApplyTarget" class="select-full">
+                    <option value="mov_and_children" selected>Mov + Children</option>
+                    <option value="children_only">Children Only</option>
+                    <option value="mov_only">Moving Only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="auto-sub-btns">
+                <button id="btnApplySelectedSavedTransform" class="btn btn-outline btn-sm"
+                  title="Apply the selected transform from the list to the target volumes">
+                  Apply Selected Transform
+                </button>
+                <label class="btn btn-secondary btn-sm" for="matFileInput"
+                  title="Import an external 4x4 .mat or .txt transformation matrix file (World RAS or FSL FLIRT .mat)">
+                  Import .mat File
+                  <input id="matFileInput" type="file" accept=".mat,.txt,.aff,.tfm" hidden />
+                </label>
+              </div>
+
+              <div class="form-row" style="margin-top:6px;">
+                <label for="selectImportedMatConvention">Imported .mat Matrix Convention:</label>
+                <select id="selectImportedMatConvention" class="select-full">
+                  <option value="world_ras" selected>World RAS 4×4 Matrix (A_new = W_ras × A_orig)</option>
+                  <option value="fsl_flirt">FSL FLIRT .mat (Scaled-Voxel Matrix via Ref &amp; Mov Headers)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Moving 4x4 Affine Matrix & NIfTI / Matrix Export -->
+          <div class="panel-section">
+            <div class="section-title-row">
+              <h3>5. Export Coregistered NIfTI &amp; Matrices</h3>
+              <div style="display:flex;gap:4px;">
+                <button id="btnCopyMatrix" class="btn-xs" title="Copy 4x4 World RAS matrix">Copy RAS</button>
+                <button id="btnDownloadWorldMat" class="btn-xs" title="Download 4x4 World RAS transform (.mat)">RAS
+                  .mat</button>
+                <button id="btnDownloadFlirtMat" class="btn-xs"
+                  title="Download 4x4 FSL FLIRT scaled-voxel transform (.mat)">FLIRT .mat</button>
+              </div>
+            </div>
+
+            <div class="matrix-caption">Moving Volume Current 4×4 NIfTI sform (RAS):</div>
+            <div id="affineMatrixGrid" class="matrix-grid">
+              <!-- 16 cells -->
+            </div>
+
+            <div class="export-config-box">
+              <div class="form-row">
+                <label for="selectExportMode">NIfTI Spatial Export Mode:</label>
+                <select id="selectExportMode" class="select-full">
+                  <option value="header_only" selected>Header-Only Update (Lossless sform/qform)</option>
+                  <option value="resample_to_ref">Resample onto Reference Grid (Match Ref FOV &amp; Voxels)</option>
+                </select>
+              </div>
+
+              <div class="form-row-inline">
+                <div class="form-col">
+                  <label for="selectExportInterp">Resample Interpolation:</label>
+                  <select id="selectExportInterp" class="select-full">
+                    <option value="auto" selected>Auto (Trilinear Images / Nearest Masks)</option>
+                    <option value="trilinear">Trilinear (Continuous Intensities)</option>
+                    <option value="nearest">Nearest-Neighbor (Labels / ROI Masks)</option>
+                  </select>
+                </div>
+                <div class="form-col-sm">
+                  <label for="selectExportFormat">Format:</label>
+                  <select id="selectExportFormat" class="select-full">
+                    <option value="nii_gz" selected>.nii.gz</option>
+                    <option value="nii">.nii</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="export-targets-label">Volumes to Export:</div>
+              <div id="exportVolumesChecklist" class="export-checklist">
+                <!-- Dynamically populated checkboxes for Moving + Child volumes -->
+              </div>
+
+              <div class="export-actions">
+                <button id="btnExportSelectedNifti" class="btn btn-primary btn-full"
+                  title="Export all checked volumes (Moving and/or Child images) as coregistered NIfTI files">
+                  <svg viewBox="0 0 20 20" width="15" height="15" fill="currentColor">
+                    <path fill-rule="evenodd"
+                      d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                      clip-rule="evenodd" />
+                  </svg>
+                  Export Checked Volumes as NIfTI
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- 3-Choice Close Application & Server Shutdown Confirmation Modal -->
+    <div id="closeAppModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="closeAppModalTitle"
+      hidden>
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-icon-circle" aria-hidden="true">
+            <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor">
+              <path fill-rule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+                clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div>
+            <h3 id="closeAppModalTitle" class="modal-title">Close NeuroCoreg Studio?</h3>
+            <p class="modal-subtitle">Would you like to save the current project before shutting down the server and
+              closing this browser tab?</p>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btnModalSaveAndClose" class="btn btn-save-project"
+            title="Save current project to a folder of your choice, then shut down server and close tab">
+            Save Project &amp; Close
+          </button>
+          <button id="btnModalCloseWithoutSaving" class="btn btn-danger-solid"
+            title="Shut down server and close browser tab immediately without saving">
+            Close Without Saving
+          </button>
+          <button id="btnModalCancelClose" class="btn btn-secondary" title="Stay in NeuroCoreg Studio">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./app.js?v=15"></script>
+</body>
+
+</html>

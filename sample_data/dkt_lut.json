@@ -1,0 +1,8126 @@
+{
+  "0": {
+    "id": 0,
+    "name": "Unknown",
+    "title": "Unknown",
+    "rgb": [
+      0,
+      0,
+      0
+    ],
+    "a": 0,
+    "hex": "#000000"
+  },
+  "1": {
+    "id": 1,
+    "name": "Left-Cerebral-Exterior",
+    "title": "Left Cerebral Exterior",
+    "rgb": [
+      70,
+      130,
+      180
+    ],
+    "a": 255,
+    "hex": "#4682b4"
+  },
+  "2": {
+    "id": 2,
+    "name": "Left-Cerebral-White-Matter",
+    "title": "Left Cerebral White Matter",
+    "rgb": [
+      245,
+      245,
+      245
+    ],
+    "a": 255,
+    "hex": "#f5f5f5"
+  },
+  "3": {
+    "id": 3,
+    "name": "Left-Cerebral-Cortex",
+    "title": "Left Cerebral Cortex",
+    "rgb": [
+      205,
+      62,
+      78
+    ],
+    "a": 255,
+    "hex": "#cd3e4e"
+  },
+  "4": {
+    "id": 4,
+    "name": "Left-Lateral-Ventricle",
+    "title": "Left Lateral Ventricle",
+    "rgb": [
+      120,
+      18,
+      134
+    ],
+    "a": 255,
+    "hex": "#781286"
+  },
+  "5": {
+    "id": 5,
+    "name": "Left-Inf-Lat-Vent",
+    "title": "Left Inf Lat Vent",
+    "rgb": [
+      196,
+      58,
+      250
+    ],
+    "a": 255,
+    "hex": "#c43afa"
+  },
+  "6": {
+    "id": 6,
+    "name": "Left-Cerebellum-Exterior",
+    "title": "Left Cerebellum Exterior",
+    "rgb": [
+      0,
+      148,
+      0
+    ],
+    "a": 255,
+    "hex": "#009400"
+  },
+  "7": {
+    "id": 7,
+    "name": "Left-Cerebellum-White-Matter",
+    "title": "Left Cerebellum White Matter",
+    "rgb": [
+      220,
+      248,
+      164
+    ],
+    "a": 255,
+    "hex": "#dcf8a4"
+  },
+  "8": {
+    "id": 8,
+    "name": "Left-Cerebellum-Cortex",
+    "title": "Left Cerebellum Cortex",
+    "rgb": [
+      230,
+      148,
+      34
+    ],
+    "a": 255,
+    "hex": "#e69422"
+  },
+  "9": {
+    "id": 9,
+    "name": "Left-Thalamus-unused",
+    "title": "Left Thalamus Unused",
+    "rgb": [
+      0,
+      118,
+      14
+    ],
+    "a": 255,
+    "hex": "#00760e"
+  },
+  "10": {
+    "id": 10,
+    "name": "Left-Thalamus",
+    "title": "Left Thalamus",
+    "rgb": [
+      0,
+      118,
+      14
+    ],
+    "a": 255,
+    "hex": "#00760e"
+  },
+  "11": {
+    "id": 11,
+    "name": "Left-Caudate",
+    "title": "Left Caudate",
+    "rgb": [
+      122,
+      186,
+      220
+    ],
+    "a": 255,
+    "hex": "#7abadc"
+  },
+  "12": {
+    "id": 12,
+    "name": "Left-Putamen",
+    "title": "Left Putamen",
+    "rgb": [
+      236,
+      13,
+      176
+    ],
+    "a": 255,
+    "hex": "#ec0db0"
+  },
+  "13": {
+    "id": 13,
+    "name": "Left-Pallidum",
+    "title": "Left Pallidum",
+    "rgb": [
+      12,
+      48,
+      255
+    ],
+    "a": 255,
+    "hex": "#0c30ff"
+  },
+  "14": {
+    "id": 14,
+    "name": "3rd-Ventricle",
+    "title": "3rd Ventricle",
+    "rgb": [
+      204,
+      182,
+      142
+    ],
+    "a": 255,
+    "hex": "#ccb68e"
+  },
+  "15": {
+    "id": 15,
+    "name": "4th-Ventricle",
+    "title": "4th Ventricle",
+    "rgb": [
+      42,
+      204,
+      164
+    ],
+    "a": 255,
+    "hex": "#2acca4"
+  },
+  "16": {
+    "id": 16,
+    "name": "Brain-Stem",
+    "title": "Brain Stem",
+    "rgb": [
+      119,
+      159,
+      176
+    ],
+    "a": 255,
+    "hex": "#779fb0"
+  },
+  "17": {
+    "id": 17,
+    "name": "Left-Hippocampus",
+    "title": "Left Hippocampus",
+    "rgb": [
+      220,
+      216,
+      20
+    ],
+    "a": 255,
+    "hex": "#dcd814"
+  },
+  "18": {
+    "id": 18,
+    "name": "Left-Amygdala",
+    "title": "Left Amygdala",
+    "rgb": [
+      103,
+      255,
+      255
+    ],
+    "a": 255,
+    "hex": "#67ffff"
+  },
+  "19": {
+    "id": 19,
+    "name": "Left-Insula",
+    "title": "Left Insula",
+    "rgb": [
+      80,
+      196,
+      98
+    ],
+    "a": 255,
+    "hex": "#50c462"
+  },
+  "20": {
+    "id": 20,
+    "name": "Left-Operculum",
+    "title": "Left Operculum",
+    "rgb": [
+      60,
+      58,
+      210
+    ],
+    "a": 255,
+    "hex": "#3c3ad2"
+  },
+  "21": {
+    "id": 21,
+    "name": "Line-1",
+    "title": "Line 1",
+    "rgb": [
+      60,
+      58,
+      210
+    ],
+    "a": 255,
+    "hex": "#3c3ad2"
+  },
+  "22": {
+    "id": 22,
+    "name": "Line-2",
+    "title": "Line 2",
+    "rgb": [
+      60,
+      58,
+      210
+    ],
+    "a": 255,
+    "hex": "#3c3ad2"
+  },
+  "23": {
+    "id": 23,
+    "name": "Line-3",
+    "title": "Line 3",
+    "rgb": [
+      60,
+      58,
+      210
+    ],
+    "a": 255,
+    "hex": "#3c3ad2"
+  },
+  "24": {
+    "id": 24,
+    "name": "CSF",
+    "title": "CSF",
+    "rgb": [
+      60,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#3c3c3c"
+  },
+  "25": {
+    "id": 25,
+    "name": "Left-Lesion",
+    "title": "Left Lesion",
+    "rgb": [
+      255,
+      165,
+      0
+    ],
+    "a": 255,
+    "hex": "#ffa500"
+  },
+  "26": {
+    "id": 26,
+    "name": "Left-Accumbens-area",
+    "title": "Left Accumbens Area",
+    "rgb": [
+      255,
+      165,
+      0
+    ],
+    "a": 255,
+    "hex": "#ffa500"
+  },
+  "27": {
+    "id": 27,
+    "name": "Left-Substancia-Nigra",
+    "title": "Left Substancia Nigra",
+    "rgb": [
+      0,
+      255,
+      127
+    ],
+    "a": 255,
+    "hex": "#00ff7f"
+  },
+  "28": {
+    "id": 28,
+    "name": "Left-VentralDC",
+    "title": "Left VentralDC",
+    "rgb": [
+      145,
+      42,
+      42
+    ],
+    "a": 255,
+    "hex": "#912a2a"
+  },
+  "29": {
+    "id": 29,
+    "name": "Left-undetermined",
+    "title": "Left Undetermined",
+    "rgb": [
+      135,
+      206,
+      235
+    ],
+    "a": 255,
+    "hex": "#87ceeb"
+  },
+  "30": {
+    "id": 30,
+    "name": "Left-vessel",
+    "title": "Left Vessel",
+    "rgb": [
+      160,
+      32,
+      240
+    ],
+    "a": 255,
+    "hex": "#a020f0"
+  },
+  "31": {
+    "id": 31,
+    "name": "Left-choroid-plexus",
+    "title": "Left Choroid Plexus",
+    "rgb": [
+      0,
+      200,
+      200
+    ],
+    "a": 255,
+    "hex": "#00c8c8"
+  },
+  "32": {
+    "id": 32,
+    "name": "Left-F3orb",
+    "title": "Left F3orb",
+    "rgb": [
+      100,
+      50,
+      100
+    ],
+    "a": 255,
+    "hex": "#643264"
+  },
+  "33": {
+    "id": 33,
+    "name": "Left-aOg",
+    "title": "Left aOg",
+    "rgb": [
+      122,
+      135,
+      50
+    ],
+    "a": 255,
+    "hex": "#7a8732"
+  },
+  "34": {
+    "id": 34,
+    "name": "Left-WMCrowns",
+    "title": "Left WMCrowns",
+    "rgb": [
+      225,
+      225,
+      255
+    ],
+    "a": 255,
+    "hex": "#e1e1ff"
+  },
+  "35": {
+    "id": 35,
+    "name": "Left-mOg",
+    "title": "Left mOg",
+    "rgb": [
+      51,
+      50,
+      135
+    ],
+    "a": 255,
+    "hex": "#333287"
+  },
+  "36": {
+    "id": 36,
+    "name": "Left-pOg",
+    "title": "Left pOg",
+    "rgb": [
+      74,
+      155,
+      60
+    ],
+    "a": 255,
+    "hex": "#4a9b3c"
+  },
+  "37": {
+    "id": 37,
+    "name": "Left-Stellate",
+    "title": "Left Stellate",
+    "rgb": [
+      120,
+      62,
+      43
+    ],
+    "a": 255,
+    "hex": "#783e2b"
+  },
+  "38": {
+    "id": 38,
+    "name": "Left-Porg",
+    "title": "Left Porg",
+    "rgb": [
+      74,
+      155,
+      60
+    ],
+    "a": 255,
+    "hex": "#4a9b3c"
+  },
+  "39": {
+    "id": 39,
+    "name": "Left-Aorg",
+    "title": "Left Aorg",
+    "rgb": [
+      122,
+      135,
+      50
+    ],
+    "a": 255,
+    "hex": "#7a8732"
+  },
+  "40": {
+    "id": 40,
+    "name": "Right-Cerebral-Exterior",
+    "title": "Right Cerebral Exterior",
+    "rgb": [
+      70,
+      130,
+      180
+    ],
+    "a": 255,
+    "hex": "#4682b4"
+  },
+  "41": {
+    "id": 41,
+    "name": "Right-Cerebral-White-Matter",
+    "title": "Right Cerebral White Matter",
+    "rgb": [
+      245,
+      245,
+      245
+    ],
+    "a": 255,
+    "hex": "#f5f5f5"
+  },
+  "42": {
+    "id": 42,
+    "name": "Right-Cerebral-Cortex",
+    "title": "Right Cerebral Cortex",
+    "rgb": [
+      205,
+      62,
+      78
+    ],
+    "a": 255,
+    "hex": "#cd3e4e"
+  },
+  "43": {
+    "id": 43,
+    "name": "Right-Lateral-Ventricle",
+    "title": "Right Lateral Ventricle",
+    "rgb": [
+      120,
+      18,
+      134
+    ],
+    "a": 255,
+    "hex": "#781286"
+  },
+  "44": {
+    "id": 44,
+    "name": "Right-Inf-Lat-Vent",
+    "title": "Right Inf Lat Vent",
+    "rgb": [
+      196,
+      58,
+      250
+    ],
+    "a": 255,
+    "hex": "#c43afa"
+  },
+  "45": {
+    "id": 45,
+    "name": "Right-Cerebellum-Exterior",
+    "title": "Right Cerebellum Exterior",
+    "rgb": [
+      0,
+      148,
+      0
+    ],
+    "a": 255,
+    "hex": "#009400"
+  },
+  "46": {
+    "id": 46,
+    "name": "Right-Cerebellum-White-Matter",
+    "title": "Right Cerebellum White Matter",
+    "rgb": [
+      220,
+      248,
+      164
+    ],
+    "a": 255,
+    "hex": "#dcf8a4"
+  },
+  "47": {
+    "id": 47,
+    "name": "Right-Cerebellum-Cortex",
+    "title": "Right Cerebellum Cortex",
+    "rgb": [
+      230,
+      148,
+      34
+    ],
+    "a": 255,
+    "hex": "#e69422"
+  },
+  "48": {
+    "id": 48,
+    "name": "Right-Thalamus-unused",
+    "title": "Right Thalamus Unused",
+    "rgb": [
+      0,
+      118,
+      14
+    ],
+    "a": 255,
+    "hex": "#00760e"
+  },
+  "49": {
+    "id": 49,
+    "name": "Right-Thalamus",
+    "title": "Right Thalamus",
+    "rgb": [
+      0,
+      118,
+      14
+    ],
+    "a": 255,
+    "hex": "#00760e"
+  },
+  "50": {
+    "id": 50,
+    "name": "Right-Caudate",
+    "title": "Right Caudate",
+    "rgb": [
+      122,
+      186,
+      220
+    ],
+    "a": 255,
+    "hex": "#7abadc"
+  },
+  "51": {
+    "id": 51,
+    "name": "Right-Putamen",
+    "title": "Right Putamen",
+    "rgb": [
+      236,
+      13,
+      176
+    ],
+    "a": 255,
+    "hex": "#ec0db0"
+  },
+  "52": {
+    "id": 52,
+    "name": "Right-Pallidum",
+    "title": "Right Pallidum",
+    "rgb": [
+      13,
+      48,
+      255
+    ],
+    "a": 255,
+    "hex": "#0d30ff"
+  },
+  "53": {
+    "id": 53,
+    "name": "Right-Hippocampus",
+    "title": "Right Hippocampus",
+    "rgb": [
+      220,
+      216,
+      20
+    ],
+    "a": 255,
+    "hex": "#dcd814"
+  },
+  "54": {
+    "id": 54,
+    "name": "Right-Amygdala",
+    "title": "Right Amygdala",
+    "rgb": [
+      103,
+      255,
+      255
+    ],
+    "a": 255,
+    "hex": "#67ffff"
+  },
+  "55": {
+    "id": 55,
+    "name": "Right-Insula",
+    "title": "Right Insula",
+    "rgb": [
+      80,
+      196,
+      98
+    ],
+    "a": 255,
+    "hex": "#50c462"
+  },
+  "56": {
+    "id": 56,
+    "name": "Right-Operculum",
+    "title": "Right Operculum",
+    "rgb": [
+      60,
+      58,
+      210
+    ],
+    "a": 255,
+    "hex": "#3c3ad2"
+  },
+  "57": {
+    "id": 57,
+    "name": "Right-Lesion",
+    "title": "Right Lesion",
+    "rgb": [
+      255,
+      165,
+      0
+    ],
+    "a": 255,
+    "hex": "#ffa500"
+  },
+  "58": {
+    "id": 58,
+    "name": "Right-Accumbens-area",
+    "title": "Right Accumbens Area",
+    "rgb": [
+      255,
+      165,
+      0
+    ],
+    "a": 255,
+    "hex": "#ffa500"
+  },
+  "59": {
+    "id": 59,
+    "name": "Right-Substancia-Nigra",
+    "title": "Right Substancia Nigra",
+    "rgb": [
+      0,
+      255,
+      127
+    ],
+    "a": 255,
+    "hex": "#00ff7f"
+  },
+  "60": {
+    "id": 60,
+    "name": "Right-VentralDC",
+    "title": "Right VentralDC",
+    "rgb": [
+      165,
+      42,
+      42
+    ],
+    "a": 255,
+    "hex": "#a52a2a"
+  },
+  "61": {
+    "id": 61,
+    "name": "Right-undetermined",
+    "title": "Right Undetermined",
+    "rgb": [
+      135,
+      206,
+      235
+    ],
+    "a": 255,
+    "hex": "#87ceeb"
+  },
+  "62": {
+    "id": 62,
+    "name": "Right-vessel",
+    "title": "Right Vessel",
+    "rgb": [
+      160,
+      32,
+      240
+    ],
+    "a": 255,
+    "hex": "#a020f0"
+  },
+  "63": {
+    "id": 63,
+    "name": "Right-choroid-plexus",
+    "title": "Right Choroid Plexus",
+    "rgb": [
+      0,
+      200,
+      221
+    ],
+    "a": 255,
+    "hex": "#00c8dd"
+  },
+  "64": {
+    "id": 64,
+    "name": "Right-F3orb",
+    "title": "Right F3orb",
+    "rgb": [
+      100,
+      50,
+      100
+    ],
+    "a": 255,
+    "hex": "#643264"
+  },
+  "65": {
+    "id": 65,
+    "name": "Right-lOg",
+    "title": "Right lOg",
+    "rgb": [
+      135,
+      50,
+      74
+    ],
+    "a": 255,
+    "hex": "#87324a"
+  },
+  "66": {
+    "id": 66,
+    "name": "Right-WMCrowns",
+    "title": "Right WMCrowns",
+    "rgb": [
+      215,
+      215,
+      255
+    ],
+    "a": 255,
+    "hex": "#d7d7ff"
+  },
+  "67": {
+    "id": 67,
+    "name": "Right-mOg",
+    "title": "Right mOg",
+    "rgb": [
+      51,
+      50,
+      135
+    ],
+    "a": 255,
+    "hex": "#333287"
+  },
+  "68": {
+    "id": 68,
+    "name": "Right-pOg",
+    "title": "Right pOg",
+    "rgb": [
+      74,
+      155,
+      60
+    ],
+    "a": 255,
+    "hex": "#4a9b3c"
+  },
+  "69": {
+    "id": 69,
+    "name": "Right-Stellate",
+    "title": "Right Stellate",
+    "rgb": [
+      120,
+      62,
+      43
+    ],
+    "a": 255,
+    "hex": "#783e2b"
+  },
+  "70": {
+    "id": 70,
+    "name": "Right-Porg",
+    "title": "Right Porg",
+    "rgb": [
+      74,
+      155,
+      60
+    ],
+    "a": 255,
+    "hex": "#4a9b3c"
+  },
+  "71": {
+    "id": 71,
+    "name": "Right-Aorg",
+    "title": "Right Aorg",
+    "rgb": [
+      122,
+      135,
+      50
+    ],
+    "a": 255,
+    "hex": "#7a8732"
+  },
+  "72": {
+    "id": 72,
+    "name": "5th-Ventricle",
+    "title": "5th Ventricle",
+    "rgb": [
+      120,
+      190,
+      150
+    ],
+    "a": 255,
+    "hex": "#78be96"
+  },
+  "73": {
+    "id": 73,
+    "name": "Left-Interior",
+    "title": "Left Interior",
+    "rgb": [
+      122,
+      135,
+      50
+    ],
+    "a": 255,
+    "hex": "#7a8732"
+  },
+  "74": {
+    "id": 74,
+    "name": "Right-Interior",
+    "title": "Right Interior",
+    "rgb": [
+      122,
+      135,
+      50
+    ],
+    "a": 255,
+    "hex": "#7a8732"
+  },
+  "75": {
+    "id": 75,
+    "name": "Left-Locus-Coeruleus",
+    "title": "Left Locus Coeruleus",
+    "rgb": [
+      91,
+      97,
+      255
+    ],
+    "a": 255,
+    "hex": "#5b61ff"
+  },
+  "76": {
+    "id": 76,
+    "name": "Right-Locus-Coeruleus",
+    "title": "Right Locus Coeruleus",
+    "rgb": [
+      0,
+      7,
+      218
+    ],
+    "a": 255,
+    "hex": "#0007da"
+  },
+  "77": {
+    "id": 77,
+    "name": "WM-hypointensities",
+    "title": "WM Hypointensities",
+    "rgb": [
+      200,
+      70,
+      255
+    ],
+    "a": 255,
+    "hex": "#c846ff"
+  },
+  "78": {
+    "id": 78,
+    "name": "Left-WM-hypointensities",
+    "title": "Left WM Hypointensities",
+    "rgb": [
+      255,
+      148,
+      10
+    ],
+    "a": 255,
+    "hex": "#ff940a"
+  },
+  "79": {
+    "id": 79,
+    "name": "Right-WM-hypointensities",
+    "title": "Right WM Hypointensities",
+    "rgb": [
+      255,
+      148,
+      10
+    ],
+    "a": 255,
+    "hex": "#ff940a"
+  },
+  "80": {
+    "id": 80,
+    "name": "non-WM-hypointensities",
+    "title": "Non WM Hypointensities",
+    "rgb": [
+      164,
+      108,
+      226
+    ],
+    "a": 255,
+    "hex": "#a46ce2"
+  },
+  "81": {
+    "id": 81,
+    "name": "Left-non-WM-hypointensities",
+    "title": "Left Non WM Hypointensities",
+    "rgb": [
+      164,
+      108,
+      226
+    ],
+    "a": 255,
+    "hex": "#a46ce2"
+  },
+  "82": {
+    "id": 82,
+    "name": "Right-non-WM-hypointensities",
+    "title": "Right Non WM Hypointensities",
+    "rgb": [
+      164,
+      108,
+      226
+    ],
+    "a": 255,
+    "hex": "#a46ce2"
+  },
+  "83": {
+    "id": 83,
+    "name": "Left-F1",
+    "title": "Left F1",
+    "rgb": [
+      255,
+      218,
+      185
+    ],
+    "a": 255,
+    "hex": "#ffdab9"
+  },
+  "84": {
+    "id": 84,
+    "name": "Right-F1",
+    "title": "Right F1",
+    "rgb": [
+      255,
+      218,
+      185
+    ],
+    "a": 255,
+    "hex": "#ffdab9"
+  },
+  "85": {
+    "id": 85,
+    "name": "Optic-Chiasm",
+    "title": "Optic Chiasm",
+    "rgb": [
+      234,
+      169,
+      30
+    ],
+    "a": 255,
+    "hex": "#eaa91e"
+  },
+  "192": {
+    "id": 192,
+    "name": "Corpus_Callosum",
+    "title": "Corpus Callosum",
+    "rgb": [
+      170,
+      255,
+      255
+    ],
+    "a": 255,
+    "hex": "#aaffff"
+  },
+  "86": {
+    "id": 86,
+    "name": "Left_future_WMSA",
+    "title": "Left Future WMSA",
+    "rgb": [
+      200,
+      120,
+      255
+    ],
+    "a": 255,
+    "hex": "#c878ff"
+  },
+  "87": {
+    "id": 87,
+    "name": "Right_future_WMSA",
+    "title": "Right Future WMSA",
+    "rgb": [
+      200,
+      121,
+      255
+    ],
+    "a": 255,
+    "hex": "#c879ff"
+  },
+  "88": {
+    "id": 88,
+    "name": "future_WMSA",
+    "title": "Future WMSA",
+    "rgb": [
+      200,
+      122,
+      255
+    ],
+    "a": 255,
+    "hex": "#c87aff"
+  },
+  "96": {
+    "id": 96,
+    "name": "Left-Amygdala-Anterior",
+    "title": "Left Amygdala Anterior",
+    "rgb": [
+      205,
+      10,
+      125
+    ],
+    "a": 255,
+    "hex": "#cd0a7d"
+  },
+  "97": {
+    "id": 97,
+    "name": "Right-Amygdala-Anterior",
+    "title": "Right Amygdala Anterior",
+    "rgb": [
+      205,
+      10,
+      125
+    ],
+    "a": 255,
+    "hex": "#cd0a7d"
+  },
+  "98": {
+    "id": 98,
+    "name": "Dura",
+    "title": "Dura",
+    "rgb": [
+      160,
+      32,
+      240
+    ],
+    "a": 255,
+    "hex": "#a020f0"
+  },
+  "99": {
+    "id": 99,
+    "name": "Lesion",
+    "title": "Lesion",
+    "rgb": [
+      255,
+      165,
+      0
+    ],
+    "a": 255,
+    "hex": "#ffa500"
+  },
+  "100": {
+    "id": 100,
+    "name": "Left-wm-intensity-abnormality",
+    "title": "Left Wm Intensity Abnormality",
+    "rgb": [
+      124,
+      140,
+      178
+    ],
+    "a": 255,
+    "hex": "#7c8cb2"
+  },
+  "101": {
+    "id": 101,
+    "name": "Left-caudate-intensity-abnormality",
+    "title": "Left Caudate Intensity Abnormality",
+    "rgb": [
+      125,
+      140,
+      178
+    ],
+    "a": 255,
+    "hex": "#7d8cb2"
+  },
+  "102": {
+    "id": 102,
+    "name": "Left-putamen-intensity-abnormality",
+    "title": "Left Putamen Intensity Abnormality",
+    "rgb": [
+      126,
+      140,
+      178
+    ],
+    "a": 255,
+    "hex": "#7e8cb2"
+  },
+  "103": {
+    "id": 103,
+    "name": "Left-accumbens-intensity-abnormality",
+    "title": "Left Accumbens Intensity Abnormality",
+    "rgb": [
+      127,
+      140,
+      178
+    ],
+    "a": 255,
+    "hex": "#7f8cb2"
+  },
+  "104": {
+    "id": 104,
+    "name": "Left-pallidum-intensity-abnormality",
+    "title": "Left Pallidum Intensity Abnormality",
+    "rgb": [
+      124,
+      141,
+      178
+    ],
+    "a": 255,
+    "hex": "#7c8db2"
+  },
+  "105": {
+    "id": 105,
+    "name": "Left-amygdala-intensity-abnormality",
+    "title": "Left Amygdala Intensity Abnormality",
+    "rgb": [
+      124,
+      142,
+      178
+    ],
+    "a": 255,
+    "hex": "#7c8eb2"
+  },
+  "106": {
+    "id": 106,
+    "name": "Left-hippocampus-intensity-abnormality",
+    "title": "Left Hippocampus Intensity Abnormality",
+    "rgb": [
+      124,
+      143,
+      178
+    ],
+    "a": 255,
+    "hex": "#7c8fb2"
+  },
+  "107": {
+    "id": 107,
+    "name": "Left-thalamus-intensity-abnormality",
+    "title": "Left Thalamus Intensity Abnormality",
+    "rgb": [
+      124,
+      144,
+      178
+    ],
+    "a": 255,
+    "hex": "#7c90b2"
+  },
+  "108": {
+    "id": 108,
+    "name": "Left-VDC-intensity-abnormality",
+    "title": "Left VDC Intensity Abnormality",
+    "rgb": [
+      124,
+      140,
+      179
+    ],
+    "a": 255,
+    "hex": "#7c8cb3"
+  },
+  "109": {
+    "id": 109,
+    "name": "Right-wm-intensity-abnormality",
+    "title": "Right Wm Intensity Abnormality",
+    "rgb": [
+      124,
+      140,
+      178
+    ],
+    "a": 255,
+    "hex": "#7c8cb2"
+  },
+  "110": {
+    "id": 110,
+    "name": "Right-caudate-intensity-abnormality",
+    "title": "Right Caudate Intensity Abnormality",
+    "rgb": [
+      125,
+      140,
+      178
+    ],
+    "a": 255,
+    "hex": "#7d8cb2"
+  },
+  "111": {
+    "id": 111,
+    "name": "Right-putamen-intensity-abnormality",
+    "title": "Right Putamen Intensity Abnormality",
+    "rgb": [
+      126,
+      140,
+      178
+    ],
+    "a": 255,
+    "hex": "#7e8cb2"
+  },
+  "112": {
+    "id": 112,
+    "name": "Right-accumbens-intensity-abnormality",
+    "title": "Right Accumbens Intensity Abnormality",
+    "rgb": [
+      127,
+      140,
+      178
+    ],
+    "a": 255,
+    "hex": "#7f8cb2"
+  },
+  "113": {
+    "id": 113,
+    "name": "Right-pallidum-intensity-abnormality",
+    "title": "Right Pallidum Intensity Abnormality",
+    "rgb": [
+      124,
+      141,
+      178
+    ],
+    "a": 255,
+    "hex": "#7c8db2"
+  },
+  "114": {
+    "id": 114,
+    "name": "Right-amygdala-intensity-abnormality",
+    "title": "Right Amygdala Intensity Abnormality",
+    "rgb": [
+      124,
+      142,
+      178
+    ],
+    "a": 255,
+    "hex": "#7c8eb2"
+  },
+  "115": {
+    "id": 115,
+    "name": "Right-hippocampus-intensity-abnormality",
+    "title": "Right Hippocampus Intensity Abnormality",
+    "rgb": [
+      124,
+      143,
+      178
+    ],
+    "a": 255,
+    "hex": "#7c8fb2"
+  },
+  "116": {
+    "id": 116,
+    "name": "Right-thalamus-intensity-abnormality",
+    "title": "Right Thalamus Intensity Abnormality",
+    "rgb": [
+      124,
+      144,
+      178
+    ],
+    "a": 255,
+    "hex": "#7c90b2"
+  },
+  "117": {
+    "id": 117,
+    "name": "Right-VDC-intensity-abnormality",
+    "title": "Right VDC Intensity Abnormality",
+    "rgb": [
+      124,
+      140,
+      179
+    ],
+    "a": 255,
+    "hex": "#7c8cb3"
+  },
+  "118": {
+    "id": 118,
+    "name": "Epidermis",
+    "title": "Epidermis",
+    "rgb": [
+      255,
+      20,
+      147
+    ],
+    "a": 255,
+    "hex": "#ff1493"
+  },
+  "119": {
+    "id": 119,
+    "name": "Conn-Tissue",
+    "title": "Conn Tissue",
+    "rgb": [
+      205,
+      179,
+      139
+    ],
+    "a": 255,
+    "hex": "#cdb38b"
+  },
+  "120": {
+    "id": 120,
+    "name": "SC-Fat-Muscle",
+    "title": "SC Fat Muscle",
+    "rgb": [
+      238,
+      238,
+      209
+    ],
+    "a": 255,
+    "hex": "#eeeed1"
+  },
+  "121": {
+    "id": 121,
+    "name": "Cranium",
+    "title": "Cranium",
+    "rgb": [
+      200,
+      200,
+      200
+    ],
+    "a": 255,
+    "hex": "#c8c8c8"
+  },
+  "122": {
+    "id": 122,
+    "name": "CSF-SA",
+    "title": "CSF SA",
+    "rgb": [
+      74,
+      255,
+      74
+    ],
+    "a": 255,
+    "hex": "#4aff4a"
+  },
+  "123": {
+    "id": 123,
+    "name": "Muscle",
+    "title": "Muscle",
+    "rgb": [
+      238,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#ee0000"
+  },
+  "124": {
+    "id": 124,
+    "name": "Ear",
+    "title": "Ear",
+    "rgb": [
+      0,
+      0,
+      139
+    ],
+    "a": 255,
+    "hex": "#00008b"
+  },
+  "125": {
+    "id": 125,
+    "name": "Adipose",
+    "title": "Adipose",
+    "rgb": [
+      173,
+      255,
+      47
+    ],
+    "a": 255,
+    "hex": "#adff2f"
+  },
+  "126": {
+    "id": 126,
+    "name": "Spinal-Cord",
+    "title": "Spinal Cord",
+    "rgb": [
+      133,
+      203,
+      229
+    ],
+    "a": 255,
+    "hex": "#85cbe5"
+  },
+  "127": {
+    "id": 127,
+    "name": "Soft-Tissue",
+    "title": "Soft Tissue",
+    "rgb": [
+      26,
+      237,
+      57
+    ],
+    "a": 255,
+    "hex": "#1aed39"
+  },
+  "128": {
+    "id": 128,
+    "name": "Nerve",
+    "title": "Nerve",
+    "rgb": [
+      34,
+      139,
+      34
+    ],
+    "a": 255,
+    "hex": "#228b22"
+  },
+  "129": {
+    "id": 129,
+    "name": "Bone",
+    "title": "Bone",
+    "rgb": [
+      30,
+      144,
+      255
+    ],
+    "a": 255,
+    "hex": "#1e90ff"
+  },
+  "130": {
+    "id": 130,
+    "name": "AirCavity",
+    "title": "AirCavity",
+    "rgb": [
+      196,
+      160,
+      128
+    ],
+    "a": 255,
+    "hex": "#c4a080"
+  },
+  "131": {
+    "id": 131,
+    "name": "Orbital-Fat",
+    "title": "Orbital Fat",
+    "rgb": [
+      238,
+      59,
+      59
+    ],
+    "a": 255,
+    "hex": "#ee3b3b"
+  },
+  "132": {
+    "id": 132,
+    "name": "Tongue",
+    "title": "Tongue",
+    "rgb": [
+      221,
+      39,
+      200
+    ],
+    "a": 255,
+    "hex": "#dd27c8"
+  },
+  "133": {
+    "id": 133,
+    "name": "Nasal-Structures",
+    "title": "Nasal Structures",
+    "rgb": [
+      238,
+      174,
+      238
+    ],
+    "a": 255,
+    "hex": "#eeaeee"
+  },
+  "134": {
+    "id": 134,
+    "name": "Globe",
+    "title": "Globe",
+    "rgb": [
+      255,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#ff0000"
+  },
+  "135": {
+    "id": 135,
+    "name": "Teeth",
+    "title": "Teeth",
+    "rgb": [
+      72,
+      61,
+      139
+    ],
+    "a": 255,
+    "hex": "#483d8b"
+  },
+  "136": {
+    "id": 136,
+    "name": "Left-Caudate-Putamen",
+    "title": "Left Caudate Putamen",
+    "rgb": [
+      21,
+      39,
+      132
+    ],
+    "a": 255,
+    "hex": "#152784"
+  },
+  "137": {
+    "id": 137,
+    "name": "Right-Caudate-Putamen",
+    "title": "Right Caudate Putamen",
+    "rgb": [
+      21,
+      39,
+      132
+    ],
+    "a": 255,
+    "hex": "#152784"
+  },
+  "138": {
+    "id": 138,
+    "name": "Left-Claustrum",
+    "title": "Left Claustrum",
+    "rgb": [
+      65,
+      135,
+      20
+    ],
+    "a": 255,
+    "hex": "#418714"
+  },
+  "139": {
+    "id": 139,
+    "name": "Right-Claustrum",
+    "title": "Right Claustrum",
+    "rgb": [
+      65,
+      135,
+      20
+    ],
+    "a": 255,
+    "hex": "#418714"
+  },
+  "140": {
+    "id": 140,
+    "name": "Cornea",
+    "title": "Cornea",
+    "rgb": [
+      134,
+      4,
+      160
+    ],
+    "a": 255,
+    "hex": "#8604a0"
+  },
+  "142": {
+    "id": 142,
+    "name": "Diploe",
+    "title": "Diploe",
+    "rgb": [
+      221,
+      226,
+      68
+    ],
+    "a": 255,
+    "hex": "#dde244"
+  },
+  "143": {
+    "id": 143,
+    "name": "Vitreous-Humor",
+    "title": "Vitreous Humor",
+    "rgb": [
+      255,
+      255,
+      254
+    ],
+    "a": 255,
+    "hex": "#fffffe"
+  },
+  "144": {
+    "id": 144,
+    "name": "Lens",
+    "title": "Lens",
+    "rgb": [
+      52,
+      209,
+      226
+    ],
+    "a": 255,
+    "hex": "#34d1e2"
+  },
+  "145": {
+    "id": 145,
+    "name": "Aqueous-Humor",
+    "title": "Aqueous Humor",
+    "rgb": [
+      239,
+      160,
+      223
+    ],
+    "a": 255,
+    "hex": "#efa0df"
+  },
+  "146": {
+    "id": 146,
+    "name": "Outer-Table",
+    "title": "Outer Table",
+    "rgb": [
+      70,
+      130,
+      180
+    ],
+    "a": 255,
+    "hex": "#4682b4"
+  },
+  "147": {
+    "id": 147,
+    "name": "Inner-Table",
+    "title": "Inner Table",
+    "rgb": [
+      70,
+      130,
+      181
+    ],
+    "a": 255,
+    "hex": "#4682b5"
+  },
+  "148": {
+    "id": 148,
+    "name": "Periosteum",
+    "title": "Periosteum",
+    "rgb": [
+      139,
+      121,
+      94
+    ],
+    "a": 255,
+    "hex": "#8b795e"
+  },
+  "149": {
+    "id": 149,
+    "name": "Endosteum",
+    "title": "Endosteum",
+    "rgb": [
+      224,
+      224,
+      224
+    ],
+    "a": 255,
+    "hex": "#e0e0e0"
+  },
+  "150": {
+    "id": 150,
+    "name": "R-C-S",
+    "title": "R C S",
+    "rgb": [
+      255,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#ff0000"
+  },
+  "151": {
+    "id": 151,
+    "name": "Iris",
+    "title": "Iris",
+    "rgb": [
+      205,
+      205,
+      0
+    ],
+    "a": 255,
+    "hex": "#cdcd00"
+  },
+  "152": {
+    "id": 152,
+    "name": "SC-Adipose-Muscle",
+    "title": "SC Adipose Muscle",
+    "rgb": [
+      238,
+      238,
+      209
+    ],
+    "a": 255,
+    "hex": "#eeeed1"
+  },
+  "153": {
+    "id": 153,
+    "name": "SC-Tissue",
+    "title": "SC Tissue",
+    "rgb": [
+      139,
+      121,
+      94
+    ],
+    "a": 255,
+    "hex": "#8b795e"
+  },
+  "154": {
+    "id": 154,
+    "name": "Orbital-Adipose",
+    "title": "Orbital Adipose",
+    "rgb": [
+      238,
+      59,
+      59
+    ],
+    "a": 255,
+    "hex": "#ee3b3b"
+  },
+  "155": {
+    "id": 155,
+    "name": "Left-IntCapsule-Ant",
+    "title": "Left IntCapsule Ant",
+    "rgb": [
+      238,
+      59,
+      59
+    ],
+    "a": 255,
+    "hex": "#ee3b3b"
+  },
+  "156": {
+    "id": 156,
+    "name": "Right-IntCapsule-Ant",
+    "title": "Right IntCapsule Ant",
+    "rgb": [
+      238,
+      59,
+      59
+    ],
+    "a": 255,
+    "hex": "#ee3b3b"
+  },
+  "157": {
+    "id": 157,
+    "name": "Left-IntCapsule-Pos",
+    "title": "Left IntCapsule Pos",
+    "rgb": [
+      62,
+      10,
+      205
+    ],
+    "a": 255,
+    "hex": "#3e0acd"
+  },
+  "158": {
+    "id": 158,
+    "name": "Right-IntCapsule-Pos",
+    "title": "Right IntCapsule Pos",
+    "rgb": [
+      62,
+      10,
+      205
+    ],
+    "a": 255,
+    "hex": "#3e0acd"
+  },
+  "159": {
+    "id": 159,
+    "name": "Left-Cerebral-WM-unmyelinated",
+    "title": "Left Cerebral WM Unmyelinated",
+    "rgb": [
+      0,
+      118,
+      14
+    ],
+    "a": 255,
+    "hex": "#00760e"
+  },
+  "160": {
+    "id": 160,
+    "name": "Right-Cerebral-WM-unmyelinated",
+    "title": "Right Cerebral WM Unmyelinated",
+    "rgb": [
+      0,
+      118,
+      14
+    ],
+    "a": 255,
+    "hex": "#00760e"
+  },
+  "161": {
+    "id": 161,
+    "name": "Left-Cerebral-WM-myelinated",
+    "title": "Left Cerebral WM Myelinated",
+    "rgb": [
+      220,
+      216,
+      21
+    ],
+    "a": 255,
+    "hex": "#dcd815"
+  },
+  "162": {
+    "id": 162,
+    "name": "Right-Cerebral-WM-myelinated",
+    "title": "Right Cerebral WM Myelinated",
+    "rgb": [
+      220,
+      216,
+      21
+    ],
+    "a": 255,
+    "hex": "#dcd815"
+  },
+  "163": {
+    "id": 163,
+    "name": "Left-Subcortical-Gray-Matter",
+    "title": "Left Subcortical Gray Matter",
+    "rgb": [
+      122,
+      186,
+      220
+    ],
+    "a": 255,
+    "hex": "#7abadc"
+  },
+  "164": {
+    "id": 164,
+    "name": "Right-Subcortical-Gray-Matter",
+    "title": "Right Subcortical Gray Matter",
+    "rgb": [
+      122,
+      186,
+      220
+    ],
+    "a": 255,
+    "hex": "#7abadc"
+  },
+  "165": {
+    "id": 165,
+    "name": "Skull",
+    "title": "Skull",
+    "rgb": [
+      120,
+      120,
+      120
+    ],
+    "a": 255,
+    "hex": "#787878"
+  },
+  "166": {
+    "id": 166,
+    "name": "Posterior-fossa",
+    "title": "Posterior Fossa",
+    "rgb": [
+      14,
+      48,
+      255
+    ],
+    "a": 255,
+    "hex": "#0e30ff"
+  },
+  "167": {
+    "id": 167,
+    "name": "Scalp",
+    "title": "Scalp",
+    "rgb": [
+      166,
+      42,
+      42
+    ],
+    "a": 255,
+    "hex": "#a62a2a"
+  },
+  "168": {
+    "id": 168,
+    "name": "Hematoma",
+    "title": "Hematoma",
+    "rgb": [
+      121,
+      18,
+      134
+    ],
+    "a": 255,
+    "hex": "#791286"
+  },
+  "169": {
+    "id": 169,
+    "name": "Left-Basal-Ganglia",
+    "title": "Left Basal Ganglia",
+    "rgb": [
+      236,
+      13,
+      127
+    ],
+    "a": 255,
+    "hex": "#ec0d7f"
+  },
+  "176": {
+    "id": 176,
+    "name": "Right-Basal-Ganglia",
+    "title": "Right Basal Ganglia",
+    "rgb": [
+      236,
+      13,
+      126
+    ],
+    "a": 255,
+    "hex": "#ec0d7e"
+  },
+  "170": {
+    "id": 170,
+    "name": "brainstem",
+    "title": "Brainstem",
+    "rgb": [
+      119,
+      159,
+      176
+    ],
+    "a": 255,
+    "hex": "#779fb0"
+  },
+  "171": {
+    "id": 171,
+    "name": "DCG",
+    "title": "DCG",
+    "rgb": [
+      119,
+      0,
+      176
+    ],
+    "a": 255,
+    "hex": "#7700b0"
+  },
+  "172": {
+    "id": 172,
+    "name": "Vermis",
+    "title": "Vermis",
+    "rgb": [
+      119,
+      100,
+      176
+    ],
+    "a": 255,
+    "hex": "#7764b0"
+  },
+  "173": {
+    "id": 173,
+    "name": "Midbrain",
+    "title": "Midbrain",
+    "rgb": [
+      242,
+      104,
+      76
+    ],
+    "a": 255,
+    "hex": "#f2684c"
+  },
+  "174": {
+    "id": 174,
+    "name": "Pons",
+    "title": "Pons",
+    "rgb": [
+      206,
+      195,
+      58
+    ],
+    "a": 255,
+    "hex": "#cec33a"
+  },
+  "175": {
+    "id": 175,
+    "name": "Medulla",
+    "title": "Medulla",
+    "rgb": [
+      119,
+      159,
+      176
+    ],
+    "a": 255,
+    "hex": "#779fb0"
+  },
+  "177": {
+    "id": 177,
+    "name": "Vermis-White-Matter",
+    "title": "Vermis White Matter",
+    "rgb": [
+      119,
+      50,
+      176
+    ],
+    "a": 255,
+    "hex": "#7732b0"
+  },
+  "178": {
+    "id": 178,
+    "name": "SCP",
+    "title": "SCP",
+    "rgb": [
+      142,
+      182,
+      0
+    ],
+    "a": 255,
+    "hex": "#8eb600"
+  },
+  "179": {
+    "id": 179,
+    "name": "Floculus",
+    "title": "Floculus",
+    "rgb": [
+      19,
+      100,
+      176
+    ],
+    "a": 255,
+    "hex": "#1364b0"
+  },
+  "180": {
+    "id": 180,
+    "name": "Left-Cortical-Dysplasia",
+    "title": "Left Cortical Dysplasia",
+    "rgb": [
+      73,
+      61,
+      139
+    ],
+    "a": 255,
+    "hex": "#493d8b"
+  },
+  "181": {
+    "id": 181,
+    "name": "Right-Cortical-Dysplasia",
+    "title": "Right Cortical Dysplasia",
+    "rgb": [
+      73,
+      62,
+      139
+    ],
+    "a": 255,
+    "hex": "#493e8b"
+  },
+  "182": {
+    "id": 182,
+    "name": "CblumNodulus",
+    "title": "CblumNodulus",
+    "rgb": [
+      10,
+      100,
+      176
+    ],
+    "a": 255,
+    "hex": "#0a64b0"
+  },
+  "183": {
+    "id": 183,
+    "name": "Left-Vermis-Area",
+    "title": "Left Vermis Area",
+    "rgb": [
+      119,
+      100,
+      176
+    ],
+    "a": 255,
+    "hex": "#7764b0"
+  },
+  "184": {
+    "id": 184,
+    "name": "Right-Vermis-Area",
+    "title": "Right Vermis Area",
+    "rgb": [
+      100,
+      119,
+      176
+    ],
+    "a": 255,
+    "hex": "#6477b0"
+  },
+  "193": {
+    "id": 193,
+    "name": "Left-hippocampal_fissure",
+    "title": "Left Hippocampal Fissure",
+    "rgb": [
+      0,
+      196,
+      255
+    ],
+    "a": 255,
+    "hex": "#00c4ff"
+  },
+  "194": {
+    "id": 194,
+    "name": "Left-CADG-head",
+    "title": "Left CADG Head",
+    "rgb": [
+      255,
+      164,
+      164
+    ],
+    "a": 255,
+    "hex": "#ffa4a4"
+  },
+  "195": {
+    "id": 195,
+    "name": "Left-subiculum",
+    "title": "Left Subiculum",
+    "rgb": [
+      196,
+      196,
+      0
+    ],
+    "a": 255,
+    "hex": "#c4c400"
+  },
+  "196": {
+    "id": 196,
+    "name": "Left-fimbria",
+    "title": "Left Fimbria",
+    "rgb": [
+      0,
+      100,
+      255
+    ],
+    "a": 255,
+    "hex": "#0064ff"
+  },
+  "197": {
+    "id": 197,
+    "name": "Right-hippocampal_fissure",
+    "title": "Right Hippocampal Fissure",
+    "rgb": [
+      128,
+      196,
+      164
+    ],
+    "a": 255,
+    "hex": "#80c4a4"
+  },
+  "198": {
+    "id": 198,
+    "name": "Right-CADG-head",
+    "title": "Right CADG Head",
+    "rgb": [
+      0,
+      126,
+      75
+    ],
+    "a": 255,
+    "hex": "#007e4b"
+  },
+  "199": {
+    "id": 199,
+    "name": "Right-subiculum",
+    "title": "Right Subiculum",
+    "rgb": [
+      128,
+      96,
+      64
+    ],
+    "a": 255,
+    "hex": "#806040"
+  },
+  "200": {
+    "id": 200,
+    "name": "Right-fimbria",
+    "title": "Right Fimbria",
+    "rgb": [
+      0,
+      50,
+      128
+    ],
+    "a": 255,
+    "hex": "#003280"
+  },
+  "201": {
+    "id": 201,
+    "name": "alveus",
+    "title": "Alveus",
+    "rgb": [
+      255,
+      204,
+      153
+    ],
+    "a": 255,
+    "hex": "#ffcc99"
+  },
+  "202": {
+    "id": 202,
+    "name": "perforant_pathway",
+    "title": "Perforant Pathway",
+    "rgb": [
+      255,
+      128,
+      128
+    ],
+    "a": 255,
+    "hex": "#ff8080"
+  },
+  "203": {
+    "id": 203,
+    "name": "parasubiculum",
+    "title": "Parasubiculum",
+    "rgb": [
+      175,
+      175,
+      75
+    ],
+    "a": 255,
+    "hex": "#afaf4b"
+  },
+  "204": {
+    "id": 204,
+    "name": "presubiculum",
+    "title": "Presubiculum",
+    "rgb": [
+      64,
+      0,
+      64
+    ],
+    "a": 255,
+    "hex": "#400040"
+  },
+  "205": {
+    "id": 205,
+    "name": "subiculum",
+    "title": "Subiculum",
+    "rgb": [
+      0,
+      0,
+      255
+    ],
+    "a": 255,
+    "hex": "#0000ff"
+  },
+  "206": {
+    "id": 206,
+    "name": "CA1",
+    "title": "CA1",
+    "rgb": [
+      255,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#ff0000"
+  },
+  "207": {
+    "id": 207,
+    "name": "CA2",
+    "title": "CA2",
+    "rgb": [
+      128,
+      128,
+      255
+    ],
+    "a": 255,
+    "hex": "#8080ff"
+  },
+  "208": {
+    "id": 208,
+    "name": "CA3",
+    "title": "CA3",
+    "rgb": [
+      0,
+      128,
+      0
+    ],
+    "a": 255,
+    "hex": "#008000"
+  },
+  "209": {
+    "id": 209,
+    "name": "CA4",
+    "title": "CA4",
+    "rgb": [
+      196,
+      160,
+      128
+    ],
+    "a": 255,
+    "hex": "#c4a080"
+  },
+  "210": {
+    "id": 210,
+    "name": "GC-DG",
+    "title": "GC DG",
+    "rgb": [
+      32,
+      200,
+      255
+    ],
+    "a": 255,
+    "hex": "#20c8ff"
+  },
+  "211": {
+    "id": 211,
+    "name": "HATA",
+    "title": "HATA",
+    "rgb": [
+      128,
+      255,
+      128
+    ],
+    "a": 255,
+    "hex": "#80ff80"
+  },
+  "212": {
+    "id": 212,
+    "name": "fimbria",
+    "title": "Fimbria",
+    "rgb": [
+      204,
+      153,
+      204
+    ],
+    "a": 255,
+    "hex": "#cc99cc"
+  },
+  "213": {
+    "id": 213,
+    "name": "lateral_ventricle",
+    "title": "Lateral Ventricle",
+    "rgb": [
+      121,
+      17,
+      136
+    ],
+    "a": 255,
+    "hex": "#791188"
+  },
+  "214": {
+    "id": 214,
+    "name": "molecular_layer_HP",
+    "title": "Molecular Layer HP",
+    "rgb": [
+      128,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#800000"
+  },
+  "215": {
+    "id": 215,
+    "name": "hippocampal_fissure",
+    "title": "Hippocampal Fissure",
+    "rgb": [
+      128,
+      32,
+      255
+    ],
+    "a": 255,
+    "hex": "#8020ff"
+  },
+  "216": {
+    "id": 216,
+    "name": "entorhinal_cortex",
+    "title": "Entorhinal Cortex",
+    "rgb": [
+      255,
+      204,
+      102
+    ],
+    "a": 255,
+    "hex": "#ffcc66"
+  },
+  "217": {
+    "id": 217,
+    "name": "molecular_layer_subiculum",
+    "title": "Molecular Layer Subiculum",
+    "rgb": [
+      128,
+      128,
+      128
+    ],
+    "a": 255,
+    "hex": "#808080"
+  },
+  "218": {
+    "id": 218,
+    "name": "Amygdala",
+    "title": "Amygdala",
+    "rgb": [
+      104,
+      255,
+      255
+    ],
+    "a": 255,
+    "hex": "#68ffff"
+  },
+  "219": {
+    "id": 219,
+    "name": "Cerebral_White_Matter",
+    "title": "Cerebral White Matter",
+    "rgb": [
+      0,
+      226,
+      0
+    ],
+    "a": 255,
+    "hex": "#00e200"
+  },
+  "220": {
+    "id": 220,
+    "name": "Cerebral_Cortex",
+    "title": "Cerebral Cortex",
+    "rgb": [
+      205,
+      63,
+      78
+    ],
+    "a": 255,
+    "hex": "#cd3f4e"
+  },
+  "221": {
+    "id": 221,
+    "name": "Inf_Lat_Vent",
+    "title": "Inf Lat Vent",
+    "rgb": [
+      197,
+      58,
+      250
+    ],
+    "a": 255,
+    "hex": "#c53afa"
+  },
+  "222": {
+    "id": 222,
+    "name": "Perirhinal",
+    "title": "Perirhinal",
+    "rgb": [
+      33,
+      150,
+      250
+    ],
+    "a": 255,
+    "hex": "#2196fa"
+  },
+  "223": {
+    "id": 223,
+    "name": "Cerebral_White_Matter_Edge",
+    "title": "Cerebral White Matter Edge",
+    "rgb": [
+      226,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#e20000"
+  },
+  "224": {
+    "id": 224,
+    "name": "Background",
+    "title": "Background",
+    "rgb": [
+      100,
+      100,
+      100
+    ],
+    "a": 255,
+    "hex": "#646464"
+  },
+  "225": {
+    "id": 225,
+    "name": "Ectorhinal",
+    "title": "Ectorhinal",
+    "rgb": [
+      197,
+      150,
+      250
+    ],
+    "a": 255,
+    "hex": "#c596fa"
+  },
+  "226": {
+    "id": 226,
+    "name": "HP_tail",
+    "title": "HP Tail",
+    "rgb": [
+      170,
+      170,
+      255
+    ],
+    "a": 255,
+    "hex": "#aaaaff"
+  },
+  "227": {
+    "id": 227,
+    "name": "Polymorphic-Layer",
+    "title": "Polymorphic Layer",
+    "rgb": [
+      128,
+      255,
+      128
+    ],
+    "a": 255,
+    "hex": "#80ff80"
+  },
+  "228": {
+    "id": 228,
+    "name": "Intracellular-Space",
+    "title": "Intracellular Space",
+    "rgb": [
+      204,
+      153,
+      204
+    ],
+    "a": 255,
+    "hex": "#cc99cc"
+  },
+  "229": {
+    "id": 229,
+    "name": "molecular_layer_DG",
+    "title": "Molecular Layer DG",
+    "rgb": [
+      168,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#a80000"
+  },
+  "230": {
+    "id": 230,
+    "name": "Prosubiculum",
+    "title": "Prosubiculum",
+    "rgb": [
+      252,
+      132,
+      8
+    ],
+    "a": 255,
+    "hex": "#fc8408"
+  },
+  "231": {
+    "id": 231,
+    "name": "HP_body",
+    "title": "HP Body",
+    "rgb": [
+      0,
+      255,
+      0
+    ],
+    "a": 255,
+    "hex": "#00ff00"
+  },
+  "232": {
+    "id": 232,
+    "name": "HP_head",
+    "title": "HP Head",
+    "rgb": [
+      255,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#ff0000"
+  },
+  "233": {
+    "id": 233,
+    "name": "presubiculum-head",
+    "title": "Presubiculum Head",
+    "rgb": [
+      32,
+      0,
+      32
+    ],
+    "a": 255,
+    "hex": "#200020"
+  },
+  "234": {
+    "id": 234,
+    "name": "presubiculum-body",
+    "title": "Presubiculum Body",
+    "rgb": [
+      64,
+      0,
+      64
+    ],
+    "a": 255,
+    "hex": "#400040"
+  },
+  "235": {
+    "id": 235,
+    "name": "subiculum-head",
+    "title": "Subiculum Head",
+    "rgb": [
+      0,
+      0,
+      175
+    ],
+    "a": 255,
+    "hex": "#0000af"
+  },
+  "236": {
+    "id": 236,
+    "name": "subiculum-body",
+    "title": "Subiculum Body",
+    "rgb": [
+      0,
+      0,
+      255
+    ],
+    "a": 255,
+    "hex": "#0000ff"
+  },
+  "237": {
+    "id": 237,
+    "name": "CA1-head",
+    "title": "CA1 Head",
+    "rgb": [
+      175,
+      75,
+      75
+    ],
+    "a": 255,
+    "hex": "#af4b4b"
+  },
+  "238": {
+    "id": 238,
+    "name": "CA1-body",
+    "title": "CA1 Body",
+    "rgb": [
+      255,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#ff0000"
+  },
+  "239": {
+    "id": 239,
+    "name": "CA3-head",
+    "title": "CA3 Head",
+    "rgb": [
+      0,
+      80,
+      0
+    ],
+    "a": 255,
+    "hex": "#005000"
+  },
+  "240": {
+    "id": 240,
+    "name": "CA3-body",
+    "title": "CA3 Body",
+    "rgb": [
+      0,
+      128,
+      0
+    ],
+    "a": 255,
+    "hex": "#008000"
+  },
+  "241": {
+    "id": 241,
+    "name": "CA4-head",
+    "title": "CA4 Head",
+    "rgb": [
+      120,
+      90,
+      50
+    ],
+    "a": 255,
+    "hex": "#785a32"
+  },
+  "242": {
+    "id": 242,
+    "name": "CA4-body",
+    "title": "CA4 Body",
+    "rgb": [
+      196,
+      160,
+      128
+    ],
+    "a": 255,
+    "hex": "#c4a080"
+  },
+  "243": {
+    "id": 243,
+    "name": "GC-ML-DG-head",
+    "title": "GC ML DG Head",
+    "rgb": [
+      75,
+      125,
+      175
+    ],
+    "a": 255,
+    "hex": "#4b7daf"
+  },
+  "244": {
+    "id": 244,
+    "name": "GC-ML-DG-body",
+    "title": "GC ML DG Body",
+    "rgb": [
+      32,
+      200,
+      255
+    ],
+    "a": 255,
+    "hex": "#20c8ff"
+  },
+  "245": {
+    "id": 245,
+    "name": "molecular_layer_HP-head",
+    "title": "Molecular Layer HP Head",
+    "rgb": [
+      100,
+      25,
+      25
+    ],
+    "a": 255,
+    "hex": "#641919"
+  },
+  "246": {
+    "id": 246,
+    "name": "molecular_layer_HP-body",
+    "title": "Molecular Layer HP Body",
+    "rgb": [
+      128,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#800000"
+  },
+  "247": {
+    "id": 247,
+    "name": "FreezeSurface",
+    "title": "FreezeSurface",
+    "rgb": [
+      10,
+      100,
+      100
+    ],
+    "a": 255,
+    "hex": "#0a6464"
+  },
+  "248": {
+    "id": 248,
+    "name": "Gyrus_Fasciolaris",
+    "title": "Gyrus Fasciolaris",
+    "rgb": [
+      0,
+      93,
+      0
+    ],
+    "a": 255,
+    "hex": "#005d00"
+  },
+  "249": {
+    "id": 249,
+    "name": "Fasciola_Cinerea",
+    "title": "Fasciola Cinerea",
+    "rgb": [
+      80,
+      255,
+      235
+    ],
+    "a": 255,
+    "hex": "#50ffeb"
+  },
+  "250": {
+    "id": 250,
+    "name": "Fornix",
+    "title": "Fornix",
+    "rgb": [
+      255,
+      42,
+      250
+    ],
+    "a": 255,
+    "hex": "#ff2afa"
+  },
+  "251": {
+    "id": 251,
+    "name": "CC_Posterior",
+    "title": "CC Posterior",
+    "rgb": [
+      0,
+      0,
+      64
+    ],
+    "a": 255,
+    "hex": "#000040"
+  },
+  "252": {
+    "id": 252,
+    "name": "CC_Mid_Posterior",
+    "title": "CC Mid Posterior",
+    "rgb": [
+      0,
+      0,
+      112
+    ],
+    "a": 255,
+    "hex": "#000070"
+  },
+  "253": {
+    "id": 253,
+    "name": "CC_Central",
+    "title": "CC Central",
+    "rgb": [
+      0,
+      0,
+      160
+    ],
+    "a": 255,
+    "hex": "#0000a0"
+  },
+  "254": {
+    "id": 254,
+    "name": "CC_Mid_Anterior",
+    "title": "CC Mid Anterior",
+    "rgb": [
+      0,
+      0,
+      208
+    ],
+    "a": 255,
+    "hex": "#0000d0"
+  },
+  "255": {
+    "id": 255,
+    "name": "CC_Anterior",
+    "title": "CC Anterior",
+    "rgb": [
+      0,
+      0,
+      255
+    ],
+    "a": 255,
+    "hex": "#0000ff"
+  },
+  "256": {
+    "id": 256,
+    "name": "Voxel-Unchanged",
+    "title": "Voxel Unchanged",
+    "rgb": [
+      0,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#000000"
+  },
+  "257": {
+    "id": 257,
+    "name": "CSF-ExtraCerebral",
+    "title": "CSF ExtraCerebral",
+    "rgb": [
+      60,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#3c3c3c"
+  },
+  "258": {
+    "id": 258,
+    "name": "Head-ExtraCerebral",
+    "title": "Head ExtraCerebral",
+    "rgb": [
+      150,
+      150,
+      200
+    ],
+    "a": 255,
+    "hex": "#9696c8"
+  },
+  "259": {
+    "id": 259,
+    "name": "Eye-Fluid",
+    "title": "Eye Fluid",
+    "rgb": [
+      60,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#3c3c3c"
+  },
+  "260": {
+    "id": 260,
+    "name": "BoneOrAir",
+    "title": "BoneOrAir",
+    "rgb": [
+      119,
+      159,
+      176
+    ],
+    "a": 255,
+    "hex": "#779fb0"
+  },
+  "261": {
+    "id": 261,
+    "name": "PossibleFluid",
+    "title": "PossibleFluid",
+    "rgb": [
+      120,
+      18,
+      134
+    ],
+    "a": 255,
+    "hex": "#781286"
+  },
+  "262": {
+    "id": 262,
+    "name": "Sinus",
+    "title": "Sinus",
+    "rgb": [
+      85,
+      85,
+      127
+    ],
+    "a": 255,
+    "hex": "#55557f"
+  },
+  "263": {
+    "id": 263,
+    "name": "Left-Eustachian",
+    "title": "Left Eustachian",
+    "rgb": [
+      119,
+      159,
+      176
+    ],
+    "a": 255,
+    "hex": "#779fb0"
+  },
+  "264": {
+    "id": 264,
+    "name": "Right-Eustachian",
+    "title": "Right Eustachian",
+    "rgb": [
+      119,
+      159,
+      176
+    ],
+    "a": 255,
+    "hex": "#779fb0"
+  },
+  "265": {
+    "id": 265,
+    "name": "Left-Eyeball",
+    "title": "Left Eyeball",
+    "rgb": [
+      60,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#3c3c3c"
+  },
+  "266": {
+    "id": 266,
+    "name": "Right-Eyeball",
+    "title": "Right Eyeball",
+    "rgb": [
+      60,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#3c3c3c"
+  },
+  "267": {
+    "id": 267,
+    "name": "Pons-Belly-Area",
+    "title": "Pons Belly Area",
+    "rgb": [
+      206,
+      195,
+      58
+    ],
+    "a": 255,
+    "hex": "#cec33a"
+  },
+  "270": {
+    "id": 270,
+    "name": "ctx-lh-infragranular",
+    "title": "Left Cortex \u2014 Infragranular",
+    "rgb": [
+      205,
+      70,
+      78
+    ],
+    "a": 255,
+    "hex": "#cd464e"
+  },
+  "271": {
+    "id": 271,
+    "name": "ctx-lh-layer1",
+    "title": "Left Cortex \u2014 Layer1",
+    "rgb": [
+      210,
+      80,
+      78
+    ],
+    "a": 255,
+    "hex": "#d2504e"
+  },
+  "272": {
+    "id": 272,
+    "name": "ctx-lh-layer2",
+    "title": "Left Cortex \u2014 Layer2",
+    "rgb": [
+      215,
+      90,
+      78
+    ],
+    "a": 255,
+    "hex": "#d75a4e"
+  },
+  "273": {
+    "id": 273,
+    "name": "ctx-lh-layer3",
+    "title": "Left Cortex \u2014 Layer3",
+    "rgb": [
+      220,
+      100,
+      78
+    ],
+    "a": 255,
+    "hex": "#dc644e"
+  },
+  "274": {
+    "id": 274,
+    "name": "ctx-lh-layer4",
+    "title": "Left Cortex \u2014 Layer4",
+    "rgb": [
+      225,
+      110,
+      78
+    ],
+    "a": 255,
+    "hex": "#e16e4e"
+  },
+  "275": {
+    "id": 275,
+    "name": "ctx-lh-layer5",
+    "title": "Left Cortex \u2014 Layer5",
+    "rgb": [
+      230,
+      120,
+      78
+    ],
+    "a": 255,
+    "hex": "#e6784e"
+  },
+  "276": {
+    "id": 276,
+    "name": "ctx-lh-layer6",
+    "title": "Left Cortex \u2014 Layer6",
+    "rgb": [
+      235,
+      135,
+      78
+    ],
+    "a": 255,
+    "hex": "#eb874e"
+  },
+  "277": {
+    "id": 277,
+    "name": "ctx-lh-supragranular",
+    "title": "Left Cortex \u2014 Supragranular",
+    "rgb": [
+      240,
+      140,
+      78
+    ],
+    "a": 255,
+    "hex": "#f08c4e"
+  },
+  "278": {
+    "id": 278,
+    "name": "SubiculumU",
+    "title": "SubiculumU",
+    "rgb": [
+      20,
+      119,
+      165
+    ],
+    "a": 255,
+    "hex": "#1477a5"
+  },
+  "279": {
+    "id": 279,
+    "name": "CA1U",
+    "title": "CA1U",
+    "rgb": [
+      255,
+      108,
+      108
+    ],
+    "a": 255,
+    "hex": "#ff6c6c"
+  },
+  "280": {
+    "id": 280,
+    "name": "CA2U",
+    "title": "CA2U",
+    "rgb": [
+      167,
+      130,
+      199
+    ],
+    "a": 255,
+    "hex": "#a782c7"
+  },
+  "281": {
+    "id": 281,
+    "name": "CA3U",
+    "title": "CA3U",
+    "rgb": [
+      0,
+      202,
+      0
+    ],
+    "a": 255,
+    "hex": "#00ca00"
+  },
+  "331": {
+    "id": 331,
+    "name": "Aorta",
+    "title": "Aorta",
+    "rgb": [
+      255,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#ff0000"
+  },
+  "332": {
+    "id": 332,
+    "name": "Left-Common-IliacA",
+    "title": "Left Common IliacA",
+    "rgb": [
+      255,
+      80,
+      0
+    ],
+    "a": 255,
+    "hex": "#ff5000"
+  },
+  "333": {
+    "id": 333,
+    "name": "Right-Common-IliacA",
+    "title": "Right Common IliacA",
+    "rgb": [
+      255,
+      160,
+      0
+    ],
+    "a": 255,
+    "hex": "#ffa000"
+  },
+  "334": {
+    "id": 334,
+    "name": "Left-External-IliacA",
+    "title": "Left External IliacA",
+    "rgb": [
+      255,
+      255,
+      0
+    ],
+    "a": 255,
+    "hex": "#ffff00"
+  },
+  "335": {
+    "id": 335,
+    "name": "Right-External-IliacA",
+    "title": "Right External IliacA",
+    "rgb": [
+      0,
+      255,
+      0
+    ],
+    "a": 255,
+    "hex": "#00ff00"
+  },
+  "336": {
+    "id": 336,
+    "name": "Left-Internal-IliacA",
+    "title": "Left Internal IliacA",
+    "rgb": [
+      255,
+      0,
+      160
+    ],
+    "a": 255,
+    "hex": "#ff00a0"
+  },
+  "337": {
+    "id": 337,
+    "name": "Right-Internal-IliacA",
+    "title": "Right Internal IliacA",
+    "rgb": [
+      255,
+      0,
+      255
+    ],
+    "a": 255,
+    "hex": "#ff00ff"
+  },
+  "338": {
+    "id": 338,
+    "name": "Left-Lateral-SacralA",
+    "title": "Left Lateral SacralA",
+    "rgb": [
+      255,
+      50,
+      80
+    ],
+    "a": 255,
+    "hex": "#ff3250"
+  },
+  "339": {
+    "id": 339,
+    "name": "Right-Lateral-SacralA",
+    "title": "Right Lateral SacralA",
+    "rgb": [
+      80,
+      255,
+      50
+    ],
+    "a": 255,
+    "hex": "#50ff32"
+  },
+  "340": {
+    "id": 340,
+    "name": "Left-ObturatorA",
+    "title": "Left ObturatorA",
+    "rgb": [
+      160,
+      255,
+      50
+    ],
+    "a": 255,
+    "hex": "#a0ff32"
+  },
+  "341": {
+    "id": 341,
+    "name": "Right-ObturatorA",
+    "title": "Right ObturatorA",
+    "rgb": [
+      160,
+      200,
+      255
+    ],
+    "a": 255,
+    "hex": "#a0c8ff"
+  },
+  "342": {
+    "id": 342,
+    "name": "Left-Internal-PudendalA",
+    "title": "Left Internal PudendalA",
+    "rgb": [
+      0,
+      255,
+      160
+    ],
+    "a": 255,
+    "hex": "#00ffa0"
+  },
+  "343": {
+    "id": 343,
+    "name": "Right-Internal-PudendalA",
+    "title": "Right Internal PudendalA",
+    "rgb": [
+      0,
+      0,
+      255
+    ],
+    "a": 255,
+    "hex": "#0000ff"
+  },
+  "344": {
+    "id": 344,
+    "name": "Left-UmbilicalA",
+    "title": "Left UmbilicalA",
+    "rgb": [
+      80,
+      50,
+      255
+    ],
+    "a": 255,
+    "hex": "#5032ff"
+  },
+  "345": {
+    "id": 345,
+    "name": "Right-UmbilicalA",
+    "title": "Right UmbilicalA",
+    "rgb": [
+      160,
+      0,
+      255
+    ],
+    "a": 255,
+    "hex": "#a000ff"
+  },
+  "346": {
+    "id": 346,
+    "name": "Left-Inf-RectalA",
+    "title": "Left Inf RectalA",
+    "rgb": [
+      255,
+      210,
+      0
+    ],
+    "a": 255,
+    "hex": "#ffd200"
+  },
+  "347": {
+    "id": 347,
+    "name": "Right-Inf-RectalA",
+    "title": "Right Inf RectalA",
+    "rgb": [
+      0,
+      160,
+      255
+    ],
+    "a": 255,
+    "hex": "#00a0ff"
+  },
+  "348": {
+    "id": 348,
+    "name": "Left-Common-IliacV",
+    "title": "Left Common IliacV",
+    "rgb": [
+      255,
+      200,
+      80
+    ],
+    "a": 255,
+    "hex": "#ffc850"
+  },
+  "349": {
+    "id": 349,
+    "name": "Right-Common-IliacV",
+    "title": "Right Common IliacV",
+    "rgb": [
+      255,
+      200,
+      160
+    ],
+    "a": 255,
+    "hex": "#ffc8a0"
+  },
+  "350": {
+    "id": 350,
+    "name": "Left-External-IliacV",
+    "title": "Left External IliacV",
+    "rgb": [
+      255,
+      80,
+      200
+    ],
+    "a": 255,
+    "hex": "#ff50c8"
+  },
+  "351": {
+    "id": 351,
+    "name": "Right-External-IliacV",
+    "title": "Right External IliacV",
+    "rgb": [
+      255,
+      160,
+      200
+    ],
+    "a": 255,
+    "hex": "#ffa0c8"
+  },
+  "352": {
+    "id": 352,
+    "name": "Left-Internal-IliacV",
+    "title": "Left Internal IliacV",
+    "rgb": [
+      30,
+      255,
+      80
+    ],
+    "a": 255,
+    "hex": "#1eff50"
+  },
+  "353": {
+    "id": 353,
+    "name": "Right-Internal-IliacV",
+    "title": "Right Internal IliacV",
+    "rgb": [
+      80,
+      200,
+      255
+    ],
+    "a": 255,
+    "hex": "#50c8ff"
+  },
+  "354": {
+    "id": 354,
+    "name": "Left-ObturatorV",
+    "title": "Left ObturatorV",
+    "rgb": [
+      80,
+      255,
+      200
+    ],
+    "a": 255,
+    "hex": "#50ffc8"
+  },
+  "355": {
+    "id": 355,
+    "name": "Right-ObturatorV",
+    "title": "Right ObturatorV",
+    "rgb": [
+      195,
+      255,
+      200
+    ],
+    "a": 255,
+    "hex": "#c3ffc8"
+  },
+  "356": {
+    "id": 356,
+    "name": "Left-Internal-PudendalV",
+    "title": "Left Internal PudendalV",
+    "rgb": [
+      120,
+      200,
+      20
+    ],
+    "a": 255,
+    "hex": "#78c814"
+  },
+  "357": {
+    "id": 357,
+    "name": "Right-Internal-PudendalV",
+    "title": "Right Internal PudendalV",
+    "rgb": [
+      170,
+      10,
+      200
+    ],
+    "a": 255,
+    "hex": "#aa0ac8"
+  },
+  "358": {
+    "id": 358,
+    "name": "Pos-Lymph",
+    "title": "Pos Lymph",
+    "rgb": [
+      20,
+      130,
+      180
+    ],
+    "a": 255,
+    "hex": "#1482b4"
+  },
+  "359": {
+    "id": 359,
+    "name": "Neg-Lymph",
+    "title": "Neg Lymph",
+    "rgb": [
+      20,
+      180,
+      130
+    ],
+    "a": 255,
+    "hex": "#14b482"
+  },
+  "370": {
+    "id": 370,
+    "name": "ctx-rh-infragranular",
+    "title": "Right Cortex \u2014 Infragranular",
+    "rgb": [
+      205,
+      70,
+      130
+    ],
+    "a": 255,
+    "hex": "#cd4682"
+  },
+  "371": {
+    "id": 371,
+    "name": "ctx-rh-layer1",
+    "title": "Right Cortex \u2014 Layer1",
+    "rgb": [
+      210,
+      80,
+      130
+    ],
+    "a": 255,
+    "hex": "#d25082"
+  },
+  "372": {
+    "id": 372,
+    "name": "ctx-rh-layer2",
+    "title": "Right Cortex \u2014 Layer2",
+    "rgb": [
+      215,
+      90,
+      130
+    ],
+    "a": 255,
+    "hex": "#d75a82"
+  },
+  "373": {
+    "id": 373,
+    "name": "ctx-rh-layer3",
+    "title": "Right Cortex \u2014 Layer3",
+    "rgb": [
+      220,
+      100,
+      130
+    ],
+    "a": 255,
+    "hex": "#dc6482"
+  },
+  "374": {
+    "id": 374,
+    "name": "ctx-rh-layer4",
+    "title": "Right Cortex \u2014 Layer4",
+    "rgb": [
+      225,
+      110,
+      130
+    ],
+    "a": 255,
+    "hex": "#e16e82"
+  },
+  "375": {
+    "id": 375,
+    "name": "ctx-rh-layer5",
+    "title": "Right Cortex \u2014 Layer5",
+    "rgb": [
+      230,
+      120,
+      130
+    ],
+    "a": 255,
+    "hex": "#e67882"
+  },
+  "376": {
+    "id": 376,
+    "name": "ctx-rh-layer6",
+    "title": "Right Cortex \u2014 Layer6",
+    "rgb": [
+      235,
+      135,
+      130
+    ],
+    "a": 255,
+    "hex": "#eb8782"
+  },
+  "377": {
+    "id": 377,
+    "name": "ctx-rh-supragranular",
+    "title": "Right Cortex \u2014 Supragranular",
+    "rgb": [
+      240,
+      140,
+      130
+    ],
+    "a": 255,
+    "hex": "#f08c82"
+  },
+  "400": {
+    "id": 400,
+    "name": "V1",
+    "title": "V1",
+    "rgb": [
+      206,
+      62,
+      78
+    ],
+    "a": 255,
+    "hex": "#ce3e4e"
+  },
+  "401": {
+    "id": 401,
+    "name": "V2",
+    "title": "V2",
+    "rgb": [
+      121,
+      18,
+      134
+    ],
+    "a": 255,
+    "hex": "#791286"
+  },
+  "402": {
+    "id": 402,
+    "name": "BA44",
+    "title": "BA44",
+    "rgb": [
+      199,
+      58,
+      250
+    ],
+    "a": 255,
+    "hex": "#c73afa"
+  },
+  "403": {
+    "id": 403,
+    "name": "BA45",
+    "title": "BA45",
+    "rgb": [
+      1,
+      148,
+      0
+    ],
+    "a": 255,
+    "hex": "#019400"
+  },
+  "404": {
+    "id": 404,
+    "name": "BA4a",
+    "title": "BA4a",
+    "rgb": [
+      221,
+      248,
+      164
+    ],
+    "a": 255,
+    "hex": "#ddf8a4"
+  },
+  "405": {
+    "id": 405,
+    "name": "BA4p",
+    "title": "BA4p",
+    "rgb": [
+      231,
+      148,
+      34
+    ],
+    "a": 255,
+    "hex": "#e79422"
+  },
+  "406": {
+    "id": 406,
+    "name": "BA6",
+    "title": "BA6",
+    "rgb": [
+      1,
+      118,
+      14
+    ],
+    "a": 255,
+    "hex": "#01760e"
+  },
+  "407": {
+    "id": 407,
+    "name": "BA2",
+    "title": "BA2",
+    "rgb": [
+      120,
+      118,
+      14
+    ],
+    "a": 255,
+    "hex": "#78760e"
+  },
+  "408": {
+    "id": 408,
+    "name": "BA1_old",
+    "title": "BA1 Old",
+    "rgb": [
+      123,
+      186,
+      221
+    ],
+    "a": 255,
+    "hex": "#7bbadd"
+  },
+  "409": {
+    "id": 409,
+    "name": "BAun2",
+    "title": "BAun2",
+    "rgb": [
+      238,
+      13,
+      177
+    ],
+    "a": 255,
+    "hex": "#ee0db1"
+  },
+  "410": {
+    "id": 410,
+    "name": "BA1",
+    "title": "BA1",
+    "rgb": [
+      123,
+      186,
+      220
+    ],
+    "a": 255,
+    "hex": "#7bbadc"
+  },
+  "411": {
+    "id": 411,
+    "name": "BA2b",
+    "title": "BA2b",
+    "rgb": [
+      138,
+      13,
+      206
+    ],
+    "a": 255,
+    "hex": "#8a0dce"
+  },
+  "412": {
+    "id": 412,
+    "name": "BA3a",
+    "title": "BA3a",
+    "rgb": [
+      238,
+      130,
+      176
+    ],
+    "a": 255,
+    "hex": "#ee82b0"
+  },
+  "413": {
+    "id": 413,
+    "name": "BA3b",
+    "title": "BA3b",
+    "rgb": [
+      218,
+      230,
+      76
+    ],
+    "a": 255,
+    "hex": "#dae64c"
+  },
+  "414": {
+    "id": 414,
+    "name": "MT",
+    "title": "MT",
+    "rgb": [
+      38,
+      213,
+      176
+    ],
+    "a": 255,
+    "hex": "#26d5b0"
+  },
+  "415": {
+    "id": 415,
+    "name": "AIPS_AIP_l",
+    "title": "AIPS AIP L",
+    "rgb": [
+      1,
+      225,
+      176
+    ],
+    "a": 255,
+    "hex": "#01e1b0"
+  },
+  "416": {
+    "id": 416,
+    "name": "AIPS_AIP_r",
+    "title": "AIPS AIP R",
+    "rgb": [
+      1,
+      225,
+      176
+    ],
+    "a": 255,
+    "hex": "#01e1b0"
+  },
+  "417": {
+    "id": 417,
+    "name": "AIPS_VIP_l",
+    "title": "AIPS VIP L",
+    "rgb": [
+      200,
+      2,
+      100
+    ],
+    "a": 255,
+    "hex": "#c80264"
+  },
+  "418": {
+    "id": 418,
+    "name": "AIPS_VIP_r",
+    "title": "AIPS VIP R",
+    "rgb": [
+      200,
+      2,
+      100
+    ],
+    "a": 255,
+    "hex": "#c80264"
+  },
+  "419": {
+    "id": 419,
+    "name": "IPL_PFcm_l",
+    "title": "IPL PFcm L",
+    "rgb": [
+      5,
+      200,
+      90
+    ],
+    "a": 255,
+    "hex": "#05c85a"
+  },
+  "420": {
+    "id": 420,
+    "name": "IPL_PFcm_r",
+    "title": "IPL PFcm R",
+    "rgb": [
+      5,
+      200,
+      90
+    ],
+    "a": 255,
+    "hex": "#05c85a"
+  },
+  "421": {
+    "id": 421,
+    "name": "IPL_PF_l",
+    "title": "IPL PF L",
+    "rgb": [
+      100,
+      5,
+      200
+    ],
+    "a": 255,
+    "hex": "#6405c8"
+  },
+  "422": {
+    "id": 422,
+    "name": "IPL_PFm_l",
+    "title": "IPL PFm L",
+    "rgb": [
+      25,
+      255,
+      100
+    ],
+    "a": 255,
+    "hex": "#19ff64"
+  },
+  "423": {
+    "id": 423,
+    "name": "IPL_PFm_r",
+    "title": "IPL PFm R",
+    "rgb": [
+      25,
+      255,
+      100
+    ],
+    "a": 255,
+    "hex": "#19ff64"
+  },
+  "424": {
+    "id": 424,
+    "name": "IPL_PFop_l",
+    "title": "IPL PFop L",
+    "rgb": [
+      230,
+      7,
+      100
+    ],
+    "a": 255,
+    "hex": "#e60764"
+  },
+  "425": {
+    "id": 425,
+    "name": "IPL_PFop_r",
+    "title": "IPL PFop R",
+    "rgb": [
+      230,
+      7,
+      100
+    ],
+    "a": 255,
+    "hex": "#e60764"
+  },
+  "426": {
+    "id": 426,
+    "name": "IPL_PF_r",
+    "title": "IPL PF R",
+    "rgb": [
+      100,
+      5,
+      200
+    ],
+    "a": 255,
+    "hex": "#6405c8"
+  },
+  "427": {
+    "id": 427,
+    "name": "IPL_PFt_l",
+    "title": "IPL PFt L",
+    "rgb": [
+      150,
+      10,
+      200
+    ],
+    "a": 255,
+    "hex": "#960ac8"
+  },
+  "428": {
+    "id": 428,
+    "name": "IPL_PFt_r",
+    "title": "IPL PFt R",
+    "rgb": [
+      150,
+      10,
+      200
+    ],
+    "a": 255,
+    "hex": "#960ac8"
+  },
+  "429": {
+    "id": 429,
+    "name": "IPL_PGa_l",
+    "title": "IPL PGa L",
+    "rgb": [
+      175,
+      10,
+      176
+    ],
+    "a": 255,
+    "hex": "#af0ab0"
+  },
+  "430": {
+    "id": 430,
+    "name": "IPL_PGa_r",
+    "title": "IPL PGa R",
+    "rgb": [
+      175,
+      10,
+      176
+    ],
+    "a": 255,
+    "hex": "#af0ab0"
+  },
+  "431": {
+    "id": 431,
+    "name": "IPL_PGp_l",
+    "title": "IPL PGp L",
+    "rgb": [
+      10,
+      100,
+      255
+    ],
+    "a": 255,
+    "hex": "#0a64ff"
+  },
+  "432": {
+    "id": 432,
+    "name": "IPL_PGp_r",
+    "title": "IPL PGp R",
+    "rgb": [
+      10,
+      100,
+      255
+    ],
+    "a": 255,
+    "hex": "#0a64ff"
+  },
+  "433": {
+    "id": 433,
+    "name": "Visual_V3d_l",
+    "title": "Visual V3d L",
+    "rgb": [
+      150,
+      45,
+      70
+    ],
+    "a": 255,
+    "hex": "#962d46"
+  },
+  "434": {
+    "id": 434,
+    "name": "Visual_V3d_r",
+    "title": "Visual V3d R",
+    "rgb": [
+      150,
+      45,
+      70
+    ],
+    "a": 255,
+    "hex": "#962d46"
+  },
+  "435": {
+    "id": 435,
+    "name": "Visual_V4_l",
+    "title": "Visual V4 L",
+    "rgb": [
+      45,
+      200,
+      15
+    ],
+    "a": 255,
+    "hex": "#2dc80f"
+  },
+  "436": {
+    "id": 436,
+    "name": "Visual_V4_r",
+    "title": "Visual V4 R",
+    "rgb": [
+      45,
+      200,
+      15
+    ],
+    "a": 255,
+    "hex": "#2dc80f"
+  },
+  "437": {
+    "id": 437,
+    "name": "Visual_V5_b",
+    "title": "Visual V5 B",
+    "rgb": [
+      227,
+      45,
+      100
+    ],
+    "a": 255,
+    "hex": "#e32d64"
+  },
+  "438": {
+    "id": 438,
+    "name": "Visual_VP_l",
+    "title": "Visual VP L",
+    "rgb": [
+      227,
+      45,
+      100
+    ],
+    "a": 255,
+    "hex": "#e32d64"
+  },
+  "439": {
+    "id": 439,
+    "name": "Visual_VP_r",
+    "title": "Visual VP R",
+    "rgb": [
+      227,
+      45,
+      100
+    ],
+    "a": 255,
+    "hex": "#e32d64"
+  },
+  "498": {
+    "id": 498,
+    "name": "wmsa",
+    "title": "Wmsa",
+    "rgb": [
+      143,
+      188,
+      143
+    ],
+    "a": 255,
+    "hex": "#8fbc8f"
+  },
+  "499": {
+    "id": 499,
+    "name": "other_wmsa",
+    "title": "Other Wmsa",
+    "rgb": [
+      255,
+      248,
+      220
+    ],
+    "a": 255,
+    "hex": "#fff8dc"
+  },
+  "500": {
+    "id": 500,
+    "name": "right_CA2_3",
+    "title": "Right CA2 3",
+    "rgb": [
+      17,
+      85,
+      136
+    ],
+    "a": 255,
+    "hex": "#115588"
+  },
+  "501": {
+    "id": 501,
+    "name": "right_alveus",
+    "title": "Right Alveus",
+    "rgb": [
+      119,
+      187,
+      102
+    ],
+    "a": 255,
+    "hex": "#77bb66"
+  },
+  "502": {
+    "id": 502,
+    "name": "right_CA1",
+    "title": "Right CA1",
+    "rgb": [
+      204,
+      68,
+      34
+    ],
+    "a": 255,
+    "hex": "#cc4422"
+  },
+  "503": {
+    "id": 503,
+    "name": "right_fimbria",
+    "title": "Right Fimbria",
+    "rgb": [
+      204,
+      0,
+      255
+    ],
+    "a": 255,
+    "hex": "#cc00ff"
+  },
+  "504": {
+    "id": 504,
+    "name": "right_presubiculum",
+    "title": "Right Presubiculum",
+    "rgb": [
+      221,
+      187,
+      17
+    ],
+    "a": 255,
+    "hex": "#ddbb11"
+  },
+  "505": {
+    "id": 505,
+    "name": "right_hippocampal_fissure",
+    "title": "Right Hippocampal Fissure",
+    "rgb": [
+      153,
+      221,
+      238
+    ],
+    "a": 255,
+    "hex": "#99ddee"
+  },
+  "506": {
+    "id": 506,
+    "name": "right_CA4_DG",
+    "title": "Right CA4 DG",
+    "rgb": [
+      51,
+      17,
+      17
+    ],
+    "a": 255,
+    "hex": "#331111"
+  },
+  "507": {
+    "id": 507,
+    "name": "right_subiculum",
+    "title": "Right Subiculum",
+    "rgb": [
+      0,
+      119,
+      85
+    ],
+    "a": 255,
+    "hex": "#007755"
+  },
+  "508": {
+    "id": 508,
+    "name": "right_fornix",
+    "title": "Right Fornix",
+    "rgb": [
+      20,
+      100,
+      200
+    ],
+    "a": 255,
+    "hex": "#1464c8"
+  },
+  "550": {
+    "id": 550,
+    "name": "left_CA2_3",
+    "title": "Left CA2 3",
+    "rgb": [
+      17,
+      85,
+      137
+    ],
+    "a": 255,
+    "hex": "#115589"
+  },
+  "551": {
+    "id": 551,
+    "name": "left_alveus",
+    "title": "Left Alveus",
+    "rgb": [
+      119,
+      187,
+      103
+    ],
+    "a": 255,
+    "hex": "#77bb67"
+  },
+  "552": {
+    "id": 552,
+    "name": "left_CA1",
+    "title": "Left CA1",
+    "rgb": [
+      204,
+      68,
+      35
+    ],
+    "a": 255,
+    "hex": "#cc4423"
+  },
+  "553": {
+    "id": 553,
+    "name": "left_fimbria",
+    "title": "Left Fimbria",
+    "rgb": [
+      204,
+      0,
+      254
+    ],
+    "a": 255,
+    "hex": "#cc00fe"
+  },
+  "554": {
+    "id": 554,
+    "name": "left_presubiculum",
+    "title": "Left Presubiculum",
+    "rgb": [
+      221,
+      187,
+      16
+    ],
+    "a": 255,
+    "hex": "#ddbb10"
+  },
+  "555": {
+    "id": 555,
+    "name": "left_hippocampal_fissure",
+    "title": "Left Hippocampal Fissure",
+    "rgb": [
+      153,
+      221,
+      239
+    ],
+    "a": 255,
+    "hex": "#99ddef"
+  },
+  "556": {
+    "id": 556,
+    "name": "left_CA4_DG",
+    "title": "Left CA4 DG",
+    "rgb": [
+      51,
+      17,
+      18
+    ],
+    "a": 255,
+    "hex": "#331112"
+  },
+  "557": {
+    "id": 557,
+    "name": "left_subiculum",
+    "title": "Left Subiculum",
+    "rgb": [
+      0,
+      119,
+      86
+    ],
+    "a": 255,
+    "hex": "#007756"
+  },
+  "558": {
+    "id": 558,
+    "name": "left_fornix",
+    "title": "Left Fornix",
+    "rgb": [
+      20,
+      100,
+      201
+    ],
+    "a": 255,
+    "hex": "#1464c9"
+  },
+  "559": {
+    "id": 559,
+    "name": "Subcortical-Gray-Matter",
+    "title": "Subcortical Gray Matter",
+    "rgb": [
+      123,
+      187,
+      221
+    ],
+    "a": 255,
+    "hex": "#7bbbdd"
+  },
+  "600": {
+    "id": 600,
+    "name": "Tumor",
+    "title": "Tumor",
+    "rgb": [
+      254,
+      254,
+      254
+    ],
+    "a": 255,
+    "hex": "#fefefe"
+  },
+  "601": {
+    "id": 601,
+    "name": "Cbm_Left_I_IV",
+    "title": "Cbm Left I IV",
+    "rgb": [
+      0,
+      69,
+      190
+    ],
+    "a": 255,
+    "hex": "#0045be"
+  },
+  "602": {
+    "id": 602,
+    "name": "Cbm_Right_I_IV",
+    "title": "Cbm Right I IV",
+    "rgb": [
+      70,
+      170,
+      180
+    ],
+    "a": 255,
+    "hex": "#46aab4"
+  },
+  "603": {
+    "id": 603,
+    "name": "Cbm_Left_V",
+    "title": "Cbm Left V",
+    "rgb": [
+      205,
+      62,
+      78
+    ],
+    "a": 255,
+    "hex": "#cd3e4e"
+  },
+  "604": {
+    "id": 604,
+    "name": "Cbm_Right_V",
+    "title": "Cbm Right V",
+    "rgb": [
+      205,
+      102,
+      78
+    ],
+    "a": 255,
+    "hex": "#cd664e"
+  },
+  "605": {
+    "id": 605,
+    "name": "Cbm_Left_VI",
+    "title": "Cbm Left VI",
+    "rgb": [
+      196,
+      58,
+      250
+    ],
+    "a": 255,
+    "hex": "#c43afa"
+  },
+  "606": {
+    "id": 606,
+    "name": "Cbm_Vermis_VI",
+    "title": "Cbm Vermis VI",
+    "rgb": [
+      0,
+      148,
+      0
+    ],
+    "a": 255,
+    "hex": "#009400"
+  },
+  "607": {
+    "id": 607,
+    "name": "Cbm_Right_VI",
+    "title": "Cbm Right VI",
+    "rgb": [
+      196,
+      98,
+      250
+    ],
+    "a": 255,
+    "hex": "#c462fa"
+  },
+  "608": {
+    "id": 608,
+    "name": "Cbm_Left_CrusI",
+    "title": "Cbm Left CrusI",
+    "rgb": [
+      230,
+      148,
+      34
+    ],
+    "a": 255,
+    "hex": "#e69422"
+  },
+  "609": {
+    "id": 609,
+    "name": "Cbm_Vermis_CrusI",
+    "title": "Cbm Vermis CrusI",
+    "rgb": [
+      0,
+      118,
+      14
+    ],
+    "a": 255,
+    "hex": "#00760e"
+  },
+  "610": {
+    "id": 610,
+    "name": "Cbm_Right_CrusI",
+    "title": "Cbm Right CrusI",
+    "rgb": [
+      230,
+      188,
+      34
+    ],
+    "a": 255,
+    "hex": "#e6bc22"
+  },
+  "611": {
+    "id": 611,
+    "name": "Cbm_Left_CrusII",
+    "title": "Cbm Left CrusII",
+    "rgb": [
+      122,
+      200,
+      120
+    ],
+    "a": 255,
+    "hex": "#7ac878"
+  },
+  "612": {
+    "id": 612,
+    "name": "Cbm_Vermis_CrusII",
+    "title": "Cbm Vermis CrusII",
+    "rgb": [
+      236,
+      13,
+      176
+    ],
+    "a": 255,
+    "hex": "#ec0db0"
+  },
+  "613": {
+    "id": 613,
+    "name": "Cbm_Right_CrusII",
+    "title": "Cbm Right CrusII",
+    "rgb": [
+      122,
+      240,
+      120
+    ],
+    "a": 255,
+    "hex": "#7af078"
+  },
+  "614": {
+    "id": 614,
+    "name": "Cbm_Left_VIIb",
+    "title": "Cbm Left VIIb",
+    "rgb": [
+      0,
+      149,
+      208
+    ],
+    "a": 255,
+    "hex": "#0095d0"
+  },
+  "615": {
+    "id": 615,
+    "name": "Cbm_Vermis_VIIb",
+    "title": "Cbm Vermis VIIb",
+    "rgb": [
+      42,
+      204,
+      164
+    ],
+    "a": 255,
+    "hex": "#2acca4"
+  },
+  "616": {
+    "id": 616,
+    "name": "Cbm_Right_VIIb",
+    "title": "Cbm Right VIIb",
+    "rgb": [
+      0,
+      189,
+      208
+    ],
+    "a": 255,
+    "hex": "#00bdd0"
+  },
+  "617": {
+    "id": 617,
+    "name": "Cbm_Left_VIIIa",
+    "title": "Cbm Left VIIIa",
+    "rgb": [
+      220,
+      205,
+      20
+    ],
+    "a": 255,
+    "hex": "#dccd14"
+  },
+  "618": {
+    "id": 618,
+    "name": "Cbm_Vermis_VIIIa",
+    "title": "Cbm Vermis VIIIa",
+    "rgb": [
+      103,
+      255,
+      255
+    ],
+    "a": 255,
+    "hex": "#67ffff"
+  },
+  "619": {
+    "id": 619,
+    "name": "Cbm_Right_VIIIa",
+    "title": "Cbm Right VIIIa",
+    "rgb": [
+      220,
+      245,
+      20
+    ],
+    "a": 255,
+    "hex": "#dcf514"
+  },
+  "620": {
+    "id": 620,
+    "name": "Cbm_Left_VIIIb",
+    "title": "Cbm Left VIIIb",
+    "rgb": [
+      60,
+      58,
+      210
+    ],
+    "a": 255,
+    "hex": "#3c3ad2"
+  },
+  "621": {
+    "id": 621,
+    "name": "Cbm_Vermis_VIIIb",
+    "title": "Cbm Vermis VIIIb",
+    "rgb": [
+      60,
+      58,
+      210
+    ],
+    "a": 255,
+    "hex": "#3c3ad2"
+  },
+  "622": {
+    "id": 622,
+    "name": "Cbm_Right_VIIIb",
+    "title": "Cbm Right VIIIb",
+    "rgb": [
+      60,
+      98,
+      210
+    ],
+    "a": 255,
+    "hex": "#3c62d2"
+  },
+  "623": {
+    "id": 623,
+    "name": "Cbm_Left_IX",
+    "title": "Cbm Left IX",
+    "rgb": [
+      90,
+      135,
+      35
+    ],
+    "a": 255,
+    "hex": "#5a8723"
+  },
+  "624": {
+    "id": 624,
+    "name": "Cbm_Vermis_IX",
+    "title": "Cbm Vermis IX",
+    "rgb": [
+      225,
+      60,
+      160
+    ],
+    "a": 255,
+    "hex": "#e13ca0"
+  },
+  "625": {
+    "id": 625,
+    "name": "Cbm_Right_IX",
+    "title": "Cbm Right IX",
+    "rgb": [
+      158,
+      233,
+      19
+    ],
+    "a": 255,
+    "hex": "#9ee913"
+  },
+  "626": {
+    "id": 626,
+    "name": "Cbm_Left_X",
+    "title": "Cbm Left X",
+    "rgb": [
+      165,
+      42,
+      42
+    ],
+    "a": 255,
+    "hex": "#a52a2a"
+  },
+  "627": {
+    "id": 627,
+    "name": "Cbm_Vermis_X",
+    "title": "Cbm Vermis X",
+    "rgb": [
+      0,
+      255,
+      127
+    ],
+    "a": 255,
+    "hex": "#00ff7f"
+  },
+  "628": {
+    "id": 628,
+    "name": "Cbm_Right_X",
+    "title": "Cbm Right X",
+    "rgb": [
+      165,
+      82,
+      42
+    ],
+    "a": 255,
+    "hex": "#a5522a"
+  },
+  "630": {
+    "id": 630,
+    "name": "Cbm_Vermis_VII",
+    "title": "Cbm Vermis VII",
+    "rgb": [
+      230,
+      73,
+      25
+    ],
+    "a": 255,
+    "hex": "#e64919"
+  },
+  "631": {
+    "id": 631,
+    "name": "Cbm_Vermis_VIII",
+    "title": "Cbm Vermis VIII",
+    "rgb": [
+      103,
+      255,
+      255
+    ],
+    "a": 255,
+    "hex": "#67ffff"
+  },
+  "632": {
+    "id": 632,
+    "name": "Cbm_Vermis",
+    "title": "Cbm Vermis",
+    "rgb": [
+      230,
+      73,
+      25
+    ],
+    "a": 255,
+    "hex": "#e64919"
+  },
+  "640": {
+    "id": 640,
+    "name": "Cbm_Right_I_V_med",
+    "title": "Cbm Right I V Med",
+    "rgb": [
+      204,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#cc0000"
+  },
+  "641": {
+    "id": 641,
+    "name": "Cbm_Right_I_V_mid",
+    "title": "Cbm Right I V Mid",
+    "rgb": [
+      255,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#ff0000"
+  },
+  "642": {
+    "id": 642,
+    "name": "Cbm_Right_VI_med",
+    "title": "Cbm Right VI Med",
+    "rgb": [
+      0,
+      0,
+      255
+    ],
+    "a": 255,
+    "hex": "#0000ff"
+  },
+  "643": {
+    "id": 643,
+    "name": "Cbm_Right_VI_mid",
+    "title": "Cbm Right VI Mid",
+    "rgb": [
+      30,
+      144,
+      255
+    ],
+    "a": 255,
+    "hex": "#1e90ff"
+  },
+  "644": {
+    "id": 644,
+    "name": "Cbm_Right_VI_lat",
+    "title": "Cbm Right VI Lat",
+    "rgb": [
+      100,
+      212,
+      237
+    ],
+    "a": 255,
+    "hex": "#64d4ed"
+  },
+  "645": {
+    "id": 645,
+    "name": "Cbm_Right_CrusI_med",
+    "title": "Cbm Right CrusI Med",
+    "rgb": [
+      218,
+      165,
+      32
+    ],
+    "a": 255,
+    "hex": "#daa520"
+  },
+  "646": {
+    "id": 646,
+    "name": "Cbm_Right_CrusI_mid",
+    "title": "Cbm Right CrusI Mid",
+    "rgb": [
+      255,
+      215,
+      0
+    ],
+    "a": 255,
+    "hex": "#ffd700"
+  },
+  "647": {
+    "id": 647,
+    "name": "Cbm_Right_CrusI_lat",
+    "title": "Cbm Right CrusI Lat",
+    "rgb": [
+      255,
+      255,
+      166
+    ],
+    "a": 255,
+    "hex": "#ffffa6"
+  },
+  "648": {
+    "id": 648,
+    "name": "Cbm_Right_CrusII_med",
+    "title": "Cbm Right CrusII Med",
+    "rgb": [
+      153,
+      0,
+      204
+    ],
+    "a": 255,
+    "hex": "#9900cc"
+  },
+  "649": {
+    "id": 649,
+    "name": "Cbm_Right_CrusII_mid",
+    "title": "Cbm Right CrusII Mid",
+    "rgb": [
+      153,
+      141,
+      209
+    ],
+    "a": 255,
+    "hex": "#998dd1"
+  },
+  "650": {
+    "id": 650,
+    "name": "Cbm_Right_CrusII_lat",
+    "title": "Cbm Right CrusII Lat",
+    "rgb": [
+      204,
+      204,
+      255
+    ],
+    "a": 255,
+    "hex": "#ccccff"
+  },
+  "651": {
+    "id": 651,
+    "name": "Cbm_Right_7med",
+    "title": "Cbm Right 7med",
+    "rgb": [
+      31,
+      212,
+      194
+    ],
+    "a": 255,
+    "hex": "#1fd4c2"
+  },
+  "652": {
+    "id": 652,
+    "name": "Cbm_Right_7mid",
+    "title": "Cbm Right 7mid",
+    "rgb": [
+      3,
+      255,
+      237
+    ],
+    "a": 255,
+    "hex": "#03ffed"
+  },
+  "653": {
+    "id": 653,
+    "name": "Cbm_Right_7lat",
+    "title": "Cbm Right 7lat",
+    "rgb": [
+      204,
+      255,
+      255
+    ],
+    "a": 255,
+    "hex": "#ccffff"
+  },
+  "654": {
+    "id": 654,
+    "name": "Cbm_Right_8med",
+    "title": "Cbm Right 8med",
+    "rgb": [
+      86,
+      74,
+      147
+    ],
+    "a": 255,
+    "hex": "#564a93"
+  },
+  "655": {
+    "id": 655,
+    "name": "Cbm_Right_8mid",
+    "title": "Cbm Right 8mid",
+    "rgb": [
+      114,
+      114,
+      190
+    ],
+    "a": 255,
+    "hex": "#7272be"
+  },
+  "656": {
+    "id": 656,
+    "name": "Cbm_Right_8lat",
+    "title": "Cbm Right 8lat",
+    "rgb": [
+      184,
+      178,
+      255
+    ],
+    "a": 255,
+    "hex": "#b8b2ff"
+  },
+  "657": {
+    "id": 657,
+    "name": "Cbm_Right_PUNs",
+    "title": "Cbm Right PUNs",
+    "rgb": [
+      126,
+      138,
+      37
+    ],
+    "a": 255,
+    "hex": "#7e8a25"
+  },
+  "658": {
+    "id": 658,
+    "name": "Cbm_Right_TONs",
+    "title": "Cbm Right TONs",
+    "rgb": [
+      189,
+      197,
+      117
+    ],
+    "a": 255,
+    "hex": "#bdc575"
+  },
+  "659": {
+    "id": 659,
+    "name": "Cbm_Right_FLOs",
+    "title": "Cbm Right FLOs",
+    "rgb": [
+      240,
+      230,
+      140
+    ],
+    "a": 255,
+    "hex": "#f0e68c"
+  },
+  "660": {
+    "id": 660,
+    "name": "Cbm_Left_I_V_med",
+    "title": "Cbm Left I V Med",
+    "rgb": [
+      204,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#cc0000"
+  },
+  "661": {
+    "id": 661,
+    "name": "Cbm_Left_I_V_mid",
+    "title": "Cbm Left I V Mid",
+    "rgb": [
+      255,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#ff0000"
+  },
+  "662": {
+    "id": 662,
+    "name": "Cbm_Left_VI_med",
+    "title": "Cbm Left VI Med",
+    "rgb": [
+      0,
+      0,
+      255
+    ],
+    "a": 255,
+    "hex": "#0000ff"
+  },
+  "663": {
+    "id": 663,
+    "name": "Cbm_Left_VI_mid",
+    "title": "Cbm Left VI Mid",
+    "rgb": [
+      30,
+      144,
+      255
+    ],
+    "a": 255,
+    "hex": "#1e90ff"
+  },
+  "664": {
+    "id": 664,
+    "name": "Cbm_Left_VI_lat",
+    "title": "Cbm Left VI Lat",
+    "rgb": [
+      100,
+      212,
+      237
+    ],
+    "a": 255,
+    "hex": "#64d4ed"
+  },
+  "665": {
+    "id": 665,
+    "name": "Cbm_Left_CrusI_med",
+    "title": "Cbm Left CrusI Med",
+    "rgb": [
+      218,
+      165,
+      32
+    ],
+    "a": 255,
+    "hex": "#daa520"
+  },
+  "666": {
+    "id": 666,
+    "name": "Cbm_Left_CrusI_mid",
+    "title": "Cbm Left CrusI Mid",
+    "rgb": [
+      255,
+      215,
+      0
+    ],
+    "a": 255,
+    "hex": "#ffd700"
+  },
+  "667": {
+    "id": 667,
+    "name": "Cbm_Left_CrusI_lat",
+    "title": "Cbm Left CrusI Lat",
+    "rgb": [
+      255,
+      255,
+      166
+    ],
+    "a": 255,
+    "hex": "#ffffa6"
+  },
+  "668": {
+    "id": 668,
+    "name": "Cbm_Left_CrusII_med",
+    "title": "Cbm Left CrusII Med",
+    "rgb": [
+      153,
+      0,
+      204
+    ],
+    "a": 255,
+    "hex": "#9900cc"
+  },
+  "669": {
+    "id": 669,
+    "name": "Cbm_Left_CrusII_mid",
+    "title": "Cbm Left CrusII Mid",
+    "rgb": [
+      153,
+      141,
+      209
+    ],
+    "a": 255,
+    "hex": "#998dd1"
+  },
+  "670": {
+    "id": 670,
+    "name": "Cbm_Left_CrusII_lat",
+    "title": "Cbm Left CrusII Lat",
+    "rgb": [
+      204,
+      204,
+      255
+    ],
+    "a": 255,
+    "hex": "#ccccff"
+  },
+  "671": {
+    "id": 671,
+    "name": "Cbm_Left_7med",
+    "title": "Cbm Left 7med",
+    "rgb": [
+      31,
+      212,
+      194
+    ],
+    "a": 255,
+    "hex": "#1fd4c2"
+  },
+  "672": {
+    "id": 672,
+    "name": "Cbm_Left_7mid",
+    "title": "Cbm Left 7mid",
+    "rgb": [
+      3,
+      255,
+      237
+    ],
+    "a": 255,
+    "hex": "#03ffed"
+  },
+  "673": {
+    "id": 673,
+    "name": "Cbm_Left_7lat",
+    "title": "Cbm Left 7lat",
+    "rgb": [
+      204,
+      255,
+      255
+    ],
+    "a": 255,
+    "hex": "#ccffff"
+  },
+  "674": {
+    "id": 674,
+    "name": "Cbm_Left_8med",
+    "title": "Cbm Left 8med",
+    "rgb": [
+      86,
+      74,
+      147
+    ],
+    "a": 255,
+    "hex": "#564a93"
+  },
+  "675": {
+    "id": 675,
+    "name": "Cbm_Left_8mid",
+    "title": "Cbm Left 8mid",
+    "rgb": [
+      114,
+      114,
+      190
+    ],
+    "a": 255,
+    "hex": "#7272be"
+  },
+  "676": {
+    "id": 676,
+    "name": "Cbm_Left_8lat",
+    "title": "Cbm Left 8lat",
+    "rgb": [
+      184,
+      178,
+      255
+    ],
+    "a": 255,
+    "hex": "#b8b2ff"
+  },
+  "677": {
+    "id": 677,
+    "name": "Cbm_Left_PUNs",
+    "title": "Cbm Left PUNs",
+    "rgb": [
+      126,
+      138,
+      37
+    ],
+    "a": 255,
+    "hex": "#7e8a25"
+  },
+  "678": {
+    "id": 678,
+    "name": "Cbm_Left_TONs",
+    "title": "Cbm Left TONs",
+    "rgb": [
+      189,
+      197,
+      117
+    ],
+    "a": 255,
+    "hex": "#bdc575"
+  },
+  "679": {
+    "id": 679,
+    "name": "Cbm_Left_FLOs",
+    "title": "Cbm Left FLOs",
+    "rgb": [
+      240,
+      230,
+      140
+    ],
+    "a": 255,
+    "hex": "#f0e68c"
+  },
+  "690": {
+    "id": 690,
+    "name": "CbmWM_Gyri_Left",
+    "title": "CbmWM Gyri Left",
+    "rgb": [
+      122,
+      135,
+      50
+    ],
+    "a": 255,
+    "hex": "#7a8732"
+  },
+  "691": {
+    "id": 691,
+    "name": "CbmWM_Gyri_Right",
+    "title": "CbmWM Gyri Right",
+    "rgb": [
+      122,
+      135,
+      50
+    ],
+    "a": 255,
+    "hex": "#7a8732"
+  },
+  "701": {
+    "id": 701,
+    "name": "CSF-FSL-FAST",
+    "title": "CSF FSL FAST",
+    "rgb": [
+      120,
+      18,
+      134
+    ],
+    "a": 255,
+    "hex": "#781286"
+  },
+  "702": {
+    "id": 702,
+    "name": "GrayMatter-FSL-FAST",
+    "title": "GrayMatter FSL FAST",
+    "rgb": [
+      205,
+      62,
+      78
+    ],
+    "a": 255,
+    "hex": "#cd3e4e"
+  },
+  "703": {
+    "id": 703,
+    "name": "WhiteMatter-FSL-FAST",
+    "title": "WhiteMatter FSL FAST",
+    "rgb": [
+      0,
+      225,
+      0
+    ],
+    "a": 255,
+    "hex": "#00e100"
+  },
+  "801": {
+    "id": 801,
+    "name": "L_hypothalamus_anterior_inferior",
+    "title": "L Hypothalamus Anterior Inferior",
+    "rgb": [
+      250,
+      255,
+      50
+    ],
+    "a": 255,
+    "hex": "#faff32"
+  },
+  "802": {
+    "id": 802,
+    "name": "L_hypothalamus_anterior_superior",
+    "title": "L Hypothalamus Anterior Superior",
+    "rgb": [
+      80,
+      200,
+      255
+    ],
+    "a": 255,
+    "hex": "#50c8ff"
+  },
+  "803": {
+    "id": 803,
+    "name": "L_hypothalamus_posterior",
+    "title": "L Hypothalamus Posterior",
+    "rgb": [
+      255,
+      160,
+      0
+    ],
+    "a": 255,
+    "hex": "#ffa000"
+  },
+  "804": {
+    "id": 804,
+    "name": "L_hypothalamus_tubular_inferior",
+    "title": "L Hypothalamus Tubular Inferior",
+    "rgb": [
+      255,
+      160,
+      200
+    ],
+    "a": 255,
+    "hex": "#ffa0c8"
+  },
+  "805": {
+    "id": 805,
+    "name": "L_hypothalamus_tubular_superior",
+    "title": "L Hypothalamus Tubular Superior",
+    "rgb": [
+      20,
+      180,
+      130
+    ],
+    "a": 255,
+    "hex": "#14b482"
+  },
+  "806": {
+    "id": 806,
+    "name": "R_hypothalamus_anterior_inferior",
+    "title": "R Hypothalamus Anterior Inferior",
+    "rgb": [
+      250,
+      255,
+      50
+    ],
+    "a": 255,
+    "hex": "#faff32"
+  },
+  "807": {
+    "id": 807,
+    "name": "R_hypothalamus_anterior_superior",
+    "title": "R Hypothalamus Anterior Superior",
+    "rgb": [
+      80,
+      200,
+      255
+    ],
+    "a": 255,
+    "hex": "#50c8ff"
+  },
+  "808": {
+    "id": 808,
+    "name": "R_hypothalamus_posterior",
+    "title": "R Hypothalamus Posterior",
+    "rgb": [
+      255,
+      160,
+      0
+    ],
+    "a": 255,
+    "hex": "#ffa000"
+  },
+  "809": {
+    "id": 809,
+    "name": "R_hypothalamus_tubular_inferior",
+    "title": "R Hypothalamus Tubular Inferior",
+    "rgb": [
+      255,
+      160,
+      200
+    ],
+    "a": 255,
+    "hex": "#ffa0c8"
+  },
+  "810": {
+    "id": 810,
+    "name": "R_hypothalamus_tubular_superior",
+    "title": "R Hypothalamus Tubular Superior",
+    "rgb": [
+      20,
+      180,
+      130
+    ],
+    "a": 255,
+    "hex": "#14b482"
+  },
+  "819": {
+    "id": 819,
+    "name": "Left-HypoThal-noMB",
+    "title": "Left HypoThal noMB",
+    "rgb": [
+      0,
+      80,
+      0
+    ],
+    "a": 255,
+    "hex": "#005000"
+  },
+  "820": {
+    "id": 820,
+    "name": "Right-HypoThal-noMB",
+    "title": "Right HypoThal noMB",
+    "rgb": [
+      15,
+      165,
+      15
+    ],
+    "a": 255,
+    "hex": "#0fa50f"
+  },
+  "821": {
+    "id": 821,
+    "name": "Left-Fornix",
+    "title": "Left Fornix",
+    "rgb": [
+      0,
+      255,
+      255
+    ],
+    "a": 255,
+    "hex": "#00ffff"
+  },
+  "822": {
+    "id": 822,
+    "name": "Right-Fornix",
+    "title": "Right Fornix",
+    "rgb": [
+      27,
+      187,
+      253
+    ],
+    "a": 255,
+    "hex": "#1bbbfd"
+  },
+  "843": {
+    "id": 843,
+    "name": "Left-MammillaryBody",
+    "title": "Left MammillaryBody",
+    "rgb": [
+      178,
+      255,
+      80
+    ],
+    "a": 255,
+    "hex": "#b2ff50"
+  },
+  "844": {
+    "id": 844,
+    "name": "Right-MammillaryBody",
+    "title": "Right MammillaryBody",
+    "rgb": [
+      25,
+      246,
+      80
+    ],
+    "a": 255,
+    "hex": "#19f650"
+  },
+  "853": {
+    "id": 853,
+    "name": "Mid-AntCom",
+    "title": "Mid AntCom",
+    "rgb": [
+      60,
+      58,
+      210
+    ],
+    "a": 255,
+    "hex": "#3c3ad2"
+  },
+  "865": {
+    "id": 865,
+    "name": "Left-Basal-Forebrain",
+    "title": "Left Basal Forebrain",
+    "rgb": [
+      170,
+      85,
+      0
+    ],
+    "a": 255,
+    "hex": "#aa5500"
+  },
+  "866": {
+    "id": 866,
+    "name": "Right-Basal-Forebrain",
+    "title": "Right Basal Forebrain",
+    "rgb": [
+      139,
+      69,
+      19
+    ],
+    "a": 255,
+    "hex": "#8b4513"
+  },
+  "869": {
+    "id": 869,
+    "name": "Left-SeptalNuc",
+    "title": "Left SeptalNuc",
+    "rgb": [
+      255,
+      170,
+      255
+    ],
+    "a": 255,
+    "hex": "#ffaaff"
+  },
+  "870": {
+    "id": 870,
+    "name": "Right-SeptalNuc",
+    "title": "Right SeptalNuc",
+    "rgb": [
+      191,
+      127,
+      191
+    ],
+    "a": 255,
+    "hex": "#bf7fbf"
+  },
+  "883": {
+    "id": 883,
+    "name": "Pituitary-Ant",
+    "title": "Pituitary Ant",
+    "rgb": [
+      247,
+      40,
+      248
+    ],
+    "a": 255,
+    "hex": "#f728f8"
+  },
+  "900": {
+    "id": 900,
+    "name": "Pineal",
+    "title": "Pineal",
+    "rgb": [
+      153,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#990000"
+  },
+  "903": {
+    "id": 903,
+    "name": "Pituitary-Post",
+    "title": "Pituitary Post",
+    "rgb": [
+      40,
+      247,
+      248
+    ],
+    "a": 255,
+    "hex": "#28f7f8"
+  },
+  "904": {
+    "id": 904,
+    "name": "PG-Infundibulum",
+    "title": "PG Infundibulum",
+    "rgb": [
+      255,
+      128,
+      0
+    ],
+    "a": 255,
+    "hex": "#ff8000"
+  },
+  "901": {
+    "id": 901,
+    "name": "Air-Internal",
+    "title": "Air Internal",
+    "rgb": [
+      0,
+      170,
+      0
+    ],
+    "a": 255,
+    "hex": "#00aa00"
+  },
+  "902": {
+    "id": 902,
+    "name": "Artery",
+    "title": "Artery",
+    "rgb": [
+      204,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#cc0000"
+  },
+  "906": {
+    "id": 906,
+    "name": "EyeBalls",
+    "title": "EyeBalls",
+    "rgb": [
+      230,
+      189,
+      66
+    ],
+    "a": 255,
+    "hex": "#e6bd42"
+  },
+  "907": {
+    "id": 907,
+    "name": "Other-Tissues",
+    "title": "Other Tissues",
+    "rgb": [
+      85,
+      85,
+      0
+    ],
+    "a": 255,
+    "hex": "#555500"
+  },
+  "908": {
+    "id": 908,
+    "name": "Rectus-Muscles",
+    "title": "Rectus Muscles",
+    "rgb": [
+      190,
+      50,
+      73
+    ],
+    "a": 255,
+    "hex": "#be3249"
+  },
+  "909": {
+    "id": 909,
+    "name": "Mucosa",
+    "title": "Mucosa",
+    "rgb": [
+      255,
+      160,
+      188
+    ],
+    "a": 255,
+    "hex": "#ffa0bc"
+  },
+  "911": {
+    "id": 911,
+    "name": "Skin",
+    "title": "Skin",
+    "rgb": [
+      85,
+      85,
+      85
+    ],
+    "a": 255,
+    "hex": "#555555"
+  },
+  "912": {
+    "id": 912,
+    "name": "Charm-Spinal-Cord",
+    "title": "Charm Spinal Cord",
+    "rgb": [
+      0,
+      187,
+      169
+    ],
+    "a": 255,
+    "hex": "#00bba9"
+  },
+  "914": {
+    "id": 914,
+    "name": "Vein",
+    "title": "Vein",
+    "rgb": [
+      0,
+      84,
+      255
+    ],
+    "a": 255,
+    "hex": "#0054ff"
+  },
+  "915": {
+    "id": 915,
+    "name": "Bone-Cortical",
+    "title": "Bone Cortical",
+    "rgb": [
+      0,
+      85,
+      0
+    ],
+    "a": 255,
+    "hex": "#005500"
+  },
+  "916": {
+    "id": 916,
+    "name": "Bone-Cancellous",
+    "title": "Bone Cancellous",
+    "rgb": [
+      170,
+      170,
+      0
+    ],
+    "a": 255,
+    "hex": "#aaaa00"
+  },
+  "917": {
+    "id": 917,
+    "name": "Charm-Background",
+    "title": "Charm Background",
+    "rgb": [
+      0,
+      168,
+      255
+    ],
+    "a": 255,
+    "hex": "#00a8ff"
+  },
+  "920": {
+    "id": 920,
+    "name": "Cortical-CSF",
+    "title": "Cortical CSF",
+    "rgb": [
+      120,
+      133,
+      217
+    ],
+    "a": 255,
+    "hex": "#7885d9"
+  },
+  "930": {
+    "id": 930,
+    "name": "Optic-Nerve",
+    "title": "Optic Nerve",
+    "rgb": [
+      0,
+      191,
+      122
+    ],
+    "a": 255,
+    "hex": "#00bf7a"
+  },
+  "931": {
+    "id": 931,
+    "name": "Spinal-CSF",
+    "title": "Spinal CSF",
+    "rgb": [
+      100,
+      113,
+      207
+    ],
+    "a": 255,
+    "hex": "#6471cf"
+  },
+  "951": {
+    "id": 951,
+    "name": "L-olfactory-bulb",
+    "title": "L Olfactory Bulb",
+    "rgb": [
+      0,
+      0,
+      255
+    ],
+    "a": 255,
+    "hex": "#0000ff"
+  },
+  "952": {
+    "id": 952,
+    "name": "R-olfactory-bulb",
+    "title": "R Olfactory Bulb",
+    "rgb": [
+      255,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#ff0000"
+  },
+  "961": {
+    "id": 961,
+    "name": "R-N.opticus",
+    "title": "R N.opticus",
+    "rgb": [
+      70,
+      130,
+      180
+    ],
+    "a": 255,
+    "hex": "#4682b4"
+  },
+  "962": {
+    "id": 962,
+    "name": "L-N.opticus",
+    "title": "L N.opticus",
+    "rgb": [
+      130,
+      180,
+      70
+    ],
+    "a": 255,
+    "hex": "#82b446"
+  },
+  "963": {
+    "id": 963,
+    "name": "R-C.mammilare",
+    "title": "R C.mammilare",
+    "rgb": [
+      205,
+      62,
+      78
+    ],
+    "a": 255,
+    "hex": "#cd3e4e"
+  },
+  "964": {
+    "id": 964,
+    "name": "R-Optic-tract",
+    "title": "R Optic Tract",
+    "rgb": [
+      80,
+      120,
+      134
+    ],
+    "a": 255,
+    "hex": "#507886"
+  },
+  "965": {
+    "id": 965,
+    "name": "L-Optic-tract",
+    "title": "L Optic Tract",
+    "rgb": [
+      196,
+      58,
+      250
+    ],
+    "a": 255,
+    "hex": "#c43afa"
+  },
+  "966": {
+    "id": 966,
+    "name": "L-C.mammilare",
+    "title": "L C.mammilare",
+    "rgb": [
+      0,
+      148,
+      0
+    ],
+    "a": 255,
+    "hex": "#009400"
+  },
+  "967": {
+    "id": 967,
+    "name": "R-Chiasma-Opticum",
+    "title": "R Chiasma Opticum",
+    "rgb": [
+      220,
+      248,
+      164
+    ],
+    "a": 255,
+    "hex": "#dcf8a4"
+  },
+  "968": {
+    "id": 968,
+    "name": "L-Chiasma-Opticum",
+    "title": "L Chiasma Opticum",
+    "rgb": [
+      230,
+      148,
+      34
+    ],
+    "a": 255,
+    "hex": "#e69422"
+  },
+  "969": {
+    "id": 969,
+    "name": "Ant-Commisure",
+    "title": "Ant Commisure",
+    "rgb": [
+      10,
+      180,
+      225
+    ],
+    "a": 255,
+    "hex": "#0ab4e1"
+  },
+  "970": {
+    "id": 970,
+    "name": "Third-Ventricle",
+    "title": "Third Ventricle",
+    "rgb": [
+      118,
+      0,
+      100
+    ],
+    "a": 255,
+    "hex": "#760064"
+  },
+  "971": {
+    "id": 971,
+    "name": "R-Fornix",
+    "title": "R Fornix",
+    "rgb": [
+      122,
+      200,
+      120
+    ],
+    "a": 255,
+    "hex": "#7ac878"
+  },
+  "972": {
+    "id": 972,
+    "name": "L-Fornix",
+    "title": "L Fornix",
+    "rgb": [
+      236,
+      13,
+      176
+    ],
+    "a": 255,
+    "hex": "#ec0db0"
+  },
+  "973": {
+    "id": 973,
+    "name": "Epiphysis",
+    "title": "Epiphysis",
+    "rgb": [
+      204,
+      182,
+      142
+    ],
+    "a": 255,
+    "hex": "#ccb68e"
+  },
+  "974": {
+    "id": 974,
+    "name": "Hypophysis",
+    "title": "Hypophysis",
+    "rgb": [
+      119,
+      159,
+      176
+    ],
+    "a": 255,
+    "hex": "#779fb0"
+  },
+  "975": {
+    "id": 975,
+    "name": "Infundibulum",
+    "title": "Infundibulum",
+    "rgb": [
+      220,
+      216,
+      20
+    ],
+    "a": 255,
+    "hex": "#dcd814"
+  },
+  "976": {
+    "id": 976,
+    "name": "Tuberal-Region",
+    "title": "Tuberal Region",
+    "rgb": [
+      120,
+      60,
+      110
+    ],
+    "a": 255,
+    "hex": "#783c6e"
+  },
+  "977": {
+    "id": 977,
+    "name": "L-Med-Hypothalamus",
+    "title": "L Med Hypothalamus",
+    "rgb": [
+      165,
+      255,
+      0
+    ],
+    "a": 255,
+    "hex": "#a5ff00"
+  },
+  "978": {
+    "id": 978,
+    "name": "L-Lat-Hypothalamus",
+    "title": "L Lat Hypothalamus",
+    "rgb": [
+      0,
+      255,
+      127
+    ],
+    "a": 255,
+    "hex": "#00ff7f"
+  },
+  "979": {
+    "id": 979,
+    "name": "L-Ant-Hypothalamus",
+    "title": "L Ant Hypothalamus",
+    "rgb": [
+      165,
+      42,
+      42
+    ],
+    "a": 255,
+    "hex": "#a52a2a"
+  },
+  "980": {
+    "id": 980,
+    "name": "L-Post-Hypothalamus",
+    "title": "L Post Hypothalamus",
+    "rgb": [
+      255,
+      215,
+      0
+    ],
+    "a": 255,
+    "hex": "#ffd700"
+  },
+  "981": {
+    "id": 981,
+    "name": "R-Med-Hypothalamus",
+    "title": "R Med Hypothalamus",
+    "rgb": [
+      115,
+      255,
+      0
+    ],
+    "a": 255,
+    "hex": "#73ff00"
+  },
+  "982": {
+    "id": 982,
+    "name": "R-Lat-Hypothalamus",
+    "title": "R Lat Hypothalamus",
+    "rgb": [
+      60,
+      255,
+      127
+    ],
+    "a": 255,
+    "hex": "#3cff7f"
+  },
+  "983": {
+    "id": 983,
+    "name": "R-Ant-Hypothalamus",
+    "title": "R Ant Hypothalamus",
+    "rgb": [
+      165,
+      142,
+      42
+    ],
+    "a": 255,
+    "hex": "#a58e2a"
+  },
+  "984": {
+    "id": 984,
+    "name": "R-Post-Hypothalamus",
+    "title": "R Post Hypothalamus",
+    "rgb": [
+      255,
+      170,
+      20
+    ],
+    "a": 255,
+    "hex": "#ffaa14"
+  },
+  "999": {
+    "id": 999,
+    "name": "SUSPICIOUS",
+    "title": "SUSPICIOUS",
+    "rgb": [
+      255,
+      100,
+      100
+    ],
+    "a": 255,
+    "hex": "#ff6464"
+  },
+  "1000": {
+    "id": 1000,
+    "name": "ctx-lh-unknown",
+    "title": "Left Cortex \u2014 Unknown",
+    "rgb": [
+      25,
+      5,
+      25
+    ],
+    "a": 255,
+    "hex": "#190519"
+  },
+  "1001": {
+    "id": 1001,
+    "name": "ctx-lh-bankssts",
+    "title": "Left Cortex \u2014 Bankssts",
+    "rgb": [
+      25,
+      100,
+      40
+    ],
+    "a": 255,
+    "hex": "#196428"
+  },
+  "1002": {
+    "id": 1002,
+    "name": "ctx-lh-caudalanteriorcingulate",
+    "title": "Left Cortex \u2014 Caudalanteriorcingulate",
+    "rgb": [
+      125,
+      100,
+      160
+    ],
+    "a": 255,
+    "hex": "#7d64a0"
+  },
+  "1003": {
+    "id": 1003,
+    "name": "ctx-lh-caudalmiddlefrontal",
+    "title": "Left Cortex \u2014 Caudalmiddlefrontal",
+    "rgb": [
+      100,
+      25,
+      0
+    ],
+    "a": 255,
+    "hex": "#641900"
+  },
+  "1004": {
+    "id": 1004,
+    "name": "ctx-lh-corpuscallosum",
+    "title": "Left Cortex \u2014 Corpuscallosum",
+    "rgb": [
+      120,
+      70,
+      50
+    ],
+    "a": 255,
+    "hex": "#784632"
+  },
+  "1005": {
+    "id": 1005,
+    "name": "ctx-lh-cuneus",
+    "title": "Left Cortex \u2014 Cuneus",
+    "rgb": [
+      220,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#dc1464"
+  },
+  "1006": {
+    "id": 1006,
+    "name": "ctx-lh-entorhinal",
+    "title": "Left Cortex \u2014 Entorhinal",
+    "rgb": [
+      220,
+      20,
+      10
+    ],
+    "a": 255,
+    "hex": "#dc140a"
+  },
+  "1007": {
+    "id": 1007,
+    "name": "ctx-lh-fusiform",
+    "title": "Left Cortex \u2014 Fusiform",
+    "rgb": [
+      180,
+      220,
+      140
+    ],
+    "a": 255,
+    "hex": "#b4dc8c"
+  },
+  "1008": {
+    "id": 1008,
+    "name": "ctx-lh-inferiorparietal",
+    "title": "Left Cortex \u2014 Inferiorparietal",
+    "rgb": [
+      220,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#dc3cdc"
+  },
+  "1009": {
+    "id": 1009,
+    "name": "ctx-lh-inferiortemporal",
+    "title": "Left Cortex \u2014 Inferiortemporal",
+    "rgb": [
+      180,
+      40,
+      120
+    ],
+    "a": 255,
+    "hex": "#b42878"
+  },
+  "1010": {
+    "id": 1010,
+    "name": "ctx-lh-isthmuscingulate",
+    "title": "Left Cortex \u2014 Isthmuscingulate",
+    "rgb": [
+      140,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#8c148c"
+  },
+  "1011": {
+    "id": 1011,
+    "name": "ctx-lh-lateraloccipital",
+    "title": "Left Cortex \u2014 Lateraloccipital",
+    "rgb": [
+      20,
+      30,
+      140
+    ],
+    "a": 255,
+    "hex": "#141e8c"
+  },
+  "1012": {
+    "id": 1012,
+    "name": "ctx-lh-lateralorbitofrontal",
+    "title": "Left Cortex \u2014 Lateralorbitofrontal",
+    "rgb": [
+      35,
+      75,
+      50
+    ],
+    "a": 255,
+    "hex": "#234b32"
+  },
+  "1013": {
+    "id": 1013,
+    "name": "ctx-lh-lingual",
+    "title": "Left Cortex \u2014 Lingual",
+    "rgb": [
+      225,
+      140,
+      140
+    ],
+    "a": 255,
+    "hex": "#e18c8c"
+  },
+  "1014": {
+    "id": 1014,
+    "name": "ctx-lh-medialorbitofrontal",
+    "title": "Left Cortex \u2014 Medialorbitofrontal",
+    "rgb": [
+      200,
+      35,
+      75
+    ],
+    "a": 255,
+    "hex": "#c8234b"
+  },
+  "1015": {
+    "id": 1015,
+    "name": "ctx-lh-middletemporal",
+    "title": "Left Cortex \u2014 Middletemporal",
+    "rgb": [
+      160,
+      100,
+      50
+    ],
+    "a": 255,
+    "hex": "#a06432"
+  },
+  "1016": {
+    "id": 1016,
+    "name": "ctx-lh-parahippocampal",
+    "title": "Left Cortex \u2014 Parahippocampal",
+    "rgb": [
+      20,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#14dc3c"
+  },
+  "1017": {
+    "id": 1017,
+    "name": "ctx-lh-paracentral",
+    "title": "Left Cortex \u2014 Paracentral",
+    "rgb": [
+      60,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#3cdc3c"
+  },
+  "1018": {
+    "id": 1018,
+    "name": "ctx-lh-parsopercularis",
+    "title": "Left Cortex \u2014 Parsopercularis",
+    "rgb": [
+      220,
+      180,
+      140
+    ],
+    "a": 255,
+    "hex": "#dcb48c"
+  },
+  "1019": {
+    "id": 1019,
+    "name": "ctx-lh-parsorbitalis",
+    "title": "Left Cortex \u2014 Parsorbitalis",
+    "rgb": [
+      20,
+      100,
+      50
+    ],
+    "a": 255,
+    "hex": "#146432"
+  },
+  "1020": {
+    "id": 1020,
+    "name": "ctx-lh-parstriangularis",
+    "title": "Left Cortex \u2014 Parstriangularis",
+    "rgb": [
+      220,
+      60,
+      20
+    ],
+    "a": 255,
+    "hex": "#dc3c14"
+  },
+  "1021": {
+    "id": 1021,
+    "name": "ctx-lh-pericalcarine",
+    "title": "Left Cortex \u2014 Pericalcarine",
+    "rgb": [
+      120,
+      100,
+      60
+    ],
+    "a": 255,
+    "hex": "#78643c"
+  },
+  "1022": {
+    "id": 1022,
+    "name": "ctx-lh-postcentral",
+    "title": "Left Cortex \u2014 Postcentral",
+    "rgb": [
+      220,
+      20,
+      20
+    ],
+    "a": 255,
+    "hex": "#dc1414"
+  },
+  "1023": {
+    "id": 1023,
+    "name": "ctx-lh-posteriorcingulate",
+    "title": "Left Cortex \u2014 Posteriorcingulate",
+    "rgb": [
+      220,
+      180,
+      220
+    ],
+    "a": 255,
+    "hex": "#dcb4dc"
+  },
+  "1024": {
+    "id": 1024,
+    "name": "ctx-lh-precentral",
+    "title": "Left Cortex \u2014 Precentral",
+    "rgb": [
+      60,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#3c14dc"
+  },
+  "1025": {
+    "id": 1025,
+    "name": "ctx-lh-precuneus",
+    "title": "Left Cortex \u2014 Precuneus",
+    "rgb": [
+      160,
+      140,
+      180
+    ],
+    "a": 255,
+    "hex": "#a08cb4"
+  },
+  "1026": {
+    "id": 1026,
+    "name": "ctx-lh-rostralanteriorcingulate",
+    "title": "Left Cortex \u2014 Rostralanteriorcingulate",
+    "rgb": [
+      80,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#50148c"
+  },
+  "1027": {
+    "id": 1027,
+    "name": "ctx-lh-rostralmiddlefrontal",
+    "title": "Left Cortex \u2014 Rostralmiddlefrontal",
+    "rgb": [
+      75,
+      50,
+      125
+    ],
+    "a": 255,
+    "hex": "#4b327d"
+  },
+  "1028": {
+    "id": 1028,
+    "name": "ctx-lh-superiorfrontal",
+    "title": "Left Cortex \u2014 Superiorfrontal",
+    "rgb": [
+      20,
+      220,
+      160
+    ],
+    "a": 255,
+    "hex": "#14dca0"
+  },
+  "1029": {
+    "id": 1029,
+    "name": "ctx-lh-superiorparietal",
+    "title": "Left Cortex \u2014 Superiorparietal",
+    "rgb": [
+      20,
+      180,
+      140
+    ],
+    "a": 255,
+    "hex": "#14b48c"
+  },
+  "1030": {
+    "id": 1030,
+    "name": "ctx-lh-superiortemporal",
+    "title": "Left Cortex \u2014 Superiortemporal",
+    "rgb": [
+      140,
+      220,
+      220
+    ],
+    "a": 255,
+    "hex": "#8cdcdc"
+  },
+  "1031": {
+    "id": 1031,
+    "name": "ctx-lh-supramarginal",
+    "title": "Left Cortex \u2014 Supramarginal",
+    "rgb": [
+      80,
+      160,
+      20
+    ],
+    "a": 255,
+    "hex": "#50a014"
+  },
+  "1032": {
+    "id": 1032,
+    "name": "ctx-lh-frontalpole",
+    "title": "Left Cortex \u2014 Frontalpole",
+    "rgb": [
+      100,
+      0,
+      100
+    ],
+    "a": 255,
+    "hex": "#640064"
+  },
+  "1033": {
+    "id": 1033,
+    "name": "ctx-lh-temporalpole",
+    "title": "Left Cortex \u2014 Temporalpole",
+    "rgb": [
+      70,
+      70,
+      70
+    ],
+    "a": 255,
+    "hex": "#464646"
+  },
+  "1034": {
+    "id": 1034,
+    "name": "ctx-lh-transversetemporal",
+    "title": "Left Cortex \u2014 Transversetemporal",
+    "rgb": [
+      150,
+      150,
+      200
+    ],
+    "a": 255,
+    "hex": "#9696c8"
+  },
+  "1035": {
+    "id": 1035,
+    "name": "ctx-lh-insula",
+    "title": "Left Cortex \u2014 Insula",
+    "rgb": [
+      255,
+      192,
+      32
+    ],
+    "a": 255,
+    "hex": "#ffc020"
+  },
+  "2000": {
+    "id": 2000,
+    "name": "ctx-rh-unknown",
+    "title": "Right Cortex \u2014 Unknown",
+    "rgb": [
+      25,
+      5,
+      25
+    ],
+    "a": 255,
+    "hex": "#190519"
+  },
+  "2001": {
+    "id": 2001,
+    "name": "ctx-rh-bankssts",
+    "title": "Right Cortex \u2014 Bankssts",
+    "rgb": [
+      25,
+      100,
+      40
+    ],
+    "a": 255,
+    "hex": "#196428"
+  },
+  "2002": {
+    "id": 2002,
+    "name": "ctx-rh-caudalanteriorcingulate",
+    "title": "Right Cortex \u2014 Caudalanteriorcingulate",
+    "rgb": [
+      125,
+      100,
+      160
+    ],
+    "a": 255,
+    "hex": "#7d64a0"
+  },
+  "2003": {
+    "id": 2003,
+    "name": "ctx-rh-caudalmiddlefrontal",
+    "title": "Right Cortex \u2014 Caudalmiddlefrontal",
+    "rgb": [
+      100,
+      25,
+      0
+    ],
+    "a": 255,
+    "hex": "#641900"
+  },
+  "2004": {
+    "id": 2004,
+    "name": "ctx-rh-corpuscallosum",
+    "title": "Right Cortex \u2014 Corpuscallosum",
+    "rgb": [
+      120,
+      70,
+      50
+    ],
+    "a": 255,
+    "hex": "#784632"
+  },
+  "2005": {
+    "id": 2005,
+    "name": "ctx-rh-cuneus",
+    "title": "Right Cortex \u2014 Cuneus",
+    "rgb": [
+      220,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#dc1464"
+  },
+  "2006": {
+    "id": 2006,
+    "name": "ctx-rh-entorhinal",
+    "title": "Right Cortex \u2014 Entorhinal",
+    "rgb": [
+      220,
+      20,
+      10
+    ],
+    "a": 255,
+    "hex": "#dc140a"
+  },
+  "2007": {
+    "id": 2007,
+    "name": "ctx-rh-fusiform",
+    "title": "Right Cortex \u2014 Fusiform",
+    "rgb": [
+      180,
+      220,
+      140
+    ],
+    "a": 255,
+    "hex": "#b4dc8c"
+  },
+  "2008": {
+    "id": 2008,
+    "name": "ctx-rh-inferiorparietal",
+    "title": "Right Cortex \u2014 Inferiorparietal",
+    "rgb": [
+      220,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#dc3cdc"
+  },
+  "2009": {
+    "id": 2009,
+    "name": "ctx-rh-inferiortemporal",
+    "title": "Right Cortex \u2014 Inferiortemporal",
+    "rgb": [
+      180,
+      40,
+      120
+    ],
+    "a": 255,
+    "hex": "#b42878"
+  },
+  "2010": {
+    "id": 2010,
+    "name": "ctx-rh-isthmuscingulate",
+    "title": "Right Cortex \u2014 Isthmuscingulate",
+    "rgb": [
+      140,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#8c148c"
+  },
+  "2011": {
+    "id": 2011,
+    "name": "ctx-rh-lateraloccipital",
+    "title": "Right Cortex \u2014 Lateraloccipital",
+    "rgb": [
+      20,
+      30,
+      140
+    ],
+    "a": 255,
+    "hex": "#141e8c"
+  },
+  "2012": {
+    "id": 2012,
+    "name": "ctx-rh-lateralorbitofrontal",
+    "title": "Right Cortex \u2014 Lateralorbitofrontal",
+    "rgb": [
+      35,
+      75,
+      50
+    ],
+    "a": 255,
+    "hex": "#234b32"
+  },
+  "2013": {
+    "id": 2013,
+    "name": "ctx-rh-lingual",
+    "title": "Right Cortex \u2014 Lingual",
+    "rgb": [
+      225,
+      140,
+      140
+    ],
+    "a": 255,
+    "hex": "#e18c8c"
+  },
+  "2014": {
+    "id": 2014,
+    "name": "ctx-rh-medialorbitofrontal",
+    "title": "Right Cortex \u2014 Medialorbitofrontal",
+    "rgb": [
+      200,
+      35,
+      75
+    ],
+    "a": 255,
+    "hex": "#c8234b"
+  },
+  "2015": {
+    "id": 2015,
+    "name": "ctx-rh-middletemporal",
+    "title": "Right Cortex \u2014 Middletemporal",
+    "rgb": [
+      160,
+      100,
+      50
+    ],
+    "a": 255,
+    "hex": "#a06432"
+  },
+  "2016": {
+    "id": 2016,
+    "name": "ctx-rh-parahippocampal",
+    "title": "Right Cortex \u2014 Parahippocampal",
+    "rgb": [
+      20,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#14dc3c"
+  },
+  "2017": {
+    "id": 2017,
+    "name": "ctx-rh-paracentral",
+    "title": "Right Cortex \u2014 Paracentral",
+    "rgb": [
+      60,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#3cdc3c"
+  },
+  "2018": {
+    "id": 2018,
+    "name": "ctx-rh-parsopercularis",
+    "title": "Right Cortex \u2014 Parsopercularis",
+    "rgb": [
+      220,
+      180,
+      140
+    ],
+    "a": 255,
+    "hex": "#dcb48c"
+  },
+  "2019": {
+    "id": 2019,
+    "name": "ctx-rh-parsorbitalis",
+    "title": "Right Cortex \u2014 Parsorbitalis",
+    "rgb": [
+      20,
+      100,
+      50
+    ],
+    "a": 255,
+    "hex": "#146432"
+  },
+  "2020": {
+    "id": 2020,
+    "name": "ctx-rh-parstriangularis",
+    "title": "Right Cortex \u2014 Parstriangularis",
+    "rgb": [
+      220,
+      60,
+      20
+    ],
+    "a": 255,
+    "hex": "#dc3c14"
+  },
+  "2021": {
+    "id": 2021,
+    "name": "ctx-rh-pericalcarine",
+    "title": "Right Cortex \u2014 Pericalcarine",
+    "rgb": [
+      120,
+      100,
+      60
+    ],
+    "a": 255,
+    "hex": "#78643c"
+  },
+  "2022": {
+    "id": 2022,
+    "name": "ctx-rh-postcentral",
+    "title": "Right Cortex \u2014 Postcentral",
+    "rgb": [
+      220,
+      20,
+      20
+    ],
+    "a": 255,
+    "hex": "#dc1414"
+  },
+  "2023": {
+    "id": 2023,
+    "name": "ctx-rh-posteriorcingulate",
+    "title": "Right Cortex \u2014 Posteriorcingulate",
+    "rgb": [
+      220,
+      180,
+      220
+    ],
+    "a": 255,
+    "hex": "#dcb4dc"
+  },
+  "2024": {
+    "id": 2024,
+    "name": "ctx-rh-precentral",
+    "title": "Right Cortex \u2014 Precentral",
+    "rgb": [
+      60,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#3c14dc"
+  },
+  "2025": {
+    "id": 2025,
+    "name": "ctx-rh-precuneus",
+    "title": "Right Cortex \u2014 Precuneus",
+    "rgb": [
+      160,
+      140,
+      180
+    ],
+    "a": 255,
+    "hex": "#a08cb4"
+  },
+  "2026": {
+    "id": 2026,
+    "name": "ctx-rh-rostralanteriorcingulate",
+    "title": "Right Cortex \u2014 Rostralanteriorcingulate",
+    "rgb": [
+      80,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#50148c"
+  },
+  "2027": {
+    "id": 2027,
+    "name": "ctx-rh-rostralmiddlefrontal",
+    "title": "Right Cortex \u2014 Rostralmiddlefrontal",
+    "rgb": [
+      75,
+      50,
+      125
+    ],
+    "a": 255,
+    "hex": "#4b327d"
+  },
+  "2028": {
+    "id": 2028,
+    "name": "ctx-rh-superiorfrontal",
+    "title": "Right Cortex \u2014 Superiorfrontal",
+    "rgb": [
+      20,
+      220,
+      160
+    ],
+    "a": 255,
+    "hex": "#14dca0"
+  },
+  "2029": {
+    "id": 2029,
+    "name": "ctx-rh-superiorparietal",
+    "title": "Right Cortex \u2014 Superiorparietal",
+    "rgb": [
+      20,
+      180,
+      140
+    ],
+    "a": 255,
+    "hex": "#14b48c"
+  },
+  "2030": {
+    "id": 2030,
+    "name": "ctx-rh-superiortemporal",
+    "title": "Right Cortex \u2014 Superiortemporal",
+    "rgb": [
+      140,
+      220,
+      220
+    ],
+    "a": 255,
+    "hex": "#8cdcdc"
+  },
+  "2031": {
+    "id": 2031,
+    "name": "ctx-rh-supramarginal",
+    "title": "Right Cortex \u2014 Supramarginal",
+    "rgb": [
+      80,
+      160,
+      20
+    ],
+    "a": 255,
+    "hex": "#50a014"
+  },
+  "2032": {
+    "id": 2032,
+    "name": "ctx-rh-frontalpole",
+    "title": "Right Cortex \u2014 Frontalpole",
+    "rgb": [
+      100,
+      0,
+      100
+    ],
+    "a": 255,
+    "hex": "#640064"
+  },
+  "2033": {
+    "id": 2033,
+    "name": "ctx-rh-temporalpole",
+    "title": "Right Cortex \u2014 Temporalpole",
+    "rgb": [
+      70,
+      70,
+      70
+    ],
+    "a": 255,
+    "hex": "#464646"
+  },
+  "2034": {
+    "id": 2034,
+    "name": "ctx-rh-transversetemporal",
+    "title": "Right Cortex \u2014 Transversetemporal",
+    "rgb": [
+      150,
+      150,
+      200
+    ],
+    "a": 255,
+    "hex": "#9696c8"
+  },
+  "2035": {
+    "id": 2035,
+    "name": "ctx-rh-insula",
+    "title": "Right Cortex \u2014 Insula",
+    "rgb": [
+      255,
+      192,
+      32
+    ],
+    "a": 255,
+    "hex": "#ffc020"
+  },
+  "1301": {
+    "id": 1301,
+    "name": "ctx-lh-frontal-lobe",
+    "title": "Left Cortex \u2014 Frontal Lobe",
+    "rgb": [
+      25,
+      100,
+      40
+    ],
+    "a": 255,
+    "hex": "#196428"
+  },
+  "1303": {
+    "id": 1303,
+    "name": "ctx-lh-cingulate-lobe",
+    "title": "Left Cortex \u2014 Cingulate Lobe",
+    "rgb": [
+      100,
+      25,
+      0
+    ],
+    "a": 255,
+    "hex": "#641900"
+  },
+  "1304": {
+    "id": 1304,
+    "name": "ctx-lh-occipital-lobe",
+    "title": "Left Cortex \u2014 Occipital Lobe",
+    "rgb": [
+      120,
+      70,
+      50
+    ],
+    "a": 255,
+    "hex": "#784632"
+  },
+  "1305": {
+    "id": 1305,
+    "name": "ctx-lh-temporal-lobe",
+    "title": "Left Cortex \u2014 Temporal Lobe",
+    "rgb": [
+      220,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#dc1464"
+  },
+  "1306": {
+    "id": 1306,
+    "name": "ctx-lh-parietal-lobe",
+    "title": "Left Cortex \u2014 Parietal Lobe",
+    "rgb": [
+      220,
+      20,
+      10
+    ],
+    "a": 255,
+    "hex": "#dc140a"
+  },
+  "1307": {
+    "id": 1307,
+    "name": "ctx-lh-insula-lobe",
+    "title": "Left Cortex \u2014 Insula Lobe",
+    "rgb": [
+      255,
+      192,
+      32
+    ],
+    "a": 255,
+    "hex": "#ffc020"
+  },
+  "1100": {
+    "id": 1100,
+    "name": "ctx-lh-Unknown",
+    "title": "Left Cortex \u2014 Unknown",
+    "rgb": [
+      0,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#000000"
+  },
+  "1101": {
+    "id": 1101,
+    "name": "ctx-lh-Corpus_callosum",
+    "title": "Left Cortex \u2014 Corpus Callosum",
+    "rgb": [
+      50,
+      50,
+      50
+    ],
+    "a": 255,
+    "hex": "#323232"
+  },
+  "1102": {
+    "id": 1102,
+    "name": "ctx-lh-G_and_S_Insula_ONLY_AVERAGE",
+    "title": "Left Cortex \u2014 G And S Insula ONLY AVERAGE",
+    "rgb": [
+      180,
+      20,
+      30
+    ],
+    "a": 255,
+    "hex": "#b4141e"
+  },
+  "1103": {
+    "id": 1103,
+    "name": "ctx-lh-G_cingulate-Isthmus",
+    "title": "Left Cortex \u2014 G Cingulate Isthmus",
+    "rgb": [
+      60,
+      25,
+      25
+    ],
+    "a": 255,
+    "hex": "#3c1919"
+  },
+  "1104": {
+    "id": 1104,
+    "name": "ctx-lh-G_cingulate-Main_part",
+    "title": "Left Cortex \u2014 G Cingulate Main Part",
+    "rgb": [
+      25,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#193c3c"
+  },
+  "1200": {
+    "id": 1200,
+    "name": "ctx-lh-G_cingulate-caudal_ACC",
+    "title": "Left Cortex \u2014 G Cingulate Caudal ACC",
+    "rgb": [
+      25,
+      60,
+      61
+    ],
+    "a": 255,
+    "hex": "#193c3d"
+  },
+  "1201": {
+    "id": 1201,
+    "name": "ctx-lh-G_cingulate-rostral_ACC",
+    "title": "Left Cortex \u2014 G Cingulate Rostral ACC",
+    "rgb": [
+      25,
+      90,
+      60
+    ],
+    "a": 255,
+    "hex": "#195a3c"
+  },
+  "1202": {
+    "id": 1202,
+    "name": "ctx-lh-G_cingulate-posterior",
+    "title": "Left Cortex \u2014 G Cingulate Posterior",
+    "rgb": [
+      25,
+      120,
+      60
+    ],
+    "a": 255,
+    "hex": "#19783c"
+  },
+  "1205": {
+    "id": 1205,
+    "name": "ctx-lh-S_cingulate-caudal_ACC",
+    "title": "Left Cortex \u2014 S Cingulate Caudal ACC",
+    "rgb": [
+      25,
+      150,
+      60
+    ],
+    "a": 255,
+    "hex": "#19963c"
+  },
+  "1206": {
+    "id": 1206,
+    "name": "ctx-lh-S_cingulate-rostral_ACC",
+    "title": "Left Cortex \u2014 S Cingulate Rostral ACC",
+    "rgb": [
+      25,
+      180,
+      60
+    ],
+    "a": 255,
+    "hex": "#19b43c"
+  },
+  "1207": {
+    "id": 1207,
+    "name": "ctx-lh-S_cingulate-posterior",
+    "title": "Left Cortex \u2014 S Cingulate Posterior",
+    "rgb": [
+      25,
+      210,
+      60
+    ],
+    "a": 255,
+    "hex": "#19d23c"
+  },
+  "1210": {
+    "id": 1210,
+    "name": "ctx-lh-S_pericallosal-caudal",
+    "title": "Left Cortex \u2014 S Pericallosal Caudal",
+    "rgb": [
+      25,
+      150,
+      90
+    ],
+    "a": 255,
+    "hex": "#19965a"
+  },
+  "1211": {
+    "id": 1211,
+    "name": "ctx-lh-S_pericallosal-rostral",
+    "title": "Left Cortex \u2014 S Pericallosal Rostral",
+    "rgb": [
+      25,
+      180,
+      90
+    ],
+    "a": 255,
+    "hex": "#19b45a"
+  },
+  "1212": {
+    "id": 1212,
+    "name": "ctx-lh-S_pericallosal-posterior",
+    "title": "Left Cortex \u2014 S Pericallosal Posterior",
+    "rgb": [
+      25,
+      210,
+      90
+    ],
+    "a": 255,
+    "hex": "#19d25a"
+  },
+  "1105": {
+    "id": 1105,
+    "name": "ctx-lh-G_cuneus",
+    "title": "Left Cortex \u2014 G Cuneus",
+    "rgb": [
+      180,
+      20,
+      20
+    ],
+    "a": 255,
+    "hex": "#b41414"
+  },
+  "1106": {
+    "id": 1106,
+    "name": "ctx-lh-G_frontal_inf-Opercular_part",
+    "title": "Left Cortex \u2014 G Frontal Inf Opercular Part",
+    "rgb": [
+      220,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#dc1464"
+  },
+  "1107": {
+    "id": 1107,
+    "name": "ctx-lh-G_frontal_inf-Orbital_part",
+    "title": "Left Cortex \u2014 G Frontal Inf Orbital Part",
+    "rgb": [
+      140,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#8c3c3c"
+  },
+  "1108": {
+    "id": 1108,
+    "name": "ctx-lh-G_frontal_inf-Triangular_part",
+    "title": "Left Cortex \u2014 G Frontal Inf Triangular Part",
+    "rgb": [
+      180,
+      220,
+      140
+    ],
+    "a": 255,
+    "hex": "#b4dc8c"
+  },
+  "1109": {
+    "id": 1109,
+    "name": "ctx-lh-G_frontal_middle",
+    "title": "Left Cortex \u2014 G Frontal Middle",
+    "rgb": [
+      140,
+      100,
+      180
+    ],
+    "a": 255,
+    "hex": "#8c64b4"
+  },
+  "1110": {
+    "id": 1110,
+    "name": "ctx-lh-G_frontal_superior",
+    "title": "Left Cortex \u2014 G Frontal Superior",
+    "rgb": [
+      180,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#b4148c"
+  },
+  "1111": {
+    "id": 1111,
+    "name": "ctx-lh-G_frontomarginal",
+    "title": "Left Cortex \u2014 G Frontomarginal",
+    "rgb": [
+      140,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#8c148c"
+  },
+  "1112": {
+    "id": 1112,
+    "name": "ctx-lh-G_insular_long",
+    "title": "Left Cortex \u2014 G Insular Long",
+    "rgb": [
+      21,
+      10,
+      10
+    ],
+    "a": 255,
+    "hex": "#150a0a"
+  },
+  "1113": {
+    "id": 1113,
+    "name": "ctx-lh-G_insular_short",
+    "title": "Left Cortex \u2014 G Insular Short",
+    "rgb": [
+      225,
+      140,
+      140
+    ],
+    "a": 255,
+    "hex": "#e18c8c"
+  },
+  "1114": {
+    "id": 1114,
+    "name": "ctx-lh-G_and_S_occipital_inferior",
+    "title": "Left Cortex \u2014 G And S Occipital Inferior",
+    "rgb": [
+      23,
+      60,
+      180
+    ],
+    "a": 255,
+    "hex": "#173cb4"
+  },
+  "1115": {
+    "id": 1115,
+    "name": "ctx-lh-G_occipital_middle",
+    "title": "Left Cortex \u2014 G Occipital Middle",
+    "rgb": [
+      180,
+      60,
+      180
+    ],
+    "a": 255,
+    "hex": "#b43cb4"
+  },
+  "1116": {
+    "id": 1116,
+    "name": "ctx-lh-G_occipital_superior",
+    "title": "Left Cortex \u2014 G Occipital Superior",
+    "rgb": [
+      20,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#14dc3c"
+  },
+  "1117": {
+    "id": 1117,
+    "name": "ctx-lh-G_occipit-temp_lat-Or_fusiform",
+    "title": "Left Cortex \u2014 G Occipit Temp Lat Or Fusiform",
+    "rgb": [
+      60,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#3c148c"
+  },
+  "1118": {
+    "id": 1118,
+    "name": "ctx-lh-G_occipit-temp_med-Lingual_part",
+    "title": "Left Cortex \u2014 G Occipit Temp Med Lingual Part",
+    "rgb": [
+      220,
+      180,
+      140
+    ],
+    "a": 255,
+    "hex": "#dcb48c"
+  },
+  "1119": {
+    "id": 1119,
+    "name": "ctx-lh-G_occipit-temp_med-Parahippocampal_part",
+    "title": "Left Cortex \u2014 G Occipit Temp Med Parahippocampal Part",
+    "rgb": [
+      65,
+      100,
+      20
+    ],
+    "a": 255,
+    "hex": "#416414"
+  },
+  "1120": {
+    "id": 1120,
+    "name": "ctx-lh-G_orbital",
+    "title": "Left Cortex \u2014 G Orbital",
+    "rgb": [
+      220,
+      60,
+      20
+    ],
+    "a": 255,
+    "hex": "#dc3c14"
+  },
+  "1121": {
+    "id": 1121,
+    "name": "ctx-lh-G_paracentral",
+    "title": "Left Cortex \u2014 G Paracentral",
+    "rgb": [
+      60,
+      100,
+      60
+    ],
+    "a": 255,
+    "hex": "#3c643c"
+  },
+  "1122": {
+    "id": 1122,
+    "name": "ctx-lh-G_parietal_inferior-Angular_part",
+    "title": "Left Cortex \u2014 G Parietal Inferior Angular Part",
+    "rgb": [
+      20,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#143cdc"
+  },
+  "1123": {
+    "id": 1123,
+    "name": "ctx-lh-G_parietal_inferior-Supramarginal_part",
+    "title": "Left Cortex \u2014 G Parietal Inferior Supramarginal Part",
+    "rgb": [
+      100,
+      100,
+      60
+    ],
+    "a": 255,
+    "hex": "#64643c"
+  },
+  "1124": {
+    "id": 1124,
+    "name": "ctx-lh-G_parietal_superior",
+    "title": "Left Cortex \u2014 G Parietal Superior",
+    "rgb": [
+      220,
+      180,
+      220
+    ],
+    "a": 255,
+    "hex": "#dcb4dc"
+  },
+  "1125": {
+    "id": 1125,
+    "name": "ctx-lh-G_postcentral",
+    "title": "Left Cortex \u2014 G Postcentral",
+    "rgb": [
+      20,
+      180,
+      140
+    ],
+    "a": 255,
+    "hex": "#14b48c"
+  },
+  "1126": {
+    "id": 1126,
+    "name": "ctx-lh-G_precentral",
+    "title": "Left Cortex \u2014 G Precentral",
+    "rgb": [
+      60,
+      140,
+      180
+    ],
+    "a": 255,
+    "hex": "#3c8cb4"
+  },
+  "1127": {
+    "id": 1127,
+    "name": "ctx-lh-G_precuneus",
+    "title": "Left Cortex \u2014 G Precuneus",
+    "rgb": [
+      25,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#19148c"
+  },
+  "1128": {
+    "id": 1128,
+    "name": "ctx-lh-G_rectus",
+    "title": "Left Cortex \u2014 G Rectus",
+    "rgb": [
+      20,
+      60,
+      100
+    ],
+    "a": 255,
+    "hex": "#143c64"
+  },
+  "1129": {
+    "id": 1129,
+    "name": "ctx-lh-G_subcallosal",
+    "title": "Left Cortex \u2014 G Subcallosal",
+    "rgb": [
+      60,
+      220,
+      20
+    ],
+    "a": 255,
+    "hex": "#3cdc14"
+  },
+  "1130": {
+    "id": 1130,
+    "name": "ctx-lh-G_subcentral",
+    "title": "Left Cortex \u2014 G Subcentral",
+    "rgb": [
+      60,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#3c14dc"
+  },
+  "1131": {
+    "id": 1131,
+    "name": "ctx-lh-G_temporal_inferior",
+    "title": "Left Cortex \u2014 G Temporal Inferior",
+    "rgb": [
+      220,
+      220,
+      100
+    ],
+    "a": 255,
+    "hex": "#dcdc64"
+  },
+  "1132": {
+    "id": 1132,
+    "name": "ctx-lh-G_temporal_middle",
+    "title": "Left Cortex \u2014 G Temporal Middle",
+    "rgb": [
+      180,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#b43c3c"
+  },
+  "1133": {
+    "id": 1133,
+    "name": "ctx-lh-G_temp_sup-G_temp_transv_and_interm_S",
+    "title": "Left Cortex \u2014 G Temp Sup G Temp Transv And Interm S",
+    "rgb": [
+      60,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#3c3cdc"
+  },
+  "1134": {
+    "id": 1134,
+    "name": "ctx-lh-G_temp_sup-Lateral_aspect",
+    "title": "Left Cortex \u2014 G Temp Sup Lateral Aspect",
+    "rgb": [
+      220,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#dc3cdc"
+  },
+  "1135": {
+    "id": 1135,
+    "name": "ctx-lh-G_temp_sup-Planum_polare",
+    "title": "Left Cortex \u2014 G Temp Sup Planum Polare",
+    "rgb": [
+      65,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#41dc3c"
+  },
+  "1136": {
+    "id": 1136,
+    "name": "ctx-lh-G_temp_sup-Planum_tempolare",
+    "title": "Left Cortex \u2014 G Temp Sup Planum Tempolare",
+    "rgb": [
+      25,
+      140,
+      20
+    ],
+    "a": 255,
+    "hex": "#198c14"
+  },
+  "1137": {
+    "id": 1137,
+    "name": "ctx-lh-G_and_S_transverse_frontopolar",
+    "title": "Left Cortex \u2014 G And S Transverse Frontopolar",
+    "rgb": [
+      13,
+      0,
+      250
+    ],
+    "a": 255,
+    "hex": "#0d00fa"
+  },
+  "1138": {
+    "id": 1138,
+    "name": "ctx-lh-Lat_Fissure-ant_sgt-ramus_horizontal",
+    "title": "Left Cortex \u2014 Lat Fissure Ant Sgt Ramus Horizontal",
+    "rgb": [
+      61,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#3d14dc"
+  },
+  "1139": {
+    "id": 1139,
+    "name": "ctx-lh-Lat_Fissure-ant_sgt-ramus_vertical",
+    "title": "Left Cortex \u2014 Lat Fissure Ant Sgt Ramus Vertical",
+    "rgb": [
+      61,
+      20,
+      60
+    ],
+    "a": 255,
+    "hex": "#3d143c"
+  },
+  "1140": {
+    "id": 1140,
+    "name": "ctx-lh-Lat_Fissure-post_sgt",
+    "title": "Left Cortex \u2014 Lat Fissure Post Sgt",
+    "rgb": [
+      61,
+      60,
+      100
+    ],
+    "a": 255,
+    "hex": "#3d3c64"
+  },
+  "1141": {
+    "id": 1141,
+    "name": "ctx-lh-Medial_wall",
+    "title": "Left Cortex \u2014 Medial Wall",
+    "rgb": [
+      25,
+      25,
+      25
+    ],
+    "a": 255,
+    "hex": "#191919"
+  },
+  "1142": {
+    "id": 1142,
+    "name": "ctx-lh-Pole_occipital",
+    "title": "Left Cortex \u2014 Pole Occipital",
+    "rgb": [
+      140,
+      20,
+      60
+    ],
+    "a": 255,
+    "hex": "#8c143c"
+  },
+  "1143": {
+    "id": 1143,
+    "name": "ctx-lh-Pole_temporal",
+    "title": "Left Cortex \u2014 Pole Temporal",
+    "rgb": [
+      220,
+      180,
+      20
+    ],
+    "a": 255,
+    "hex": "#dcb414"
+  },
+  "1144": {
+    "id": 1144,
+    "name": "ctx-lh-S_calcarine",
+    "title": "Left Cortex \u2014 S Calcarine",
+    "rgb": [
+      63,
+      180,
+      180
+    ],
+    "a": 255,
+    "hex": "#3fb4b4"
+  },
+  "1145": {
+    "id": 1145,
+    "name": "ctx-lh-S_central",
+    "title": "Left Cortex \u2014 S Central",
+    "rgb": [
+      221,
+      20,
+      10
+    ],
+    "a": 255,
+    "hex": "#dd140a"
+  },
+  "1146": {
+    "id": 1146,
+    "name": "ctx-lh-S_central_insula",
+    "title": "Left Cortex \u2014 S Central Insula",
+    "rgb": [
+      21,
+      220,
+      20
+    ],
+    "a": 255,
+    "hex": "#15dc14"
+  },
+  "1147": {
+    "id": 1147,
+    "name": "ctx-lh-S_cingulate-Main_part_and_Intracingulate",
+    "title": "Left Cortex \u2014 S Cingulate Main Part And Intracingulate",
+    "rgb": [
+      183,
+      100,
+      20
+    ],
+    "a": 255,
+    "hex": "#b76414"
+  },
+  "1148": {
+    "id": 1148,
+    "name": "ctx-lh-S_cingulate-Marginalis_part",
+    "title": "Left Cortex \u2014 S Cingulate Marginalis Part",
+    "rgb": [
+      221,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#dd1464"
+  },
+  "1149": {
+    "id": 1149,
+    "name": "ctx-lh-S_circular_insula_anterior",
+    "title": "Left Cortex \u2014 S Circular Insula Anterior",
+    "rgb": [
+      221,
+      60,
+      140
+    ],
+    "a": 255,
+    "hex": "#dd3c8c"
+  },
+  "1150": {
+    "id": 1150,
+    "name": "ctx-lh-S_circular_insula_inferior",
+    "title": "Left Cortex \u2014 S Circular Insula Inferior",
+    "rgb": [
+      221,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#dd14dc"
+  },
+  "1151": {
+    "id": 1151,
+    "name": "ctx-lh-S_circular_insula_superior",
+    "title": "Left Cortex \u2014 S Circular Insula Superior",
+    "rgb": [
+      61,
+      220,
+      220
+    ],
+    "a": 255,
+    "hex": "#3ddcdc"
+  },
+  "1152": {
+    "id": 1152,
+    "name": "ctx-lh-S_collateral_transverse_ant",
+    "title": "Left Cortex \u2014 S Collateral Transverse Ant",
+    "rgb": [
+      100,
+      200,
+      200
+    ],
+    "a": 255,
+    "hex": "#64c8c8"
+  },
+  "1153": {
+    "id": 1153,
+    "name": "ctx-lh-S_collateral_transverse_post",
+    "title": "Left Cortex \u2014 S Collateral Transverse Post",
+    "rgb": [
+      10,
+      200,
+      200
+    ],
+    "a": 255,
+    "hex": "#0ac8c8"
+  },
+  "1154": {
+    "id": 1154,
+    "name": "ctx-lh-S_frontal_inferior",
+    "title": "Left Cortex \u2014 S Frontal Inferior",
+    "rgb": [
+      221,
+      220,
+      20
+    ],
+    "a": 255,
+    "hex": "#dddc14"
+  },
+  "1155": {
+    "id": 1155,
+    "name": "ctx-lh-S_frontal_middle",
+    "title": "Left Cortex \u2014 S Frontal Middle",
+    "rgb": [
+      141,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#8d1464"
+  },
+  "1156": {
+    "id": 1156,
+    "name": "ctx-lh-S_frontal_superior",
+    "title": "Left Cortex \u2014 S Frontal Superior",
+    "rgb": [
+      61,
+      220,
+      100
+    ],
+    "a": 255,
+    "hex": "#3ddc64"
+  },
+  "1157": {
+    "id": 1157,
+    "name": "ctx-lh-S_frontomarginal",
+    "title": "Left Cortex \u2014 S Frontomarginal",
+    "rgb": [
+      21,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#15dc3c"
+  },
+  "1158": {
+    "id": 1158,
+    "name": "ctx-lh-S_intermedius_primus-Jensen",
+    "title": "Left Cortex \u2014 S Intermedius Primus Jensen",
+    "rgb": [
+      141,
+      60,
+      20
+    ],
+    "a": 255,
+    "hex": "#8d3c14"
+  },
+  "1159": {
+    "id": 1159,
+    "name": "ctx-lh-S_intraparietal-and_Parietal_transverse",
+    "title": "Left Cortex \u2014 S Intraparietal And Parietal Transverse",
+    "rgb": [
+      143,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#8f14dc"
+  },
+  "1160": {
+    "id": 1160,
+    "name": "ctx-lh-S_occipital_anterior",
+    "title": "Left Cortex \u2014 S Occipital Anterior",
+    "rgb": [
+      61,
+      20,
+      180
+    ],
+    "a": 255,
+    "hex": "#3d14b4"
+  },
+  "1161": {
+    "id": 1161,
+    "name": "ctx-lh-S_occipital_middle_and_Lunatus",
+    "title": "Left Cortex \u2014 S Occipital Middle And Lunatus",
+    "rgb": [
+      101,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#653cdc"
+  },
+  "1162": {
+    "id": 1162,
+    "name": "ctx-lh-S_occipital_superior_and_transversalis",
+    "title": "Left Cortex \u2014 S Occipital Superior And Transversalis",
+    "rgb": [
+      21,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#15148c"
+  },
+  "1163": {
+    "id": 1163,
+    "name": "ctx-lh-S_occipito-temporal_lateral",
+    "title": "Left Cortex \u2014 S Occipito Temporal Lateral",
+    "rgb": [
+      221,
+      140,
+      20
+    ],
+    "a": 255,
+    "hex": "#dd8c14"
+  },
+  "1164": {
+    "id": 1164,
+    "name": "ctx-lh-S_occipito-temporal_medial_and_S_Lingual",
+    "title": "Left Cortex \u2014 S Occipito Temporal Medial And S Lingual",
+    "rgb": [
+      141,
+      100,
+      220
+    ],
+    "a": 255,
+    "hex": "#8d64dc"
+  },
+  "1165": {
+    "id": 1165,
+    "name": "ctx-lh-S_orbital-H_shapped",
+    "title": "Left Cortex \u2014 S Orbital H Shapped",
+    "rgb": [
+      101,
+      20,
+      20
+    ],
+    "a": 255,
+    "hex": "#651414"
+  },
+  "1166": {
+    "id": 1166,
+    "name": "ctx-lh-S_orbital_lateral",
+    "title": "Left Cortex \u2014 S Orbital Lateral",
+    "rgb": [
+      221,
+      100,
+      20
+    ],
+    "a": 255,
+    "hex": "#dd6414"
+  },
+  "1167": {
+    "id": 1167,
+    "name": "ctx-lh-S_orbital_medial-Or_olfactory",
+    "title": "Left Cortex \u2014 S Orbital Medial Or Olfactory",
+    "rgb": [
+      181,
+      200,
+      20
+    ],
+    "a": 255,
+    "hex": "#b5c814"
+  },
+  "1168": {
+    "id": 1168,
+    "name": "ctx-lh-S_paracentral",
+    "title": "Left Cortex \u2014 S Paracentral",
+    "rgb": [
+      21,
+      180,
+      140
+    ],
+    "a": 255,
+    "hex": "#15b48c"
+  },
+  "1169": {
+    "id": 1169,
+    "name": "ctx-lh-S_parieto_occipital",
+    "title": "Left Cortex \u2014 S Parieto Occipital",
+    "rgb": [
+      101,
+      100,
+      180
+    ],
+    "a": 255,
+    "hex": "#6564b4"
+  },
+  "1170": {
+    "id": 1170,
+    "name": "ctx-lh-S_pericallosal",
+    "title": "Left Cortex \u2014 S Pericallosal",
+    "rgb": [
+      181,
+      220,
+      20
+    ],
+    "a": 255,
+    "hex": "#b5dc14"
+  },
+  "1171": {
+    "id": 1171,
+    "name": "ctx-lh-S_postcentral",
+    "title": "Left Cortex \u2014 S Postcentral",
+    "rgb": [
+      21,
+      140,
+      200
+    ],
+    "a": 255,
+    "hex": "#158cc8"
+  },
+  "1172": {
+    "id": 1172,
+    "name": "ctx-lh-S_precentral-Inferior-part",
+    "title": "Left Cortex \u2014 S Precentral Inferior Part",
+    "rgb": [
+      21,
+      20,
+      240
+    ],
+    "a": 255,
+    "hex": "#1514f0"
+  },
+  "1173": {
+    "id": 1173,
+    "name": "ctx-lh-S_precentral-Superior-part",
+    "title": "Left Cortex \u2014 S Precentral Superior Part",
+    "rgb": [
+      21,
+      20,
+      200
+    ],
+    "a": 255,
+    "hex": "#1514c8"
+  },
+  "1174": {
+    "id": 1174,
+    "name": "ctx-lh-S_subcentral_ant",
+    "title": "Left Cortex \u2014 S Subcentral Ant",
+    "rgb": [
+      61,
+      180,
+      60
+    ],
+    "a": 255,
+    "hex": "#3db43c"
+  },
+  "1175": {
+    "id": 1175,
+    "name": "ctx-lh-S_subcentral_post",
+    "title": "Left Cortex \u2014 S Subcentral Post",
+    "rgb": [
+      61,
+      180,
+      250
+    ],
+    "a": 255,
+    "hex": "#3db4fa"
+  },
+  "1176": {
+    "id": 1176,
+    "name": "ctx-lh-S_suborbital",
+    "title": "Left Cortex \u2014 S Suborbital",
+    "rgb": [
+      21,
+      20,
+      60
+    ],
+    "a": 255,
+    "hex": "#15143c"
+  },
+  "1177": {
+    "id": 1177,
+    "name": "ctx-lh-S_subparietal",
+    "title": "Left Cortex \u2014 S Subparietal",
+    "rgb": [
+      101,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#653c3c"
+  },
+  "1178": {
+    "id": 1178,
+    "name": "ctx-lh-S_supracingulate",
+    "title": "Left Cortex \u2014 S Supracingulate",
+    "rgb": [
+      21,
+      220,
+      220
+    ],
+    "a": 255,
+    "hex": "#15dcdc"
+  },
+  "1179": {
+    "id": 1179,
+    "name": "ctx-lh-S_temporal_inferior",
+    "title": "Left Cortex \u2014 S Temporal Inferior",
+    "rgb": [
+      21,
+      180,
+      180
+    ],
+    "a": 255,
+    "hex": "#15b4b4"
+  },
+  "1180": {
+    "id": 1180,
+    "name": "ctx-lh-S_temporal_superior",
+    "title": "Left Cortex \u2014 S Temporal Superior",
+    "rgb": [
+      223,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#dfdc3c"
+  },
+  "1181": {
+    "id": 1181,
+    "name": "ctx-lh-S_temporal_transverse",
+    "title": "Left Cortex \u2014 S Temporal Transverse",
+    "rgb": [
+      221,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#dd3c3c"
+  },
+  "2100": {
+    "id": 2100,
+    "name": "ctx-rh-Unknown",
+    "title": "Right Cortex \u2014 Unknown",
+    "rgb": [
+      0,
+      0,
+      0
+    ],
+    "a": 255,
+    "hex": "#000000"
+  }
+}
