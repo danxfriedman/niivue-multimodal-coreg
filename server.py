@@ -105,6 +105,7 @@ FREESURFER_DIR = find_freesurfer_dir()
 DKT_LUT_JSON_PATH = os.path.join(ROOT_DIR, "sample_data", "dkt_lut.json")
 MNI_T1_BRAIN_PATH = os.path.join(ROOT_DIR, "sample_data", "nifti", "MNI152_T1_brain_2mm.nii.gz")
 MNI_DKT_ATLAS_PATH = os.path.join(ROOT_DIR, "sample_data", "nifti", "MNI152_DKT_atlas_2mm.nii.gz")
+MNI_DESTRIEUX_ATLAS_PATH = os.path.join(ROOT_DIR, "sample_data", "nifti", "MNI152_Destrieux_atlas_2mm.nii.gz")
 SAMPLE_T1_PATH = os.path.join(ROOT_DIR, "sample_data", "nifti", "sub-01_T1w.nii.gz")
 SAMPLE_FASTSURFER_DKT_PATH = os.path.join(
     ROOT_DIR, "sample_data", "nifti", "sub-01_T1w_FastSurferVINN_DKT.nii.gz"
@@ -432,6 +433,100 @@ def find_fastsurfer_installation():
     return None
 
 
+CACHED_FS_LICENSE_PATH = os.path.join(FASTSURFER_CACHE_DIR, "fs_license.txt")
+CACHED_FS_LICENSE_META_PATH = os.path.join(FASTSURFER_CACHE_DIR, "fs_license_meta.json")
+
+
+def validate_freesurfer_license_content(raw_text: str) -> tuple:
+    """
+    Validates that a text string conforms to the FreeSurfer license file format:
+      - 3 to 5 non-empty lines:
+        * Line 1: registered email address (contains '@')
+        * Line 2: numeric license ID (digits)
+        * Line 3 (and optional Line 4): cryptographic key tokens
+    Returns (is_valid: bool, message: str).
+    """
+    if not raw_text or not isinstance(raw_text, str):
+        return False, "License file is empty."
+    lines = [ln.strip() for ln in raw_text.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+    if len(lines) < 3 or len(lines) > 6:
+        return (
+            False,
+            f"Expected 3–4 non-empty lines in FreeSurfer license (email, numeric ID, key lines), found {len(lines)}.",
+        )
+    email_line = lines[0]
+    id_line = lines[1]
+    key_lines = lines[2:]
+    if "@" not in email_line or len(email_line) > 128 or " " in email_line:
+        return False, "Line 1 of FreeSurfer license must be a valid registered email address."
+    if not re.match(r"^\d+$", id_line):
+        return False, "Line 2 of FreeSurfer license must be a numeric license ID."
+    if any(len(k) < 4 or len(k) > 128 for k in key_lines):
+        return False, "Lines 3–4 of FreeSurfer license must contain valid license key strings."
+    return True, "Valid FreeSurfer license"
+
+
+def validate_freesurfer_license_file(path: str) -> tuple:
+    """Checks that `path` exists on disk, is a regular file <= 16 KB, and contains a valid FreeSurfer license."""
+    if not path or not os.path.isfile(path):
+        return False, "File does not exist."
+    try:
+        if os.path.getsize(path) > 16384:
+            return False, "File is too large to be a FreeSurfer license file."
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+        return validate_freesurfer_license_content(content)
+    except Exception as e:
+        return False, f"Cannot read license file: {e}"
+
+
+def find_freesurfer_license(fs_install: dict = None) -> str:
+    """
+    Locates and validates a FreeSurfer license file required when running the FastSurfer surface pipeline (--fsaparc).
+    Checks user-selected cached license first, then $FS_LICENSE, ~/license.txt, ~/.license, and $FREESURFER_HOME.
+    """
+    candidates = []
+    # 1. Check if the user previously selected a license file in the UI
+    if os.path.isfile(CACHED_FS_LICENSE_META_PATH):
+        try:
+            with open(CACHED_FS_LICENSE_META_PATH, "r", encoding="utf-8") as mf:
+                meta = json.load(mf)
+            if meta.get("originalPath") and os.path.isfile(meta["originalPath"]):
+                candidates.append(meta["originalPath"])
+        except Exception:
+            pass
+    candidates.append(CACHED_FS_LICENSE_PATH)
+
+    # 2. Standard environment & home/FreeSurfer locations
+    candidates.extend([
+        os.environ.get("FS_LICENSE", "").strip(),
+        os.path.expanduser("~/license.txt"),
+        os.path.expanduser("~/.license"),
+        os.path.expanduser("~/Downloads/license.txt"),
+        os.path.expanduser("~/Desktop/license.txt"),
+    ])
+    if fs_install and fs_install.get("freesurferHome"):
+        fsh = fs_install["freesurferHome"]
+        candidates.extend([
+            os.path.join(fsh, "license.txt"),
+            os.path.join(fsh, ".license"),
+            os.path.join(fsh, "license.dat"),
+        ])
+    if FREESURFER_DIR:
+        candidates.extend([
+            os.path.join(FREESURFER_DIR, "license.txt"),
+            os.path.join(FREESURFER_DIR, ".license"),
+            os.path.join(FREESURFER_DIR, "license.dat"),
+            os.path.join(os.path.dirname(FREESURFER_DIR), "license.txt"),
+        ])
+    for c in candidates:
+        if c:
+            ok, _ = validate_freesurfer_license_file(c)
+            if ok:
+                return c
+    return None
+
+
 def build_fastsurfer_macos_env(fs_install: dict) -> dict:
     """
     Constructs the environment dictionary for FastSurfer across macOS and Linux following
@@ -439,6 +534,7 @@ def build_fastsurfer_macos_env(fs_install: dict) -> dict:
       - FASTSURFER_HOME=/Applications/FastSurfer... (or /opt/fastsurfer)
       - PYTHONPATH=$FASTSURFER_HOME:$PYTHONPATH
       - FREESURFER_HOME=$FASTSURFER_HOME/fs-pruned (or $FREESURFER_HOME)
+      - FS_LICENSE=<path to license.txt> (if found, needed for surface pipeline / --fsaparc)
       - PATH=$FASTSURFER_HOME:$FASTSURFER_HOME/python/bin:$FREESURFER_HOME/bin:$PATH
     """
     env = os.environ.copy()
@@ -455,6 +551,10 @@ def build_fastsurfer_macos_env(fs_install: dict) -> dict:
     freesurfer_home = fs_install.get("freesurferHome")
     if freesurfer_home and os.path.isdir(freesurfer_home):
         env["FREESURFER_HOME"] = freesurfer_home
+
+    fs_lic = find_freesurfer_license(fs_install)
+    if fs_lic:
+        env["FS_LICENSE"] = fs_lic
 
     path_parts = []
     for p in [
@@ -504,6 +604,19 @@ def detect_neuro_tools() -> dict:
             pass
 
     fallback_ok = os.path.exists(MNI_DKT_ATLAS_PATH) and os.path.exists(MNI_T1_BRAIN_PATH)
+    fs_lic_path = find_freesurfer_license(fs_install)
+    fs_lic_label = os.path.basename(fs_lic_path) if fs_lic_path else None
+    if fs_lic_path == CACHED_FS_LICENSE_PATH and os.path.isfile(CACHED_FS_LICENSE_META_PATH):
+        try:
+            with open(CACHED_FS_LICENSE_META_PATH, "r", encoding="utf-8") as mf:
+                fs_lic_label = json.load(mf).get("fileName") or fs_lic_label
+        except Exception:
+            pass
+    fs_lic_info = {
+        "available": bool(fs_lic_path),
+        "path": fs_lic_path,
+        "label": fs_lic_label,
+    }
 
     if fs_install:
         os.environ["FASTSURFER_HOME"] = fs_install["fastsurferHome"]
@@ -519,6 +632,7 @@ def detect_neuro_tools() -> dict:
             "version": fs_install["version"],
             "dockerImage": docker_fastsurfer_image,
             "fallbackAvailable": fallback_ok,
+            "fsLicense": fs_lic_info,
             "statusLabel": f"FastSurfer Ready ({os.path.basename(fs_install['fastsurferHome'])})",
         }
     elif docker_fastsurfer_image:
@@ -530,6 +644,7 @@ def detect_neuro_tools() -> dict:
             "cliPath": docker_bin,
             "dockerImage": True,
             "fallbackAvailable": fallback_ok,
+            "fsLicense": fs_lic_info,
             "statusLabel": "FastSurfer Docker Image Ready (deepmi/fastsurfer)",
         }
     else:
@@ -541,6 +656,7 @@ def detect_neuro_tools() -> dict:
             "cliPath": None,
             "dockerImage": False,
             "fallbackAvailable": fallback_ok,
+            "fsLicense": fs_lic_info,
             "statusLabel": "FastSurfer Not Found — Template DKT Atlas Ready",
         }
 
@@ -551,6 +667,7 @@ def detect_neuro_tools() -> dict:
             "path": BET_BIN if bet_cli_ok else "SciPy 3D Morphological BET Fallback",
         },
         "fastsurfer": fs_status,
+        "fsLicense": fs_lic_info,
     }
 
 
@@ -915,6 +1032,8 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
             self._handle_skull_strip_bet(body)
         elif parsed.path == "/api/dkt-segment":
             self._handle_dkt_segment(body)
+        elif parsed.path == "/api/set-fs-license":
+            self._handle_set_fs_license(body)
         elif parsed.path == "/api/convert-volume":
             self._handle_convert_volume(body)
         elif parsed.path == "/api/shutdown":
@@ -1556,23 +1675,86 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             self._send_json(500, {"error": str(e)})
 
+    def _handle_set_fs_license(self, body):
+        """
+        Validates and saves a user-selected FreeSurfer license file (uploaded from the browser file picker
+        or specified via a local path) into the user's writable cache so FastSurfer --fsaparc can use it.
+        """
+        try:
+            file_name = os.path.basename(body.get("fileName") or "license.txt")
+            file_path = body.get("filePath")
+            content_text = body.get("contentText")
+            content_b64 = body.get("contentBase64")
+
+            if file_path:
+                norm_p = normalize_user_path(file_path)
+                is_valid, msg = validate_freesurfer_license_file(norm_p)
+                if not is_valid:
+                    self._send_json(400, {"valid": False, "error": msg})
+                    return
+                with open(norm_p, "r", encoding="utf-8", errors="replace") as rf:
+                    content_text = rf.read()
+                file_name = os.path.basename(norm_p)
+            elif content_b64:
+                content_text = base64.b64decode(content_b64).decode("utf-8", errors="replace")
+
+            is_valid, msg = validate_freesurfer_license_content(content_text)
+            if not is_valid:
+                self._send_json(400, {"valid": False, "error": msg})
+                return
+
+            os.makedirs(FASTSURFER_CACHE_DIR, exist_ok=True)
+            with open(CACHED_FS_LICENSE_PATH, "w", encoding="utf-8") as wf:
+                wf.write(content_text)
+            with open(CACHED_FS_LICENSE_META_PATH, "w", encoding="utf-8") as mf:
+                json.dump(
+                    {
+                        "fileName": file_name,
+                        "originalPath": normalize_user_path(file_path) if file_path else None,
+                    },
+                    mf,
+                )
+            os.environ["FS_LICENSE"] = CACHED_FS_LICENSE_PATH
+
+            self._send_json(200, {
+                "valid": True,
+                "message": msg,
+                "fsLicense": {
+                    "available": True,
+                    "path": CACHED_FS_LICENSE_PATH,
+                    "label": file_name,
+                },
+            })
+        except Exception as e:
+            self._send_json(500, {"valid": False, "error": str(e)})
+
     def _handle_dkt_segment(self, body):
         """
-        Runs whole-brain Desikan-Killiany-Tourville (DKT) + subcortical segmentation:
-          - Supports native FastSurfer on macOS/Linux (`macos_native`, `linux_native`) and Docker (`deepmi/fastsurfer`)
+        Runs whole-brain Desikan-Killiany-Tourville (DKT, aparc.DKTatlas+aseg) or Destrieux (aparc.a2009s+aseg)
+        cortical + subcortical segmentation:
+          - Supports atlasType:
+              * 'dkt' (default): Desikan-Killiany-Tourville (aparc.DKTatlas+aseg, 104 regions, max ID 2035)
+              * 'destrieux': Destrieux sulco-gyral atlas (aparc.a2009s+aseg, 148 cortical + subcortical, max ID 12175)
+                Runs FastSurfer with `--fsaparc` and WITHOUT `--seg_only` when FastSurfer is available,
+                and reverts to MNI152 template registration only when FastSurfer is unavailable (or when
+                template_flirt mode is explicitly selected).
           - Supports dktMode:
-              * 'fastsurfer_vinn' (default): FastSurferVINN DKT-only (--seg_only --no_cereb --no_hypothal --no_cc --no_biasfield --keepgeom)
-              * 'fastsurfer_full': Full FastSurfer (--seg_only with CerebNet, HypVINN, CC)
-              * 'template_flirt': Quick MNI152 -> Subject template DKT registration (via FSL FLIRT or SciPy 9-DOF affine fallback)
+              * 'fastsurfer_vinn' (default): FastSurferVINN (--seg_only for DKT; --fsaparc without --seg_only for Destrieux)
+              * 'fastsurfer_full': Full FastSurfer (+ CerebNet, HypVINN, CC)
+              * 'template_flirt': Quick MNI152 -> Subject template registration (via FSL FLIRT or SciPy 9-DOF affine fallback)
         """
         try:
             src_bytes = base64.b64decode(body["sourceBase64"])
             src_name = body.get("sourceName") or "T1w.nii.gz"
             curr_affine = body.get("currentAffine")
             dkt_mode = body.get("dktMode") or "fastsurfer_vinn"
+            raw_atlas_type = str(body.get("atlasType") or "dkt").strip().lower()
+            is_destrieux = raw_atlas_type in ("destrieux", "a2009s", "aparc.a2009s")
+            atlas_type = "destrieux" if is_destrieux else "dkt"
+            atlas_short = "Destrieux" if is_destrieux else "DKT"
 
             base_clean = strip_neuro_ext(os.path.basename(src_name)).replace("_brain", "")
-            out_filename = f"{base_clean}_DKT_atlas.nii.gz"
+            out_filename = f"{base_clean}_{atlas_short}_atlas.nii.gz"
 
             tools_info = detect_neuro_tools()
             fs_info = tools_info["fastsurfer"]
@@ -1606,11 +1788,15 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                         import hashlib
                         os.makedirs(FASTSURFER_CACHE_DIR, exist_ok=True)
                         vox_hash = hashlib.sha256(src_3d.tobytes()).hexdigest()[:16]
-                        cached_seg_path = os.path.join(FASTSURFER_CACHE_DIR, f"{dkt_mode}_{vox_hash}.nii.gz")
+                        cached_seg_path = os.path.join(
+                            FASTSURFER_CACHE_DIR,
+                            f"{atlas_type}_{dkt_mode}_{vox_hash}.nii.gz" if is_destrieux else f"{dkt_mode}_{vox_hash}.nii.gz",
+                        )
 
-                        # Also check if input matches sample sub-01_T1w (or its BET brain) with pre-generated FastSurferVINN output
+                        # For DKT only: check if input matches sample sub-01_T1w with pre-generated FastSurferVINN DKT output
                         if (
-                            dkt_mode == "fastsurfer_vinn"
+                            not is_destrieux
+                            and dkt_mode == "fastsurfer_vinn"
                             and not os.path.exists(cached_seg_path)
                             and os.path.exists(SAMPLE_FASTSURFER_DKT_PATH)
                             and os.path.exists(SAMPLE_T1_PATH)
@@ -1643,22 +1829,39 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                             dkt_nii.set_sform(target_aff, code=1)
                             dkt_nii.set_qform(target_aff, code=1)
                             nib.save(dkt_nii, out_dkt_path)
-                            engine_used = (
-                                f"FastSurferVINN ({fs_info.get('version', '2.7.0')}) DKT Segmentation"
-                                if dkt_mode == "fastsurfer_vinn"
-                                else f"FastSurfer Full ({fs_info.get('version', '2.7.0')}) Segmentation"
-                            )
+                            if is_destrieux:
+                                engine_used = f"FastSurfer ({fs_info.get('version', '2.7.0')}) --fsaparc Destrieux (aparc.a2009s+aseg)"
+                            else:
+                                engine_used = (
+                                    f"FastSurferVINN ({fs_info.get('version', '2.7.0')}) DKT Segmentation"
+                                    if dkt_mode == "fastsurfer_vinn"
+                                    else f"FastSurfer Full ({fs_info.get('version', '2.7.0')}) Segmentation"
+                                )
                         else:
                             fs_sd = os.path.join(tmpdir, "fs_out")
                             os.makedirs(fs_sd, exist_ok=True)
-                            extra_flags = (
-                                ["--seg_only", "--no_cereb", "--no_hypothal", "--no_cc", "--no_biasfield", "--keepgeom", "--batch_size", "8", "--threads", "8"]
-                                if dkt_mode == "fastsurfer_vinn"
-                                else ["--seg_only", "--batch_size", "8", "--threads", "8"]
-                            )
+                            if is_destrieux:
+                                # Per FastSurfer GitHub documentation: run with --fsaparc and WITHOUT --seg_only
+                                # (note: --keepgeom is incompatible with the surface pipeline)
+                                extra_flags = (
+                                    ["--fsaparc", "--no_cereb", "--no_hypothal", "--no_cc", "--parallel", "--batch_size", "8", "--threads", "8"]
+                                    if dkt_mode == "fastsurfer_vinn"
+                                    else ["--fsaparc", "--parallel", "--batch_size", "8", "--threads", "8"]
+                                )
+                                run_timeout = 3600
+                            else:
+                                extra_flags = (
+                                    ["--seg_only", "--no_cereb", "--no_hypothal", "--no_cc", "--no_biasfield", "--keepgeom", "--batch_size", "8", "--threads", "8"]
+                                    if dkt_mode == "fastsurfer_vinn"
+                                    else ["--seg_only", "--batch_size", "8", "--threads", "8"]
+                                )
+                                run_timeout = 600
 
                             if fs_info.get("mode") in ("macos_native", "linux_native") and fs_info.get("cliPath"):
                                 fs_env = build_fastsurfer_macos_env(fs_info)
+                                fs_lic = fs_env.get("FS_LICENSE")
+                                if is_destrieux and fs_lic and os.path.isfile(fs_lic):
+                                    extra_flags = [*extra_flags, "--fs_license", fs_lic]
                                 setup_sh = fs_info.get("setupScript")
                                 cli_path = fs_info["cliPath"]
                                 fs_args = [
@@ -1679,7 +1882,7 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                                     env=fs_env,
                                     capture_output=True,
                                     text=True,
-                                    timeout=600,
+                                    timeout=run_timeout,
                                 )
                             elif fs_info.get("mode") == "docker":
                                 docker_bin = shutil.which("docker") or "docker"
@@ -1692,13 +1895,52 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                                     "--sd", "/data/fs_out",
                                     *extra_flags,
                                 ]
-                                subprocess.run(docker_cmd, capture_output=True, text=True, timeout=600)
+                                subprocess.run(docker_cmd, capture_output=True, text=True, timeout=run_timeout)
 
-                            cand_mgz = [
-                                os.path.join(fs_sd, "sub_dkt", "mri", "aparc.DKTatlas+aseg.deep.mgz"),
-                                os.path.join(fs_sd, "sub_dkt", "mri", "aparc.DKTatlas+aseg.orig.mgz"),
-                                os.path.join(fs_sd, "sub_dkt", "mri", "aparc.DKTatlas+aseg.mgz"),
-                            ]
+                            if is_destrieux:
+                                cand_mgz = [
+                                    os.path.join(fs_sd, "sub_dkt", "mri", "aparc.a2009s+aseg.mgz"),
+                                ]
+                                # If surface annotations (lh/rh.aparc.a2009s.annot) exist but aparc.a2009s+aseg.mgz wasn't mapped yet:
+                                sub_mri = os.path.join(fs_sd, "sub_dkt", "mri")
+                                sub_lbl = os.path.join(fs_sd, "sub_dkt", "label")
+                                sub_surf = os.path.join(fs_sd, "sub_dkt", "surf")
+                                if (
+                                    not os.path.exists(cand_mgz[0])
+                                    and os.path.exists(os.path.join(sub_lbl, "lh.aparc.a2009s.annot"))
+                                    and os.path.exists(os.path.join(sub_lbl, "rh.aparc.a2009s.annot"))
+                                    and os.path.exists(os.path.join(sub_mri, "aseg.mgz"))
+                                ):
+                                    fs_env = build_fastsurfer_macos_env(fs_info)
+                                    surf2vol_bin = shutil.which("mri_surf2volseg", path=fs_env.get("PATH"))
+                                    if surf2vol_bin:
+                                        subprocess.run(
+                                            [
+                                                surf2vol_bin,
+                                                "--o", cand_mgz[0],
+                                                "--label-cortex",
+                                                "--i", os.path.join(sub_mri, "aseg.mgz"),
+                                                "--lh-annot", os.path.join(sub_lbl, "lh.aparc.a2009s.annot"), "11100",
+                                                "--lh-cortex-mask", os.path.join(sub_lbl, "lh.cortex.label"),
+                                                "--lh-white", os.path.join(sub_surf, "lh.white"),
+                                                "--lh-pial", os.path.join(sub_surf, "lh.pial"),
+                                                "--rh-annot", os.path.join(sub_lbl, "rh.aparc.a2009s.annot"), "12100",
+                                                "--rh-cortex-mask", os.path.join(sub_lbl, "rh.cortex.label"),
+                                                "--rh-white", os.path.join(sub_surf, "rh.white"),
+                                                "--rh-pial", os.path.join(sub_surf, "rh.pial"),
+                                            ],
+                                            env=fs_env,
+                                            capture_output=True,
+                                            text=True,
+                                            timeout=300,
+                                        )
+                            else:
+                                cand_mgz = [
+                                    os.path.join(fs_sd, "sub_dkt", "mri", "aparc.DKTatlas+aseg.deep.mgz"),
+                                    os.path.join(fs_sd, "sub_dkt", "mri", "aparc.DKTatlas+aseg.orig.mgz"),
+                                    os.path.join(fs_sd, "sub_dkt", "mri", "aparc.DKTatlas+aseg.mgz"),
+                                ]
+
                             for mgz_p in cand_mgz:
                                 if os.path.exists(mgz_p):
                                     fs_seg_img = nib.load(mgz_p)
@@ -1725,20 +1967,24 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                                         nib.save(dkt_nii, cached_seg_path)
                                     except Exception:
                                         pass
-                                    engine_used = (
-                                        f"FastSurferVINN ({fs_info.get('version', '2.7.0')}) DKT Segmentation"
-                                        if dkt_mode == "fastsurfer_vinn"
-                                        else f"FastSurfer Full ({fs_info.get('version', '2.7.0')}) Segmentation"
-                                    )
+                                    if is_destrieux:
+                                        engine_used = f"FastSurfer ({fs_info.get('version', '2.7.0')}) --fsaparc Destrieux (aparc.a2009s+aseg)"
+                                    else:
+                                        engine_used = (
+                                            f"FastSurferVINN ({fs_info.get('version', '2.7.0')}) DKT Segmentation"
+                                            if dkt_mode == "fastsurfer_vinn"
+                                            else f"FastSurfer Full ({fs_info.get('version', '2.7.0')}) Segmentation"
+                                        )
                                     break
                     except Exception as fs_err:
-                        print(f"FastSurfer execution warning (falling back to template DKT): {fs_err}", flush=True)
+                        print(f"FastSurfer execution warning (falling back to template {atlas_short}): {fs_err}", flush=True)
 
-                # 2. Fast Template DKT Atlas Registration (FSL FLIRT or Pure-Python SciPy 9-DOF fallback)
+                # 2. Fast Template Atlas Registration (FSL FLIRT or Pure-Python SciPy 9-DOF fallback)
                 if not os.path.exists(out_dkt_path):
-                    if not (os.path.exists(MNI_DKT_ATLAS_PATH) and os.path.exists(MNI_T1_BRAIN_PATH)):
+                    template_atlas_path = MNI_DESTRIEUX_ATLAS_PATH if is_destrieux else MNI_DKT_ATLAS_PATH
+                    if not (os.path.exists(template_atlas_path) and os.path.exists(MNI_T1_BRAIN_PATH)):
                         self._send_json(500, {
-                            "error": "Neither FastSurfer nor the MNI152 DKT Atlas template was found on disk."
+                            "error": f"Neither FastSurfer nor the MNI152 {atlas_short} Atlas template was found on disk."
                         })
                         return
 
@@ -1789,7 +2035,7 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                         if os.path.exists(mni2sub_mat):
                             flirt_apply_cmd = [
                                 FLIRT_BIN,
-                                "-in", MNI_DKT_ATLAS_PATH,
+                                "-in", template_atlas_path,
                                 "-ref", in_t1_path,
                                 "-applyxfm",
                                 "-init", mni2sub_mat,
@@ -1799,13 +2045,17 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                             subprocess.run(flirt_apply_cmd, env=env, capture_output=True, text=True, timeout=60)
                             if os.path.exists(out_dkt_path):
                                 flirt_ok = True
-                                engine_used = "FSL FLIRT 12-DOF + FreeSurfer DKT Atlas (aparc.DKTatlas+aseg)"
+                                engine_used = (
+                                    "FSL FLIRT 12-DOF + FreeSurfer Destrieux Atlas (aparc.a2009s+aseg)"
+                                    if is_destrieux
+                                    else "FSL FLIRT 12-DOF + FreeSurfer DKT Atlas (aparc.DKTatlas+aseg)"
+                                )
 
                     if not flirt_ok:
                         # Pure-Python SciPy 9-DOF MNI152 -> Subject Registration Fallback
                         sub_brain_img = nib.load(sub_brain_path)
                         mni_brain_img = nib.load(MNI_T1_BRAIN_PATH)
-                        mni_dkt_img = nib.load(MNI_DKT_ATLAS_PATH)
+                        mni_dkt_img = nib.load(template_atlas_path)
                         _, _, new_mni_aff = optimize_multimodal_registration(sub_brain_img, mni_brain_img, dof=9)
                         vox_to_mni = safe_inv4x4(new_mni_aff) @ target_aff
                         dkt_mni_data = np.rint(get_clean_3d_data(mni_dkt_img)).astype(np.int16)
@@ -1822,7 +2072,11 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                         clean_dkt_nii.set_sform(target_aff, code=1)
                         clean_dkt_nii.set_qform(target_aff, code=1)
                         nib.save(clean_dkt_nii, out_dkt_path)
-                        engine_used = "SciPy 9-DOF Template Registration + FreeSurfer DKT Atlas"
+                        engine_used = (
+                            "SciPy 9-DOF Template Registration + FreeSurfer Destrieux Atlas (aparc.a2009s+aseg)"
+                            if is_destrieux
+                            else "SciPy 9-DOF Template Registration + FreeSurfer DKT Atlas"
+                        )
                     else:
                         # Ensure clean integer int16 labels & exact subject sform/qform affine
                         dkt_raw_img = nib.load(out_dkt_path)
@@ -1832,7 +2086,7 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                         clean_dkt_nii.set_qform(target_aff, code=1)
                         nib.save(clean_dkt_nii, out_dkt_path)
 
-                # 3. Mask the DKT Atlas with the Subject's Brain Mask so all voxels outside the brain are 0
+                # 3. Mask the Atlas with the Subject's Brain Mask so all voxels outside the brain are 0
                 final_img = nib.load(out_dkt_path)
                 unmasked_data = np.rint(get_clean_3d_data(final_img)).astype(np.int16)
 
@@ -1915,7 +2169,7 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                         0, 1, 6, 24, 29, 30, 40, 45, 61, 62, 80, 81, 82, 85, 98,
                         *range(118, 155), 165, 166, 167, 168, 224,
                         *range(256, 267), 701, *range(901, 932),
-                        1000, 1001, 1100, 2000, 2001, 2100,
+                        1000, 1001, 1100, 2000, 2001, 2100, 11100, 12100,
                     ],
                     dtype=np.int16,
                 )
@@ -1933,6 +2187,9 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
 
                 self._send_json(200, {
                     "engine": engine_used,
+                    "atlasType": atlas_type,
+                    "atlasLabel": f"{atlas_short} Atlas",
+                    "maxLutId": 12175 if is_destrieux else 2035,
                     "fastsurferDetected": bool(fs_info.get("available")),
                     "fastsurferStatus": fs_info,
                     "fileName": out_filename,
@@ -1976,6 +2233,7 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
 
                 img = nib.load(in_path)
                 clean_arr = get_clean_3d_data(img, dtype=np.float32)
+                detected_atlas_type = None
                 if is_dkt:
                     data = np.rint(clean_arr).astype(np.int16)
                     non_brain_fs_ids = np.array(
@@ -1983,11 +2241,16 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                             0, 1, 6, 24, 29, 30, 40, 45, 61, 62, 80, 81, 82, 85, 98,
                             *range(118, 155), 165, 166, 167, 168, 224,
                             *range(256, 267), 701, *range(901, 932),
-                            1000, 1001, 1100, 2000, 2001, 2100,
+                            1000, 1001, 1100, 2000, 2001, 2100, 11100, 12100,
                         ],
                         dtype=np.int16,
                     )
                     data[np.isin(data, non_brain_fs_ids) | (data < 0)] = 0
+                    max_lbl = int(np.max(data)) if data.size > 0 else 0
+                    if max_lbl >= 11100 or "a2009s" in lower_name or "destrieux" in lower_name:
+                        detected_atlas_type = "destrieux"
+                    else:
+                        detected_atlas_type = "dkt"
                 else:
                     data = clean_arr
                 aff = get_best_affine(img)
@@ -2005,6 +2268,7 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                     "fileName": out_filename,
                     "niftiBase64": out_b64,
                     "shape": list(out_nii.shape[:3]),
+                    "atlasType": detected_atlas_type,
                     "dktLut": load_dkt_lut() if is_dkt else None,
                 })
         except Exception as e:

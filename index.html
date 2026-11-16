@@ -202,13 +202,13 @@
           </div>
         </div>
 
-        <!-- Standalone Module 2: FastSurfer & DKT Cortical/Subcortical Parcellation — Separately Minimizable (Minimized by Default) -->
+        <!-- Standalone Module 2: FastSurfer & Brain Atlas (DKT / Destrieux) Parcellation — Separately Minimizable (Minimized by Default) -->
         <div id="dktModuleSection" class="panel-section neuro-module-section is-minimized">
           <div id="dktModuleHeader" class="neuro-module-header" role="button" tabindex="0" aria-expanded="false"
-            aria-controls="dktModuleBody" title="Click to expand or minimize FastSurfer &amp; DKT Atlas module">
+            aria-controls="dktModuleBody" title="Click to expand or minimize FastSurfer &amp; Brain Atlas module">
             <div class="neuro-module-title-wrap">
               <span class="neuro-module-chevron" aria-hidden="true">▸</span>
-              <h3>FastSurfer &amp; DKT Atlas</h3>
+              <h3>FastSurfer &amp; Brain Atlas</h3>
             </div>
             <div class="neuro-module-header-actions">
               <span id="fastsurferStatusBadge" class="tool-mini-badge checking"
@@ -218,24 +218,45 @@
                 Check
               </button>
               <button id="btnToggleDktModule" type="button" class="icon-btn module-min-btn"
-                aria-label="Toggle FastSurfer &amp; DKT Atlas module"
-                title="Expand / Minimize FastSurfer &amp; DKT Atlas">+</button>
+                aria-label="Toggle FastSurfer &amp; Brain Atlas module"
+                title="Expand / Minimize FastSurfer &amp; Brain Atlas">+</button>
             </div>
           </div>
 
           <div id="dktModuleBody" class="neuro-module-body" hidden>
             <div id="fastsurferDetailNote" class="neuro-tool-note">
-              Checks /Applications/FastSurfer* (macos_setup_fastsurfer.sh) and runs 104-region DKT parcellation for
+              Checks /Applications/FastSurfer* (macos_setup_fastsurfer.sh) and runs DKT or Destrieux parcellation for
               interactive cursor hover.
+            </div>
+            <div class="form-row" style="margin-bottom:5px;">
+              <label for="selectAtlasType">Anatomical Atlas:</label>
+              <select id="selectAtlasType" class="select-full"
+                title="Choose between the Desikan-Killiany-Tourville (DKT, aparc.DKTatlas+aseg) or Destrieux (aparc.a2009s+aseg) cortical and subcortical parcellation">
+                <option value="dkt" selected>DKT Atlas (aparc.DKTatlas+aseg — 104 Regions)</option>
+                <option value="destrieux">Destrieux Atlas (aparc.a2009s+aseg — 148 Cortical + Subcortical)</option>
+              </select>
+            </div>
+            <div id="destrieuxSlowWarning" class="atlas-slow-warning" hidden>
+              <div>
+                <strong>Slower Processing Notice:</strong> Generating the Destrieux (<code>aparc.a2009s</code>) atlas runs FastSurfer with <code>--fsaparc</code> and without <code>--seg_only</code> (full cortical surface reconstruction), which is significantly slower than DKT segmentation. Reverts to template registration only when FastSurfer is unavailable.
+              </div>
+              <div id="fsLicenseStatusRow" class="fs-license-row">
+                <span id="fsLicenseStatusText" class="fs-license-status">FS License: Checking...</span>
+                <label class="btn-xs fs-license-btn" for="fsLicenseFileInput"
+                  title="Select your local FreeSurfer license file (license.txt / .license / license.dat) required by FastSurfer --fsaparc">
+                  <span id="lblSelectFsLicenseBtn">Select License...</span>
+                  <input id="fsLicenseFileInput" type="file" accept=".txt,.dat,.license,*/*" hidden />
+                </label>
+              </div>
             </div>
             <div class="form-row" style="margin-bottom:5px;">
               <label for="selectDktT1Vol">Target T1w Structural MRI:</label>
               <select id="selectDktT1Vol" class="select-full"></select>
             </div>
             <div class="form-row" style="margin-bottom:5px;">
-              <label for="selectDktMode">DKT Pipeline Mode:</label>
+              <label id="lblSelectDktMode" for="selectDktMode">Atlas Pipeline Mode:</label>
               <select id="selectDktMode" class="select-full"
-                title="Choose between FastSurferVINN DKT-Only (--seg_only --no_cereb --no_hypothal --no_cc --no_biasfield), Full FastSurfer (--seg_only), or Quick Template DKT">
+                title="Choose between FastSurferVINN, Full FastSurfer, or Quick MNI152 Template Registration">
                 <option value="fastsurfer_vinn" selected>FastSurferVINN DKT-Only (Fast, Recommended)</option>
                 <option value="fastsurfer_full">Full FastSurfer (--seg_only + Cereb/HypVINN)</option>
                 <option value="template_flirt">Quick Template DKT (FSL FLIRT ~2s)</option>
@@ -243,25 +264,25 @@
             </div>
             <div class="neuro-bet-controls">
               <button id="btnRunDktAtlas" class="btn btn-dkt-seg btn-sm" style="flex:1;"
-                title="Segment selected T1w MRI into the Desikan-Killiany-Tourville (DKT) anatomical atlas and enable interactive hover display">
+                title="Segment selected T1w MRI into the selected anatomical atlas (DKT or Destrieux) and enable interactive hover display">
                 Generate DKT Atlas
               </button>
-              <label class="btn btn-secondary btn-sm" for="dktFileInput"
-                title="Load an existing FastSurfer / FreeSurfer aparc.DKTatlas+aseg (.mgz or .nii.gz) segmentation file">
-                Load DKT
+              <label id="lblLoadDktWrap" class="btn btn-secondary btn-sm" for="dktFileInput"
+                title="Load an existing FastSurfer / FreeSurfer aparc.DKTatlas+aseg or aparc.a2009s+aseg (.mgz or .nii.gz) segmentation file">
+                <span id="lblLoadDktBtn">Load DKT</span>
                 <input id="dktFileInput" type="file" accept=".nii,.nii.gz,.mgz" hidden />
               </label>
             </div>
             <!-- Segmentation Color Overlay Toggle + Inline Opacity Slider (keeps cursor hover active when OFF) -->
             <div id="dktOverlayControlRow" class="dkt-overlay-toggle-row">
               <label class="vis-switch-label" for="chkDktColorOverlay"
-                title="Toggle DKT segmentation color overlay ON / OFF on the brain slices (cursor hover region readout remains active even when color overlay is OFF)">
+                title="Toggle atlas segmentation color overlay ON / OFF on the brain slices (cursor hover region readout remains active even when color overlay is OFF)">
                 <input type="checkbox" role="switch" class="vis-switch" id="chkDktColorOverlay" checked disabled />
                 <span class="dkt-overlay-label">Color Overlay</span>
               </label>
               <div class="dkt-overlay-slider-wrap">
                 <input type="range" id="sliderDktOverlayOpacity" min="0" max="100" value="35" disabled
-                  title="Adjust DKT segmentation color overlay opacity" />
+                  title="Adjust atlas segmentation color overlay opacity" />
                 <span id="valDktOverlayOpacity" class="opacity-pct">35%</span>
               </div>
             </div>
@@ -274,24 +295,24 @@
               <input type="number" id="inputDktCalMax" class="window-input" step="any" value="2035.0" disabled
                 title="Atlas Overlay Intensity / Label Max (cal_max)" />
               <button type="button" id="btnDktAutoWindow" class="btn-xs" disabled
-                title="Reset DKT Atlas window to full brain label range (0.5 – 2035)">Auto</button>
+                title="Reset Atlas window to full brain label range">Auto</button>
             </div>
           </div>
         </div>
 
-        <!-- Standalone Module 3: Crosshair, Voxel & DKT Hover Inspector — Separately Minimizable -->
+        <!-- Standalone Module 3: Crosshair, Voxel & Atlas Hover Inspector — Separately Minimizable -->
         <div id="inspectorModuleSection" class="panel-section neuro-module-section coord-inspector is-minimized">
           <div id="inspectorModuleHeader" class="neuro-module-header" role="button" tabindex="0" aria-expanded="false"
-            aria-controls="inspectorModuleBody" title="Click to expand or minimize Crosshair &amp; DKT Hover Inspector">
+            aria-controls="inspectorModuleBody" title="Click to expand or minimize Crosshair &amp; Atlas Hover Inspector">
             <div class="neuro-module-title-wrap">
               <span class="neuro-module-chevron" aria-hidden="true">▸</span>
-              <h3>Crosshair &amp; DKT Inspector</h3>
+              <h3>Crosshair &amp; Atlas Inspector</h3>
             </div>
             <div class="neuro-module-header-actions">
               <span id="rasCoordsBadge" class="coord-badge">RAS: 0.0, 0.0, 0.0 mm</span>
               <button id="btnToggleInspectorModule" type="button" class="icon-btn module-min-btn"
-                aria-label="Toggle Crosshair &amp; DKT Inspector module"
-                title="Expand / Minimize Crosshair &amp; DKT Inspector">+</button>
+                aria-label="Toggle Crosshair &amp; Atlas Inspector module"
+                title="Expand / Minimize Crosshair &amp; Atlas Inspector">+</button>
             </div>
           </div>
           <div id="inspectorModuleBody" class="neuro-module-body" hidden>

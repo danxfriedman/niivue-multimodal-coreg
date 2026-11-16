@@ -1436,6 +1436,64 @@ html, body {
   white-space: nowrap;
 }
 
+.atlas-slow-warning {
+  margin-bottom: 6px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  line-height: 1.38;
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.atlas-slow-warning strong {
+  color: #fbbf24;
+}
+
+.atlas-slow-warning code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: #fef3c7;
+  background: rgba(15, 23, 42, 0.55);
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+
+.fs-license-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px dashed rgba(245, 158, 11, 0.35);
+}
+
+.fs-license-status {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: #fef3c7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fs-license-status.is-valid {
+  color: #6ee7b7;
+}
+
+.fs-license-status.is-missing {
+  color: #fca5a5;
+}
+
+.fs-license-btn {
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
 /* ============================================================================
    Interactive DKT Atlas Cursor Hover Tooltip, Canvas HUD Pill & Inspector Box
    ============================================================================ */

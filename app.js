@@ -573,8 +573,11 @@ function toggleCoregPanel(forceState = null) {
 // Modality heuristic from filename
 function inferModalityAndStyle(filename) {
   const lower = filename.toLowerCase();
+  if (lower.includes("destrieux") || lower.includes("a2009s")) {
+    return { modality: "Destrieux Atlas (FreeSurferColorLUT)", colormap: "actc", opacity: 0.35, isMask: true, isDktAtlas: true, atlasType: "destrieux" };
+  }
   if (lower.includes("dkt") || lower.includes("aparc") || lower.includes("aseg") || lower.includes("atlas")) {
-    return { modality: "DKT Atlas (104 ROIs)", colormap: "actc", opacity: 0.38, isMask: true, isDktAtlas: true };
+    return { modality: "DKT Atlas (104 ROIs)", colormap: "actc", opacity: 0.38, isMask: true, isDktAtlas: true, atlasType: "dkt" };
   }
   if (lower.includes("mask") || lower.includes("seeg") || lower.includes("elec") || lower.includes("roi") || lower.includes("seg")) {
     return { modality: "ROI / Contacts Mask", colormap: "green", opacity: 0.9, isMask: true, isDktAtlas: false };
@@ -609,6 +612,7 @@ function registerVolumeMeta(vol, overrides = {}) {
   const isChild = Boolean(overrides.isChildOfMov || overrides.role === "child");
   const isMask = overrides.isMask !== undefined ? Boolean(overrides.isMask) : inferred.isMask;
   const isDktAtlas = overrides.isDktAtlas !== undefined ? Boolean(overrides.isDktAtlas) : Boolean(inferred.isDktAtlas);
+  const atlasType = overrides.atlasType || inferred.atlasType || (isDktAtlas ? resolveAtlasTypeForVolume(vol) : null);
 
   state.layerMeta.set(vol.id, {
     label: overrides.label || vol.name || "Volume",
@@ -622,6 +626,7 @@ function registerVolumeMeta(vol, overrides = {}) {
     isCheckedForExport: isChild || overrides.role === "moving" || isDktAtlas,
     isMask,
     isDktAtlas,
+    atlasType,
     rawBytes: overrides.rawBytes || null,
     isSyntheticVerification: Boolean(overrides.isSyntheticVerification),
     isEdgeOfMov: Boolean(overrides.isEdgeOfMov),
@@ -651,6 +656,28 @@ function toggleVolumeVisibility(volId, forceState = null) {
 
   const targetOpacity = nextVis ? (meta.savedOpacity > 0 ? meta.savedOpacity : 0.75) : 0.0;
   state.nv.setOpacity(idx, targetOpacity);
+
+  // If the user explicitly turns ON a DKT or Destrieux atlas layer in the Image Stack, make it the active atlas
+  if (meta.isDktAtlas && nextVis) {
+    state.activeDktVolId = volId;
+    const vol = state.nv.volumes[idx];
+    const detectedType = resolveAtlasTypeForVolume(vol);
+    const atlasSelect = document.getElementById("selectAtlasType");
+    if (atlasSelect && atlasSelect.value !== detectedType) {
+      atlasSelect.value = detectedType;
+      syncAtlasTypeSelectionUI(false, false);
+    }
+    state.nv.volumes.forEach((otherVol, otherIdx) => {
+      if (otherVol.id !== volId) {
+        const otherMeta = state.layerMeta.get(otherVol.id);
+        if (otherMeta?.isDktAtlas && otherMeta.visible) {
+          otherMeta.visible = false;
+          state.nv.setOpacity(otherIdx, 0.0);
+        }
+      }
+    });
+  }
+
   state.nv.drawScene();
   renderLayerList();
 }
@@ -2355,6 +2382,7 @@ function buildProjectBundleData() {
         isCheckedForExport: Boolean(m?.isCheckedForExport),
         isMask: Boolean(m?.isMask),
         isDktAtlas: Boolean(m?.isDktAtlas),
+        atlasType: m?.atlasType || null,
         visible: m ? Boolean(m.visible) : true,
         opacity: vol.opacity,
         savedOpacity: m?.savedOpacity ?? 0.75,
@@ -2646,6 +2674,7 @@ async function restoreProjectWorkspace(manifest, niftiBytesByName) {
       isChildOfMov: Boolean(vEntry.isChildOfMov),
       isMask: Boolean(vEntry.isMask),
       isDktAtlas: Boolean(vEntry.isDktAtlas),
+      atlasType: vEntry.atlasType || null,
       rawBytes,
     });
 
@@ -2888,6 +2917,8 @@ async function checkNeuroToolsStatus(showToastMsg = false) {
       }
     }
 
+    syncAtlasTypeSelectionUI(false, false);
+
     if (showToastMsg) {
       const fs = data.fastsurfer || {};
       const msg = fs.available
@@ -3049,7 +3080,180 @@ async function runFslBetSkullStrip() {
   }
 }
 
-// Generate DKT (aparc.DKTatlas+aseg) anatomical segmentation & add interactive DKT atlas to workspace
+// Helper: Determine whether an atlas volume or type string is Destrieux ('destrieux', max ID 12175) vs DKT ('dkt', max ID 2035)
+function resolveAtlasTypeForVolume(vol = null, explicitType = null) {
+  if (explicitType) {
+    const t = String(explicitType).toLowerCase();
+    if (t.includes("destrieux") || t.includes("a2009s")) return "destrieux";
+    if (t.includes("dkt")) return "dkt";
+  }
+  if (vol) {
+    const meta = state.layerMeta.get(vol.id);
+    if (meta?.atlasType) return meta.atlasType;
+    if (/destrieux|a2009s/i.test(vol.name || "") || /destrieux|a2009s/i.test(meta?.label || "")) {
+      return "destrieux";
+    }
+    const srcArr = meta?.unmaskedDktData || vol.img;
+    if (srcArr && srcArr.length) {
+      for (let i = 0; i < srcArr.length; i += 8) {
+        if (srcArr[i] >= 11100) return "destrieux";
+      }
+    }
+  }
+  const sel = document.getElementById("selectAtlasType")?.value;
+  return sel === "destrieux" ? "destrieux" : "dkt";
+}
+
+function getAtlasDefaultMaxLabel(vol = null, explicitType = null) {
+  return resolveAtlasTypeForVolume(vol, explicitType) === "destrieux" ? 12175 : 2035;
+}
+
+function getAtlasShortTitle(vol = null, explicitType = null) {
+  return resolveAtlasTypeForVolume(vol, explicitType) === "destrieux" ? "Destrieux Atlas" : "DKT Atlas";
+}
+
+// Synchronize the Atlas Tab UI (Pipeline options, Slow-Processing Warning Banner, Generate/Load buttons, and Active Atlas Volume)
+function syncAtlasTypeSelectionUI(showSlowNoticeToast = false, switchActiveVolume = false) {
+  const atlasSelect = document.getElementById("selectAtlasType");
+  const modeSelect = document.getElementById("selectDktMode");
+  const warnBanner = document.getElementById("destrieuxSlowWarning");
+  const runBtn = document.getElementById("btnRunDktAtlas");
+  const loadLbl = document.getElementById("lblLoadDktBtn");
+  const detailNote = document.getElementById("fastsurferDetailNote");
+
+  const atlasType = atlasSelect?.value === "destrieux" ? "destrieux" : "dkt";
+  const isDestrieux = atlasType === "destrieux";
+  state.selectedAtlasType = atlasType;
+
+  if (modeSelect) {
+    const optVinn = modeSelect.querySelector('option[value="fastsurfer_vinn"]');
+    const optFull = modeSelect.querySelector('option[value="fastsurfer_full"]');
+    const optTmpl = modeSelect.querySelector('option[value="template_flirt"]');
+    if (isDestrieux) {
+      if (optVinn) optVinn.textContent = "FastSurfer Surface + --fsaparc (aparc.a2009s, Slower)";
+      if (optFull) optFull.textContent = "Full FastSurfer + --fsaparc (aparc.a2009s + Cereb/HypVINN, Slower)";
+      if (optTmpl) optTmpl.textContent = "Quick Template Destrieux (FSL FLIRT ~2s)";
+    } else {
+      if (optVinn) optVinn.textContent = "FastSurferVINN DKT-Only (Fast, Recommended)";
+      if (optFull) optFull.textContent = "Full FastSurfer (--seg_only + Cereb/HypVINN)";
+      if (optTmpl) optTmpl.textContent = "Quick Template DKT (FSL FLIRT ~2s)";
+    }
+  }
+
+  const modeVal = modeSelect?.value || "fastsurfer_vinn";
+  const isSlowFsAparc = isDestrieux && modeVal !== "template_flirt";
+
+  if (warnBanner) {
+    warnBanner.hidden = !isSlowFsAparc;
+  }
+
+  // Update FreeSurfer License status indicator in the Destrieux notice banner
+  const licStatusEl = document.getElementById("fsLicenseStatusText");
+  const licBtnLbl = document.getElementById("lblSelectFsLicenseBtn");
+  const licInfo = state.neuroToolsStatus?.fsLicense || state.neuroToolsStatus?.fastsurfer?.fsLicense || null;
+  if (licStatusEl) {
+    if (licInfo?.available) {
+      licStatusEl.textContent = `✓ FS License: ${licInfo.label || "license.txt"}`;
+      licStatusEl.title = licInfo.path || "Valid FreeSurfer license detected";
+      licStatusEl.className = "fs-license-status is-valid";
+      if (licBtnLbl) licBtnLbl.textContent = "Change...";
+    } else {
+      licStatusEl.textContent = "⚠ FS License: Not Found";
+      licStatusEl.title = "No valid FreeSurfer license file automatically found in $FS_LICENSE, ~/license.txt, or $FREESURFER_HOME";
+      licStatusEl.className = "fs-license-status is-missing";
+      if (licBtnLbl) licBtnLbl.textContent = "Select License...";
+    }
+  }
+
+  if (detailNote) {
+    detailNote.textContent = isDestrieux
+      ? "Destrieux (aparc.a2009s+aseg, 148 cortical gyral/sulcal + subcortical regions): runs FastSurfer with --fsaparc and without --seg_only, or reverts to MNI152 template registration when FastSurfer is unavailable."
+      : "DKT (aparc.DKTatlas+aseg, 104 cortical + subcortical regions): runs FastSurferVINN (--seg_only) or MNI152 template registration for interactive cursor hover.";
+  }
+
+  if (runBtn && !runBtn.disabled) {
+    runBtn.textContent = isDestrieux ? "Generate Destrieux Atlas" : "Generate DKT Atlas";
+  }
+  if (loadLbl) {
+    loadLbl.textContent = isDestrieux ? "Load Destrieux" : "Load DKT";
+  }
+
+  if (switchActiveVolume && state.nv && Array.isArray(state.nv.volumes)) {
+    const matchingAtlasVol = state.nv.volumes.find((v) => {
+      const m = state.layerMeta.get(v.id);
+      return m?.isDktAtlas && resolveAtlasTypeForVolume(v) === atlasType;
+    });
+    if (matchingAtlasVol) {
+      state.activeDktVolId = matchingAtlasVol.id;
+      // Show the selected atlas overlay and hide other loaded parcellation overlays so only one atlas overlay is visible at a time
+      state.nv.volumes.forEach((v, idx) => {
+        const m = state.layerMeta.get(v.id);
+        if (m?.isDktAtlas) {
+          const isSelected = v.id === matchingAtlasVol.id;
+          m.visible = isSelected;
+          const targetAlpha = isSelected ? (m.savedOpacity > 0 ? m.savedOpacity : 0.35) : 0;
+          state.nv.setOpacity(idx, targetAlpha);
+        }
+      });
+      state.nv.drawScene();
+      renderLayerList();
+      const dktInfo = lookupDktRegionAtRAS(state.lastCrosshairRAS);
+      updateDktReadoutUI(dktInfo, null);
+    } else {
+      syncDktOverlayControlsUI();
+    }
+  } else {
+    syncDktOverlayControlsUI();
+  }
+
+  if (showSlowNoticeToast && isSlowFsAparc) {
+    showToast(
+      "Destrieux (aparc.a2009s) selected: FastSurfer will run with --fsaparc and without --seg_only (full surface reconstruction — processing is significantly slower). Reverts to template registration only if FastSurfer is unavailable.",
+      5800
+    );
+  }
+}
+
+// Validate & save a user-selected FreeSurfer license file via /api/set-fs-license
+async function uploadAndSetFsLicenseFile(file) {
+  if (!file) return false;
+  try {
+    const contentText = await file.text();
+    const resp = await fetch("/api/set-fs-license", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: file.name,
+        contentText,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.valid) {
+      throw new Error(data.error || "Invalid FreeSurfer license file format");
+    }
+
+    if (!state.neuroToolsStatus) state.neuroToolsStatus = {};
+    state.neuroToolsStatus.fsLicense = data.fsLicense;
+    if (state.neuroToolsStatus.fastsurfer) {
+      state.neuroToolsStatus.fastsurfer.fsLicense = data.fsLicense;
+    }
+    syncAtlasTypeSelectionUI(false, false);
+    showToast(`Validated & saved FreeSurfer license "${file.name}"!`, 4200);
+
+    if (state._pendingDestrieuxRunAfterLicense) {
+      state._pendingDestrieuxRunAfterLicense = false;
+      await runDktSegmentation();
+    }
+    return true;
+  } catch (err) {
+    state._pendingDestrieuxRunAfterLicense = false;
+    console.error("FreeSurfer license validation error:", err);
+    showToast(`Invalid FreeSurfer License: ${err.message}`, 5500);
+    return false;
+  }
+}
+
+// Generate DKT (aparc.DKTatlas+aseg) or Destrieux (aparc.a2009s+aseg) anatomical segmentation & add interactive atlas to workspace
 async function runDktSegmentation() {
   if (!state.nv) return;
   const t1Select = document.getElementById("selectDktT1Vol") || document.getElementById("selectNeuroT1Vol");
@@ -3062,14 +3266,42 @@ async function runDktSegmentation() {
 
   const srcVol = state.nv.volumes[volIdx];
   const srcMeta = state.layerMeta.get(srcVol.id);
+  const atlasType = document.getElementById("selectAtlasType")?.value === "destrieux" ? "destrieux" : "dkt";
+  const isDestrieux = atlasType === "destrieux";
+  const atlasShort = isDestrieux ? "Destrieux" : "DKT";
+  const aparcName = isDestrieux ? "aparc.a2009s+aseg" : "aparc.DKTatlas+aseg";
+
   if (!srcMeta?.rawBytes) {
-    showToast("Selected volume does not have raw NIfTI bytes available for DKT segmentation.");
+    showToast(`Selected volume does not have raw NIfTI bytes available for ${atlasShort} segmentation.`);
     return;
   }
 
   const btn = document.getElementById("btnRunDktAtlas");
-  const origBtnText = btn ? btn.textContent : "Generate DKT Atlas";
-  const dktMode = document.getElementById("selectDktMode")?.value || "fastsurfer_vinn";
+  let dktMode = document.getElementById("selectDktMode")?.value || "fastsurfer_vinn";
+
+  // If Destrieux + FastSurfer (--fsaparc) is selected, ensure tools status has been checked and verify FreeSurfer license
+  if (isDestrieux && dktMode !== "template_flirt") {
+    if (!state.neuroToolsStatus) {
+      await checkNeuroToolsStatus(false);
+    }
+    const fsAvail = Boolean(state.neuroToolsStatus?.fastsurfer?.available);
+    const licAvail = Boolean(
+      state.neuroToolsStatus?.fsLicense?.available ||
+      state.neuroToolsStatus?.fastsurfer?.fsLicense?.available
+    );
+    if (fsAvail && !licAvail) {
+      const wantSelect = window.confirm(
+        "FastSurfer --fsaparc (Destrieux aparc.a2009s surface pipeline) requires a valid FreeSurfer license file (license.txt / .license), and none was automatically found in standard paths ($FS_LICENSE, ~/license.txt, $FREESURFER_HOME/license.txt).\n\nClick OK to select your local FreeSurfer license file now, or click Cancel to run Quick Template Destrieux registration instead."
+      );
+      if (wantSelect) {
+        state._pendingDestrieuxRunAfterLicense = true;
+        document.getElementById("fsLicenseFileInput")?.click();
+        return;
+      } else {
+        dktMode = "template_flirt";
+      }
+    }
+  }
   const fracInput = document.getElementById("betFracInput");
   const betFrac = Math.max(0.05, Math.min(0.95, parseFloat(fracInput?.value || "0.5") || 0.5));
   const activeBrainVol = findActiveBrainMaskVolume();
@@ -3078,19 +3310,27 @@ async function runDktSegmentation() {
   try {
     if (btn) {
       btn.disabled = true;
-      btn.textContent = "Segmenting DKT...";
+      btn.textContent = isDestrieux ? "Segmenting Destrieux..." : "Segmenting DKT...";
     }
-    setCoregStatus("Segmenting DKT...", true);
-    showToast(
-      `Running ${dktMode === "template_flirt" ? "Template DKT" : "FastSurfer DKT"} parcellation (aparc.DKTatlas+aseg) for ${srcMeta.label}...`,
-      0
-    );
+    setCoregStatus(`Segmenting ${atlasShort}...`, true);
+    if (isDestrieux && dktMode !== "template_flirt") {
+      showToast(
+        `Running FastSurfer with --fsaparc (without --seg_only) to generate Destrieux (${aparcName}) for ${srcMeta.label}. Please note: full surface reconstruction is slower (reverts to template registration only if FastSurfer is unavailable)...`,
+        0
+      );
+    } else {
+      showToast(
+        `Running ${dktMode === "template_flirt" ? `Template ${atlasShort}` : `FastSurfer ${atlasShort}`} parcellation (${aparcName}) for ${srcMeta.label}...`,
+        0
+      );
+    }
 
     const reqPayload = {
       sourceName: srcVol.name,
       sourceBase64: uint8ArrayToBase64(srcMeta.rawBytes),
       currentAffine: srcVol.hdr.affine,
       dktMode,
+      atlasType,
       betFrac,
     };
     if (activeBrainMeta?.rawBytes) {
@@ -3105,7 +3345,7 @@ async function runDktSegmentation() {
     });
     const data = await resp.json();
     if (!resp.ok || !data.niftiBase64) {
-      throw new Error(data.error || "DKT segmentation failed");
+      throw new Error(data.error || `${atlasShort} segmentation failed`);
     }
 
     if (data.dktLut && Object.keys(data.dktLut).length > 0) {
@@ -3114,26 +3354,29 @@ async function runDktSegmentation() {
 
     const dktBytes = base64ToUint8Array(data.niftiBase64);
     const unmaskedBytes = data.unmaskedNiftiBase64 ? base64ToUint8Array(data.unmaskedNiftiBase64) : null;
+    const resolvedType = data.atlasType || atlasType;
+    const resolvedTitle = resolvedType === "destrieux" ? "Destrieux Atlas" : "DKT Atlas";
     await addDktAtlasVolumeToWorkspace(
       dktBytes,
       data.fileName,
-      `DKT Atlas (${data.regionCount || 104} Regions)`,
-      unmaskedBytes
+      `${resolvedTitle} (${data.regionCount || (resolvedType === "destrieux" ? 185 : 104)} Regions)`,
+      unmaskedBytes,
+      resolvedType
     );
 
     setCoregStatus("Ready", false);
     showToast(
-      `DKT Atlas loaded & brain-masked (${data.regionCount} anatomical regions via ${data.engine})! Hover cursor over brain to inspect DKT areas.`,
+      `${resolvedTitle} loaded & brain-masked (${data.regionCount} anatomical regions via ${data.engine})! Hover cursor over brain to inspect ${resolvedTitle} areas.`,
       5200
     );
   } catch (err) {
-    console.error("DKT segmentation error:", err);
+    console.error(`${atlasShort} segmentation error:`, err);
     setCoregStatus("Ready", false);
-    showToast(`DKT Segmentation Error: ${err.message}`, 4500);
+    showToast(`${atlasShort} Segmentation Error: ${err.message}`, 4500);
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = origBtnText;
+      syncAtlasTypeSelectionUI(false, false);
     }
   }
 }
@@ -3162,7 +3405,7 @@ const NON_BRAIN_FREESURFER_LABELS = new Set([
   165, 166, 167, 168, 224,
   256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266,
   701, 901, 902, 906, 907, 908, 909, 911, 915, 916, 920, 930, 931,
-  1000, 1001, 1100, 2000, 2001, 2100,
+  1000, 1001, 1100, 2000, 2001, 2100, 11100, 12100,
 ]);
 
 const NON_BRAIN_FREESURFER_NAME_RE =
@@ -3186,7 +3429,8 @@ function buildFreeSurferNiiVueLabelColormap(dktLutObj, maxVolLabel = 2100, calMi
   const lutIds = Object.keys(lutSource)
     .map((k) => parseInt(k, 10))
     .filter((n) => Number.isFinite(n) && n >= 0);
-  const maxId = Math.min(4095, Math.max(2100, maxVolLabel, ...(lutIds.length ? lutIds : [2100])));
+  // Support both DKT (max 2035) and Destrieux aparc.a2009s+aseg (max 12175)
+  const maxId = Math.min(16384, Math.max(2100, maxVolLabel, ...(lutIds.length ? lutIds : [2100])));
   const effMin = Number.isFinite(Number(calMin)) ? Math.max(0.5, Number(calMin)) : 0.5;
   const effMax = Number.isFinite(Number(calMax)) && Number(calMax) >= effMin ? Number(calMax) : maxId;
 
@@ -3259,11 +3503,11 @@ async function applyFreeSurferColorLutToVolume(vol) {
     }
   }
 
-  // Determine whether `vol` is a discrete DKT/label volume vs a continuous structural MRI/CT volume
+  // Determine whether `vol` is a discrete DKT/Destrieux/label volume vs a continuous structural MRI/CT volume
   const isDiscreteLabelVol = Boolean(
     meta?.isDktAtlas ||
       meta?.isMask ||
-      /dkt|aparc|aseg|atlas|seg|mask/i.test(vol.name || "")
+      /dkt|destrieux|a2009s|aparc|aseg|atlas|seg|mask/i.test(vol.name || "")
   );
 
   if (isDiscreteLabelVol) {
@@ -3281,11 +3525,16 @@ async function applyFreeSurferColorLutToVolume(vol) {
       }
     }
 
+    if (meta && !meta.atlasType) {
+      meta.atlasType = maxVox >= 11100 ? "destrieux" : resolveAtlasTypeForVolume(vol);
+    }
+    const defaultMax = maxVox >= 11100 ? 12175 : getAtlasDefaultMaxLabel(vol);
+
     if (!Number.isFinite(vol.cal_min) || vol.cal_min < 0.5) {
       vol.cal_min = 0.5;
     }
     if (!Number.isFinite(vol.cal_max) || vol.cal_max <= 0) {
-      vol.cal_max = 2035;
+      vol.cal_max = defaultMax;
     }
 
     const labelCmap = buildFreeSurferNiiVueLabelColormap(dktLutObj, maxVox, vol.cal_min, vol.cal_max);
@@ -3342,7 +3591,7 @@ function findActiveBrainMaskVolume() {
   return brainNamedVol || null;
 }
 
-// Mask the DKT Atlas volume in-place using the active brain mask volume so any voxel outside the brain is set to 0 and transparent
+// Mask the DKT / Destrieux Atlas volume in-place using the active brain mask volume so any voxel outside the brain is set to 0 and transparent
 async function applyBrainMaskToDktVolume(dktVol = null, brainVolOverride = null) {
   const targetDktVol = dktVol || getDktVolume();
   if (!targetDktVol || !targetDktVol.img) return false;
@@ -3422,8 +3671,8 @@ async function applyBrainMaskToDktVolume(dktVol = null, brainVolOverride = null)
   return true;
 }
 
-async function addDktAtlasVolumeToWorkspace(dktBytes, fileName, displayLabel, unmaskedBytes = null) {
-  // Remove any previously loaded DKT atlas with the same filename
+async function addDktAtlasVolumeToWorkspace(dktBytes, fileName, displayLabel, unmaskedBytes = null, explicitAtlasType = null) {
+  // Remove any previously loaded atlas with the same filename
   const existingIdx = state.nv.volumes.findIndex((v) => {
     const m = state.layerMeta.get(v.id);
     return m?.isDktAtlas && v.name === fileName;
@@ -3436,12 +3685,15 @@ async function addDktAtlasVolumeToWorkspace(dktBytes, fileName, displayLabel, un
 
   await ensureDktLutLoaded();
 
+  const initialType = resolveAtlasTypeForVolume(null, explicitAtlasType || fileName);
+  const initialMax = initialType === "destrieux" ? 12175 : 2035;
+
   const dktVol = await loadNVImageFromBytes(dktBytes, {
     name: fileName,
     colormap: "gray",
     opacity: 0.35,
     cal_min: 0.5,
-    cal_max: 2035,
+    cal_max: initialMax,
   });
 
   let unmaskedDktData = null;
@@ -3463,16 +3715,31 @@ async function addDktAtlasVolumeToWorkspace(dktBytes, fileName, displayLabel, un
     unmaskedDktData = new Int16Array(dktVol.img);
   }
 
+  const detectedAtlasType = resolveAtlasTypeForVolume(dktVol, explicitAtlasType || fileName);
+  const isDestrieux = detectedAtlasType === "destrieux";
+  const atlasTitle = isDestrieux ? "Destrieux Atlas" : "DKT Atlas";
+  dktVol.cal_max = isDestrieux ? 12175 : 2035;
+
+  // Hide any other loaded parcellation overlays so only the newly activated atlas color overlay is displayed
+  state.nv.volumes.forEach((v, idx) => {
+    const m = state.layerMeta.get(v.id);
+    if (m?.isDktAtlas) {
+      m.visible = false;
+      state.nv.setOpacity(idx, 0);
+    }
+  });
+
   await applyFreeSurferColorLutToVolume(dktVol);
 
   state.nv.addVolume(dktVol);
   registerVolumeMeta(dktVol, {
-    label: displayLabel || `DKT Atlas (${fileName})`,
-    modality: "DKT Atlas (FreeSurferColorLUT)",
+    label: displayLabel || `${atlasTitle} (${fileName})`,
+    modality: `${atlasTitle} (FreeSurferColorLUT)`,
     opacity: 0.35,
     visible: true,
     isMask: true,
     isDktAtlas: true,
+    atlasType: detectedAtlasType,
     rawBytes: dktBytes,
   });
   const dktMeta = state.layerMeta.get(dktVol.id);
@@ -3481,7 +3748,14 @@ async function addDktAtlasVolumeToWorkspace(dktBytes, fileName, displayLabel, un
   }
   state.activeDktVolId = dktVol.id;
 
-  // If a brain mask volume is present in the stack, ensure the DKT overlay is masked to it
+  // Sync the Atlas Type dropdown to match the newly loaded/generated atlas
+  const atlasSelect = document.getElementById("selectAtlasType");
+  if (atlasSelect && atlasSelect.value !== detectedAtlasType) {
+    atlasSelect.value = detectedAtlasType;
+  }
+  syncAtlasTypeSelectionUI(false, false);
+
+  // If a brain mask volume is present in the stack, ensure the Atlas overlay is masked to it
   if (findActiveBrainMaskVolume()) {
     await applyBrainMaskToDktVolume(dktVol);
   }
@@ -3490,18 +3764,19 @@ async function addDktAtlasVolumeToWorkspace(dktBytes, fileName, displayLabel, un
   state.nv.drawScene();
   renderLayerList();
 
-  // Immediately evaluate DKT region at current crosshair position
+  // Immediately evaluate Atlas region at current crosshair position
   const dktInfo = lookupDktRegionAtRAS(state.lastCrosshairRAS);
   updateDktReadoutUI(dktInfo, null);
 }
 
 async function loadDktAtlasFile(file) {
   if (!file) return;
+  const selectedType = document.getElementById("selectAtlasType")?.value === "destrieux" ? "destrieux" : "dkt";
   try {
-    setCoregStatus("Loading DKT...", true);
-    showToast(`Loading DKT Atlas file ${file.name}...`, 0);
+    setCoregStatus("Loading Atlas...", true);
+    showToast(`Loading Atlas file ${file.name}...`, 0);
 
-    // Ensure DKT LUT is loaded
+    // Ensure FreeSurfer/DKT/Destrieux LUT is loaded
     if (!state.dktLut || Object.keys(state.dktLut).length === 0) {
       await checkNeuroToolsStatus(false);
     }
@@ -3509,6 +3784,7 @@ async function loadDktAtlasFile(file) {
     const ab = await file.arrayBuffer();
     let dktBytes = new Uint8Array(ab);
     let fileName = file.name;
+    let detectedType = /destrieux|a2009s/i.test(file.name) ? "destrieux" : (/dkt/i.test(file.name) ? "dkt" : selectedType);
 
     if (file.name.toLowerCase().endsWith(".mgz") || file.name.toLowerCase().endsWith(".mgh")) {
       const resp = await fetch("/api/convert-volume", {
@@ -3527,24 +3803,35 @@ async function loadDktAtlasFile(file) {
       dktBytes = base64ToUint8Array(data.niftiBase64);
       fileName = data.fileName;
       if (data.dktLut) state.dktLut = data.dktLut;
+      if (data.atlasType) detectedType = data.atlasType;
     }
 
-    await addDktAtlasVolumeToWorkspace(dktBytes, fileName, `DKT Atlas (${file.name})`);
+    const atlasTitle = detectedType === "destrieux" ? "Destrieux Atlas" : "DKT Atlas";
+    await addDktAtlasVolumeToWorkspace(dktBytes, fileName, `${atlasTitle} (${file.name})`, null, detectedType);
     setCoregStatus("Ready", false);
-    showToast(`Loaded DKT Atlas "${file.name}"! Hover cursor over brain slices to view DKT anatomical areas.`);
+    showToast(`Loaded ${atlasTitle} "${file.name}"! Hover cursor over brain slices to view ${atlasTitle} anatomical areas.`);
   } catch (err) {
-    console.error("Failed to load DKT file:", err);
+    console.error("Failed to load Atlas file:", err);
     setCoregStatus("Ready", false);
-    showToast(`Load DKT Error: ${err.message}`, 4500);
+    showToast(`Load Atlas Error: ${err.message}`, 4500);
   }
 }
 
-// Find the active DKT Atlas NVImage volume in workspace
+// Find the active DKT / Destrieux Atlas NVImage volume in workspace
 function getDktVolume() {
   if (!state.nv) return null;
   if (state.activeDktVolId) {
     const idx = getVolumeIndexById(state.activeDktVolId);
     if (idx >= 0) return state.nv.volumes[idx];
+  }
+  const preferredType = document.getElementById("selectAtlasType")?.value || state.selectedAtlasType || "dkt";
+  const preferred = state.nv.volumes.find((v) => {
+    const m = state.layerMeta.get(v.id);
+    return m?.isDktAtlas && resolveAtlasTypeForVolume(v) === preferredType;
+  });
+  if (preferred) {
+    state.activeDktVolId = preferred.id;
+    return preferred;
   }
   const found = state.nv.volumes.find((v) => state.layerMeta.get(v.id)?.isDktAtlas);
   if (found) {
@@ -3554,20 +3841,21 @@ function getDktVolume() {
   return null;
 }
 
-// Sample the integer DKT label at a 3D RAS coordinate [x, y, z] and resolve via FreeSurfer/FastSurfer DKT LUT
+// Sample the integer DKT / Destrieux label at a 3D RAS coordinate [x, y, z] and resolve via FreeSurferColorLUT
 function lookupDktRegionAtRAS(ras) {
   const dktVol = getDktVolume();
   if (!dktVol || !dktVol.hdr?.affine || !dktVol.img) {
     return null;
   }
+  const atlasTitle = getAtlasShortTitle(dktVol);
   const invAff = invertMat4(dktVol.hdr.affine);
   const rawVal = sampleVolumeAtRAS(dktVol, invAff, ras, true);
   const labelId = Math.round(rawVal);
   const entry = state.dktLut?.[String(labelId)] || null;
   if (!labelId || labelId <= 0 || !isBrainFreeSurferLutEntry(labelId, entry)) {
-    return { labelId: 0, entry: null, ras };
+    return { labelId: 0, entry: null, ras, atlasTitle };
   }
-  return { labelId, entry, ras };
+  return { labelId, entry, ras, atlasTitle };
 }
 
 function syncDktOverlayControlsUI() {
@@ -3578,6 +3866,7 @@ function syncDktOverlayControlsUI() {
   const maxInput = document.getElementById("inputDktCalMax");
   const autoBtn = document.getElementById("btnDktAutoWindow");
   const dktVol = getDktVolume();
+  const defaultMax = getAtlasDefaultMaxLabel(dktVol);
 
   if (!dktVol) {
     if (chk) {
@@ -3594,7 +3883,7 @@ function syncDktOverlayControlsUI() {
       minInput.disabled = true;
     }
     if (maxInput) {
-      maxInput.value = "2035.0";
+      maxInput.value = defaultMax.toFixed(1);
       maxInput.disabled = true;
     }
     if (autoBtn) {
@@ -3628,13 +3917,14 @@ function syncDktOverlayControlsUI() {
   }
   if (maxInput) {
     maxInput.disabled = false;
-    const calMaxVal = dktVol.cal_max !== undefined ? Number(dktVol.cal_max).toFixed(1) : "2035.0";
+    const calMaxVal = dktVol.cal_max !== undefined ? Number(dktVol.cal_max).toFixed(1) : defaultMax.toFixed(1);
     if (document.activeElement !== maxInput) {
       maxInput.value = calMaxVal;
     }
   }
   if (autoBtn) {
     autoBtn.disabled = false;
+    autoBtn.title = `Reset ${getAtlasShortTitle(dktVol)} window to full brain label range (0.5 – ${defaultMax})`;
   }
 }
 
@@ -3644,10 +3934,11 @@ function resetDktInspectorUI() {
   const subEl = document.getElementById("dktRegionSub");
   const tooltip = document.getElementById("dktHoverTooltip");
   const hudPill = document.getElementById("dktHudPill");
+  const atlasTitle = getAtlasShortTitle();
 
   if (swatch) swatch.style.background = "#475569";
-  if (titleEl) titleEl.textContent = "DKT Atlas: Not Loaded";
-  if (subEl) subEl.textContent = 'Click "Generate DKT Atlas" above, then hover cursor over brain';
+  if (titleEl) titleEl.textContent = `${atlasTitle}: Not Loaded`;
+  if (subEl) subEl.textContent = `Click "Generate ${atlasTitle}" above, then hover cursor over brain`;
   if (tooltip) tooltip.hidden = true;
   if (hudPill) hudPill.hidden = true;
   syncDktOverlayControlsUI();
@@ -3666,13 +3957,14 @@ function updateDktReadoutUI(dktInfo, cursorEvent = null) {
     return;
   }
 
-  const { labelId, entry, ras } = dktInfo;
+  const { labelId, entry, ras, atlasTitle: infoAtlasTitle } = dktInfo;
+  const activeAtlasTitle = infoAtlasTitle || getAtlasShortTitle(getDktVolume());
   const rasStr = ras ? `RAS [${ras[0].toFixed(1)}, ${ras[1].toFixed(1)}, ${ras[2].toFixed(1)}] mm` : "";
 
   if (labelId > 0 && entry) {
     if (swatch) swatch.style.background = entry.hex || "#38bdf8";
     if (titleEl) titleEl.textContent = entry.title;
-    if (subEl) subEl.textContent = `${entry.name} (LUT #${labelId}) · ${rasStr}`;
+    if (subEl) subEl.textContent = `${entry.name} (${activeAtlasTitle} #${labelId}) · ${rasStr}`;
 
     if (hudPill) {
       hudPill.hidden = false;
@@ -3703,16 +3995,16 @@ function updateDktReadoutUI(dktInfo, cursorEvent = null) {
       tooltip.hidden = false;
     }
   } else {
-    // Cursor is over background (label 0) while a DKT Atlas is loaded
+    // Cursor is over background (label 0) while an Atlas is loaded
     if (swatch) swatch.style.background = "#334155";
     if (titleEl) titleEl.textContent = "Outside Parcellated Brain (Background)";
-    if (subEl) subEl.textContent = `DKT Label #0 · ${rasStr} — Hover over cortical/subcortical tissue`;
+    if (subEl) subEl.textContent = `${activeAtlasTitle} Label #0 · ${rasStr} — Hover over cortical/subcortical tissue`;
     if (tooltip) tooltip.hidden = true;
     if (hudPill) {
       hudPill.hidden = false;
       hudPill.innerHTML = `
         <span class="dkt-swatch" style="background:#475569;"></span>
-        <span style="color:var(--text-secondary);">DKT Atlas Active — Hover over brain tissue</span>
+        <span style="color:var(--text-secondary);">${activeAtlasTitle} Active — Hover over brain tissue</span>
       `;
     }
   }
@@ -3886,6 +4178,12 @@ function setupEventListeners() {
     e.stopPropagation();
     checkNeuroToolsStatus(true);
   });
+  document.getElementById("selectAtlasType")?.addEventListener("change", () => {
+    syncAtlasTypeSelectionUI(true, true);
+  });
+  document.getElementById("selectDktMode")?.addEventListener("change", () => {
+    syncAtlasTypeSelectionUI(true, false);
+  });
   document.getElementById("btnRunBet")?.addEventListener("click", () => {
     runFslBetSkullStrip();
   });
@@ -3898,15 +4196,22 @@ function setupEventListeners() {
       e.target.value = "";
     }
   });
+  document.getElementById("fsLicenseFileInput")?.addEventListener("change", (e) => {
+    if (e.target.files?.length) {
+      uploadAndSetFsLicenseFile(e.target.files[0]);
+      e.target.value = "";
+    }
+  });
   document.getElementById("chkDktColorOverlay")?.addEventListener("change", (e) => {
     const dktVol = getDktVolume();
     if (!dktVol) return;
     const isOn = Boolean(e.target.checked);
+    const atlasTitle = getAtlasShortTitle(dktVol);
     toggleVolumeVisibility(dktVol.id, isOn);
     showToast(
       isOn
-        ? "DKT segmentation color overlay enabled."
-        : "DKT segmentation color overlay hidden — interactive cursor hover region lookup remains active!"
+        ? `${atlasTitle} segmentation color overlay enabled.`
+        : `${atlasTitle} segmentation color overlay hidden — interactive cursor hover region lookup remains active!`
     );
   });
   document.getElementById("sliderDktOverlayOpacity")?.addEventListener("input", (e) => {
@@ -3954,13 +4259,15 @@ function setupEventListeners() {
   document.getElementById("btnDktAutoWindow")?.addEventListener("click", async () => {
     const dktVol = getDktVolume();
     if (!dktVol) return;
+    const defaultMax = getAtlasDefaultMaxLabel(dktVol);
+    const atlasTitle = getAtlasShortTitle(dktVol);
     dktVol.cal_min = 0.5;
-    dktVol.cal_max = 2035;
+    dktVol.cal_max = defaultMax;
     await applyFreeSurferColorLutToVolume(dktVol);
     state.nv.updateGLVolume();
     state.nv.drawScene();
     renderLayerList();
-    showToast("Reset DKT Atlas window to full brain label range (0.5 – 2035).");
+    showToast(`Reset ${atlasTitle} window to full brain label range (0.5 – ${defaultMax}).`);
   });
 
   // 1c. Responsive Browser Window Scaling (ResizeObserver + Window Resize) & Interactive DKT Cursor Hover
@@ -4163,7 +4470,8 @@ function setupEventListeners() {
       const parsedMax = parseFloat(target.value);
       const meta = state.layerMeta.get(vol.id);
       if (meta?.isDktAtlas || vol.colormap === "FreeSurferColorLUT") {
-        vol.cal_max = Number.isFinite(parsedMax) ? Math.max(vol.cal_min || 0.5, parsedMax) : 2035;
+        const defMax = getAtlasDefaultMaxLabel(vol);
+        vol.cal_max = Number.isFinite(parsedMax) ? Math.max(vol.cal_min || 0.5, parsedMax) : defMax;
         applyFreeSurferColorLutToVolume(vol).then(() => {
           state.nv.updateGLVolume();
           state.nv.drawScene();
@@ -4281,7 +4589,7 @@ function setupEventListeners() {
     } else if (action === "auto-window") {
       if (meta?.isDktAtlas) {
         vol.cal_min = 0.5;
-        vol.cal_max = 2035;
+        vol.cal_max = getAtlasDefaultMaxLabel(vol);
         applyFreeSurferColorLutToVolume(vol).then(() => {
           state.nv.updateGLVolume();
           state.nv.drawScene();

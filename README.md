@@ -16,8 +16,9 @@ Built on [`@niivue/niivue`](https://github.com/niivue/niivue) (`niivue/mono`) an
   - Real-time alignment verification tools: **Blink Comparator (`Space`)**, **Cross-Fade Blend**, **3D Sobel Edge Contours**, **3D Checkerboard Fusion**, and **3D Red/Cyan Anaglyph**, plus live **NMI**, **|NCC|**, and **3D Edge Overlap** metrics.
 - **Brain Extraction (Skull-Stripping)**:
   - One-click **FSL BET** skull-stripping with adjustable fractional intensity threshold (`-f`), plus an automatic pure-Python 3D morphological skull-stripping fallback when FSL is not installed.
-- **FastSurfer / FreeSurfer DKT Anatomical Atlas & Hover Inspector**:
-  - Segment T1w structural MRIs into the 104-region **Desikan–Killiany–Tourville (`aparc.DKTatlas+aseg`)** cortical and subcortical parcellation using **FastSurferVINN**, **Full FastSurfer**, or **Template Registration**.
+- **FastSurfer / FreeSurfer DKT & Destrieux Anatomical Atlases + Hover Inspector**:
+  - Select between the 104-region **Desikan–Killiany–Tourville (`aparc.DKTatlas+aseg`)** atlas or the 148-cortical-region **Destrieux (`aparc.a2009s+aseg`)** sulco-gyral atlas.
+  - Runs **FastSurferVINN (`--seg_only`)** for fast DKT segmentation, **FastSurfer with `--fsaparc` (without `--seg_only`)** for full-surface Destrieux parcellation (with automatic FreeSurfer license file validation and interactive local license file picker if not found in standard paths), or **MNI152 Template Registration** fallback when FastSurfer is unavailable.
   - Automatic brain-masking and 3D-safe `FreeSurferColorLUT` rendering (areas outside the brain are set to `0` and 100% transparent so they never obscure the 3D volume render), with dedicated opacity and windowing (`cal_min` / `cal_max`) controls and live cursor-hover region readout.
 - **Project Save / Open & Network Share Support**:
   - Save and reopen complete patient workspaces (NIfTI volumes, transforms, layer roles, opacity/windowing settings, and metrics) to local folders or mounted network drives (`SMB`, `NFS`, `CIFS`, Windows UNC paths `\\server\share`, macOS `/Volumes/...`, Linux `/mnt/...`).
@@ -72,7 +73,7 @@ python3 fslinstaller.py --dest "$HOME/fsl"
 
 #### Step 4: Launch NeuroCoreg Studio
 ```bash
-git clone https://github.com/dfriedman36/niivue-multimodal-coreg.git
+git clone https://github.com/danxfriedman/niivue-multimodal-coreg.git
 cd niivue-multimodal-coreg
 chmod +x start.sh
 ./start.sh
@@ -114,7 +115,7 @@ python3 fslinstaller.py --dest "$HOME/fsl"
 
 #### Step 4: Launch NeuroCoreg Studio
 ```bash
-git clone https://github.com/dfriedman36/niivue-multimodal-coreg.git
+git clone https://github.com/danxfriedman/niivue-multimodal-coreg.git
 cd niivue-multimodal-coreg
 chmod +x start.sh
 ./start.sh
@@ -141,7 +142,7 @@ Then open **http://127.0.0.1:8765** in your browser.
 4. **Launch NeuroCoreg Studio**:
    - Double-click **`start.bat`** in File Explorer, or run in Command Prompt / PowerShell:
      ```cmd
-     git clone https://github.com/dfriedman36/niivue-multimodal-coreg.git
+     git clone https://github.com/danxfriedman/niivue-multimodal-coreg.git
      cd niivue-multimodal-coreg
      start.bat
      ```

@@ -1,9 +1,28 @@
-# NeuroCoreg Studio — Installation & Prerequisites Guide
-
-*(This file mirrors [`README.md`](./README.md) for convenience.)*
+# NeuroCoreg Studio
 
 **Single-Subject Multimodal Brain Image Visualization, Skull-Stripping, DKT Parcellation & 3D Coregistration Tool**  
 Built on [`@niivue/niivue`](https://github.com/niivue/niivue) (`niivue/mono`) and Python (`nibabel`, `scipy`, `numpy`, `pydicom`), with seamless integration for **FSL** (`flirt`, `bet`), **FastSurfer / FreeSurfer** (`aparc.DKTatlas+aseg`), and **`dcm2niix`**.
+
+---
+
+## Key Features
+
+- **Multimodal NIfTI, FreeSurfer & DICOM Workspace**:
+  - Load `.nii`, `.nii.gz`, FreeSurfer `.mgz` / `.mgh`, and raw DICOM series folders (`.dcm`).
+  - Assign **Reference (`REF`)**, **Moving (`MOV`)**, and live-linked **Child (`CHILD`)** volumes (e.g., SEEG electrode contact masks or ROI overlays that automatically inherit Moving transforms).
+- **Interactive & Automated 3D Coregistration**:
+  - Manual 9-DOF sliders (translation, rotation, isotropic/anisotropic scaling) with live 4×4 World RAS & FSL FLIRT `.mat` matrix editing and **Undo / Clear Transform**.
+  - Automated multimodal registration via **SciPy Powell (NMI / NCC)** or **FSL FLIRT** (6-DOF Rigid, 9-DOF Traditional, 12-DOF Affine) with pure-Python fallbacks on all operating systems.
+  - Real-time alignment verification tools: **Blink Comparator (`Space`)**, **Cross-Fade Blend**, **3D Sobel Edge Contours**, **3D Checkerboard Fusion**, and **3D Red/Cyan Anaglyph**, plus live **NMI**, **|NCC|**, and **3D Edge Overlap** metrics.
+- **Brain Extraction (Skull-Stripping)**:
+  - One-click **FSL BET** skull-stripping with adjustable fractional intensity threshold (`-f`), plus an automatic pure-Python 3D morphological skull-stripping fallback when FSL is not installed.
+- **FastSurfer / FreeSurfer DKT & Destrieux Anatomical Atlases + Hover Inspector**:
+  - Select between the 104-region **Desikan–Killiany–Tourville (`aparc.DKTatlas+aseg`)** atlas or the 148-cortical-region **Destrieux (`aparc.a2009s+aseg`)** sulco-gyral atlas.
+  - Runs **FastSurferVINN (`--seg_only`)** for fast DKT segmentation, **FastSurfer with `--fsaparc` (without `--seg_only`)** for full-surface Destrieux parcellation (with automatic FreeSurfer license file validation and interactive local license file picker if not found in standard paths), or **MNI152 Template Registration** fallback when FastSurfer is unavailable.
+  - Automatic brain-masking and 3D-safe `FreeSurferColorLUT` rendering (areas outside the brain are set to `0` and 100% transparent so they never obscure the 3D volume render), with dedicated opacity and windowing (`cal_min` / `cal_max`) controls and live cursor-hover region readout.
+- **Project Save / Open & Network Share Support**:
+  - Save and reopen complete patient workspaces (NIfTI volumes, transforms, layer roles, opacity/windowing settings, and metrics) to local folders or mounted network drives (`SMB`, `NFS`, `CIFS`, Windows UNC paths `\\server\share`, macOS `/Volumes/...`, Linux `/mnt/...`).
+  - Runs entirely in user space with **zero administrative (`sudo` / Administrator) privileges required**.
 
 ---
 
@@ -31,82 +50,161 @@ Built on [`@niivue/niivue`](https://github.com/niivue/niivue) (`niivue/mono`) an
 
 ### macOS (Apple Silicon `M1/M2/M3/M4` & Intel)
 
-1. **Install Python 3 & `dcm2niix` (via Homebrew)**:
-   ```bash
-   brew install python dcm2niix
-   ```
-2. **(Recommended) Install FSL (`bet` & `flirt`)**:
-   Download `fslinstaller.py` from [fsl.fmrib.ox.ac.uk](https://fsl.fmrib.ox.ac.uk/fsl/docs/#/install/macos) and run:
-   ```bash
-   python3 fslinstaller.py --dest "$HOME/fsl"
-   ```
-3. **(Recommended) Install FastSurfer**:
-   Extract FastSurfer into `/Applications/FastSurfer*` or `~/FastSurfer*`, or pull the Docker image:
-   ```bash
-   docker pull deepmi/fastsurfer:latest
-   ```
-4. **Launch NeuroCoreg Studio**:
-   ```bash
-   chmod +x start.sh
-   ./start.sh
-   ```
-   Open **http://127.0.0.1:8765** in your browser.
+#### Step 1: Install Python 3 & Recommended Tools (Homebrew)
+If you do not have [Homebrew](https://brew.sh) installed, install it first or use the official Python installer from [python.org](https://www.python.org/downloads/macos/):
+```bash
+# Install Python 3 and dcm2niix
+brew install python dcm2niix
+```
+
+#### Step 2: (Recommended) Install FSL (`bet` & `flirt`)
+Download and run the official FSL installer script from [fsl.fmrib.ox.ac.uk](https://fsl.fmrib.ox.ac.uk/fsl/docs/#/install/macos):
+```bash
+python3 fslinstaller.py --dest "$HOME/fsl"
+```
+*(Installing into `$HOME/fsl` requires no `sudo`/admin privileges; NeuroCoreg Studio automatically detects both `$HOME/fsl` and `/usr/local/fsl`.)*
+
+#### Step 3: (Recommended) Install FastSurfer
+- **Native macOS bundle**: Extract FastSurfer into `/Applications/FastSurfer*` or `~/FastSurfer*` (with `macos_setup_fastsurfer.sh`). `start.sh` automatically discovers and sources it.
+- **Or via Docker Desktop**:
+  ```bash
+  docker pull deepmi/fastsurfer:latest
+  ```
+
+#### Step 4: Launch NeuroCoreg Studio
+```bash
+git clone https://github.com/danxfriedman/niivue-multimodal-coreg.git
+cd niivue-multimodal-coreg
+chmod +x start.sh
+./start.sh
+```
+Then open **http://127.0.0.1:8765** in your browser.
 
 ---
 
 ### Linux (Ubuntu / Debian, Fedora / RHEL, Arch)
 
-1. **Install Python 3, `venv`, and `dcm2niix`**:
-   - **Ubuntu / Debian**:
-     ```bash
-     sudo apt update && sudo apt install -y python3 python3-venv python3-pip dcm2niix git
-     ```
-   - **Fedora / RHEL**:
-     ```bash
-     sudo dnf install -y python3 python3-pip dcm2niix git
-     ```
-   - **Arch Linux**:
-     ```bash
-     sudo pacman -S python python-pip dcm2niix git
-     ```
-2. **(Recommended) Install FSL (`bet` & `flirt`)**:
-   Download `fslinstaller.py` from [fsl.fmrib.ox.ac.uk](https://fsl.fmrib.ox.ac.uk/fsl/docs/#/install/linux) and run:
-   ```bash
-   python3 fslinstaller.py --dest "$HOME/fsl"
-   ```
-3. **(Recommended) Install FastSurfer**:
-   ```bash
-   docker pull deepmi/fastsurfer:latest
-   ```
-4. **Launch NeuroCoreg Studio**:
-   ```bash
-   chmod +x start.sh
-   ./start.sh
-   ```
-   Open **http://127.0.0.1:8765** in your browser.
+#### Step 1: Install Python 3, `venv`, and `dcm2niix`
+- **Ubuntu / Debian**:
+  ```bash
+  sudo apt update
+  sudo apt install -y python3 python3-venv python3-pip dcm2niix git
+  ```
+- **Fedora / RHEL / Rocky Linux**:
+  ```bash
+  sudo dnf install -y python3 python3-pip dcm2niix git
+  ```
+- **Arch Linux**:
+  ```bash
+  sudo pacman -S python python-pip dcm2niix git
+  ```
+*(If you do not have `sudo` access on a shared workstation, you can use Miniconda/Miniforge in `$HOME/miniforge3`—no root access is needed.)*
+
+#### Step 2: (Recommended) Install FSL (`bet` & `flirt`)
+Download `fslinstaller.py` from [fsl.fmrib.ox.ac.uk](https://fsl.fmrib.ox.ac.uk/fsl/docs/#/install/linux) and install into your home directory or `/usr/local/fsl`:
+```bash
+python3 fslinstaller.py --dest "$HOME/fsl"
+```
+
+#### Step 3: (Recommended) Install FastSurfer
+- **Via Docker**:
+  ```bash
+  docker pull deepmi/fastsurfer:latest
+  ```
+- **Or Native Conda/Pip Installation**: Clone [DeepMI/FastSurfer](https://github.com/DeepMI/FastSurfer) into `~/FastSurfer` or `/opt/fastsurfer` and set `export FASTSURFER_HOME="$HOME/FastSurfer"`.
+
+#### Step 4: Launch NeuroCoreg Studio
+```bash
+git clone https://github.com/danxfriedman/niivue-multimodal-coreg.git
+cd niivue-multimodal-coreg
+chmod +x start.sh
+./start.sh
+```
+Then open **http://127.0.0.1:8765** in your browser.
 
 ---
 
 ### Windows (Windows 10 / 11 — Native & WSL2)
 
 #### Option A: Native Windows 10 / 11 (No Administrator Privileges Required)
-1. **Install Python 3.10+**:
-   Download the Windows 64-bit installer from [python.org/downloads/windows](https://www.python.org/downloads/windows/) (check **"Add python.exe to PATH"**) or run:
-   ```cmd
-   winget install -e --id Python.Python.3.12 --scope user
-   ```
-2. **(Optional) Install `dcm2niix` & FastSurfer**:
-   - Download `dcm2niix_win.zip` from [github.com/rordenlab/dcm2niix/releases](https://github.com/rordenlab/dcm2niix/releases) and place `dcm2niix.exe` on your `PATH`.
-   - For FastSurfer, install Docker Desktop and run `docker pull deepmi/fastsurfer:latest`.
-3. **Launch NeuroCoreg Studio**:
-   Double-click **`start.bat`** or run:
-   ```cmd
-   start.bat
-   ```
-   Open **http://127.0.0.1:8765** in your browser.
 
-#### Option B: Windows Subsystem for Linux (WSL2 — Recommended for FSL on Windows)
-```powershell
+1. **Install Python 3.10+**:
+   - Download the **Windows Installer (64-bit)** from [python.org/downloads/windows](https://www.python.org/downloads/windows/) (check **"Add python.exe to PATH"**; standard per-user installation requires no Administrator elevation), **or** run via `winget`:
+     ```cmd
+     winget install -e --id Python.Python.3.12 --scope user
+     ```
+2. **(Optional) Install `dcm2niix`**:
+   - Download the latest Windows release (`dcm2niix_win.zip`) from [github.com/rordenlab/dcm2niix/releases](https://github.com/rordenlab/dcm2niix/releases) and place `dcm2niix.exe` in the project folder or on your user `PATH`.
+3. **(Optional) Install FastSurfer via Docker Desktop**:
+   ```cmd
+   docker pull deepmi/fastsurfer:latest
+   ```
+4. **Launch NeuroCoreg Studio**:
+   - Double-click **`start.bat`** in File Explorer, or run in Command Prompt / PowerShell:
+     ```cmd
+     git clone https://github.com/danxfriedman/niivue-multimodal-coreg.git
+     cd niivue-multimodal-coreg
+     start.bat
+     ```
+   - `start.bat` automatically creates a user-space virtual environment in `%LOCALAPPDATA%\neurocoreg-venv`, installs `requirements.txt`, and starts the server on **http://127.0.0.1:8765**.
+
+#### Option B: Windows Subsystem for Linux (WSL2 — Recommended if using FSL on Windows)
+FSL runs natively inside WSL2 Ubuntu on Windows 10/11:
+```bash
 wsl --install -d Ubuntu
 ```
-Inside Ubuntu WSL2, follow the **Linux** steps above (`./start.sh`) and open **http://127.0.0.1:8765** in your Windows browser.
+Inside the Ubuntu WSL2 terminal, follow the **Linux (Ubuntu / Debian)** instructions above (`./start.sh`), and access **http://127.0.0.1:8765** directly from your Windows browser.
+
+---
+
+## Manual Python Virtual Environment Setup (All OS)
+
+If you prefer to create and manage the Python environment manually instead of using `start.sh` / `start.bat`:
+
+```bash
+# macOS / Linux
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+python3 server.py
+```
+
+```cmd
+:: Windows (Command Prompt)
+python -m venv .venv
+.venv\Scripts\activate
+pip install --upgrade pip
+pip install -r requirements.txt
+python server.py
+```
+
+### Custom Port or Custom Python Interpreter
+- **Custom Port** (default `8765`):
+  ```bash
+  PORT=9000 ./start.sh
+  ```
+- **Custom Python Binary**:
+  ```bash
+  NEUROCOREG_PYTHON=/path/to/python3 ./start.sh
+  ```
+
+---
+
+## Project Structure
+
+```text
+niivue-multimodal-coreg/
+├── index.html               # Main workstation UI & modals
+├── styles.css               # Responsive dark-mode neuroimaging UI styling
+├── app.js                   # Frontend NiiVue 3D coregistration, DKT LUT & workspace engine
+├── server.py                # Cross-platform Python HTTP & neuroimaging API server
+├── generate_sample_data.py  # Generates synthetic sample multimodal NIfTI & DICOM datasets
+├── requirements.txt         # Python dependencies (numpy, scipy, nibabel, pydicom)
+├── start.sh                 # macOS / Linux zero-admin launcher script
+├── start.bat                # Windows zero-admin launcher script
+└── sample_data/
+    ├── dkt_lut.json         # FreeSurfer / FastSurfer DKT lookup table
+    ├── nifti/               # Sample T1w, misaligned CT, SEEG mask, FLAIR, DTI FA, DKT & MNI templates
+    └── dicom_t2_flair/      # Sample 91-slice axial T2-FLAIR DICOM series
+```

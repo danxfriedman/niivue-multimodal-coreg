@@ -8120,7 +8120,2815 @@
       0,
       0
     ],
-    "a": 255,
+    "a": 0,
     "hex": "#000000"
+  },
+  "2101": {
+    "id": 2101,
+    "name": "ctx-rh-Corpus_callosum",
+    "title": "Right Cortex \u2014 Corpus Callosum",
+    "rgb": [
+      50,
+      50,
+      50
+    ],
+    "a": 255,
+    "hex": "#323232"
+  },
+  "2102": {
+    "id": 2102,
+    "name": "ctx-rh-G_and_S_Insula_ONLY_AVERAGE",
+    "title": "Right Cortex \u2014 G & S Insula Only Average",
+    "rgb": [
+      180,
+      20,
+      30
+    ],
+    "a": 255,
+    "hex": "#b4141e"
+  },
+  "2103": {
+    "id": 2103,
+    "name": "ctx-rh-G_cingulate-Isthmus",
+    "title": "Right Cortex \u2014 G Cingulate Isthmus",
+    "rgb": [
+      60,
+      25,
+      25
+    ],
+    "a": 255,
+    "hex": "#3c1919"
+  },
+  "2104": {
+    "id": 2104,
+    "name": "ctx-rh-G_cingulate-Main_part",
+    "title": "Right Cortex \u2014 G Cingulate Main Part",
+    "rgb": [
+      25,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#193c3c"
+  },
+  "2105": {
+    "id": 2105,
+    "name": "ctx-rh-G_cuneus",
+    "title": "Right Cortex \u2014 G Cuneus",
+    "rgb": [
+      180,
+      20,
+      20
+    ],
+    "a": 255,
+    "hex": "#b41414"
+  },
+  "2106": {
+    "id": 2106,
+    "name": "ctx-rh-G_frontal_inf-Opercular_part",
+    "title": "Right Cortex \u2014 G Frontal Inf Opercular Part",
+    "rgb": [
+      220,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#dc1464"
+  },
+  "2107": {
+    "id": 2107,
+    "name": "ctx-rh-G_frontal_inf-Orbital_part",
+    "title": "Right Cortex \u2014 G Frontal Inf Orbital Part",
+    "rgb": [
+      140,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#8c3c3c"
+  },
+  "2108": {
+    "id": 2108,
+    "name": "ctx-rh-G_frontal_inf-Triangular_part",
+    "title": "Right Cortex \u2014 G Frontal Inf Triangular Part",
+    "rgb": [
+      180,
+      220,
+      140
+    ],
+    "a": 255,
+    "hex": "#b4dc8c"
+  },
+  "2109": {
+    "id": 2109,
+    "name": "ctx-rh-G_frontal_middle",
+    "title": "Right Cortex \u2014 G Frontal Middle",
+    "rgb": [
+      140,
+      100,
+      180
+    ],
+    "a": 255,
+    "hex": "#8c64b4"
+  },
+  "2110": {
+    "id": 2110,
+    "name": "ctx-rh-G_frontal_superior",
+    "title": "Right Cortex \u2014 G Frontal Superior",
+    "rgb": [
+      180,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#b4148c"
+  },
+  "2111": {
+    "id": 2111,
+    "name": "ctx-rh-G_frontomarginal",
+    "title": "Right Cortex \u2014 G Frontomarginal",
+    "rgb": [
+      140,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#8c148c"
+  },
+  "2112": {
+    "id": 2112,
+    "name": "ctx-rh-G_insular_long",
+    "title": "Right Cortex \u2014 G Insular Long",
+    "rgb": [
+      21,
+      10,
+      10
+    ],
+    "a": 255,
+    "hex": "#150a0a"
+  },
+  "2113": {
+    "id": 2113,
+    "name": "ctx-rh-G_insular_short",
+    "title": "Right Cortex \u2014 G Insular Short",
+    "rgb": [
+      225,
+      140,
+      140
+    ],
+    "a": 255,
+    "hex": "#e18c8c"
+  },
+  "2114": {
+    "id": 2114,
+    "name": "ctx-rh-G_and_S_occipital_inferior",
+    "title": "Right Cortex \u2014 G & S Occipital Inferior",
+    "rgb": [
+      23,
+      60,
+      180
+    ],
+    "a": 255,
+    "hex": "#173cb4"
+  },
+  "2115": {
+    "id": 2115,
+    "name": "ctx-rh-G_occipital_middle",
+    "title": "Right Cortex \u2014 G Occipital Middle",
+    "rgb": [
+      180,
+      60,
+      180
+    ],
+    "a": 255,
+    "hex": "#b43cb4"
+  },
+  "2116": {
+    "id": 2116,
+    "name": "ctx-rh-G_occipital_superior",
+    "title": "Right Cortex \u2014 G Occipital Superior",
+    "rgb": [
+      20,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#14dc3c"
+  },
+  "2117": {
+    "id": 2117,
+    "name": "ctx-rh-G_occipit-temp_lat-Or_fusiform",
+    "title": "Right Cortex \u2014 G Occipit Temp Lat Or Fusiform",
+    "rgb": [
+      60,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#3c148c"
+  },
+  "2118": {
+    "id": 2118,
+    "name": "ctx-rh-G_occipit-temp_med-Lingual_part",
+    "title": "Right Cortex \u2014 G Occipit Temp Med Lingual Part",
+    "rgb": [
+      220,
+      180,
+      140
+    ],
+    "a": 255,
+    "hex": "#dcb48c"
+  },
+  "2119": {
+    "id": 2119,
+    "name": "ctx-rh-G_occipit-temp_med-Parahippocampal_part",
+    "title": "Right Cortex \u2014 G Occipit Temp Med Parahippocampal Part",
+    "rgb": [
+      65,
+      100,
+      20
+    ],
+    "a": 255,
+    "hex": "#416414"
+  },
+  "2120": {
+    "id": 2120,
+    "name": "ctx-rh-G_orbital",
+    "title": "Right Cortex \u2014 G Orbital",
+    "rgb": [
+      220,
+      60,
+      20
+    ],
+    "a": 255,
+    "hex": "#dc3c14"
+  },
+  "2121": {
+    "id": 2121,
+    "name": "ctx-rh-G_paracentral",
+    "title": "Right Cortex \u2014 G Paracentral",
+    "rgb": [
+      60,
+      100,
+      60
+    ],
+    "a": 255,
+    "hex": "#3c643c"
+  },
+  "2122": {
+    "id": 2122,
+    "name": "ctx-rh-G_parietal_inferior-Angular_part",
+    "title": "Right Cortex \u2014 G Parietal Inferior Angular Part",
+    "rgb": [
+      20,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#143cdc"
+  },
+  "2123": {
+    "id": 2123,
+    "name": "ctx-rh-G_parietal_inferior-Supramarginal_part",
+    "title": "Right Cortex \u2014 G Parietal Inferior Supramarginal Part",
+    "rgb": [
+      100,
+      100,
+      60
+    ],
+    "a": 255,
+    "hex": "#64643c"
+  },
+  "2124": {
+    "id": 2124,
+    "name": "ctx-rh-G_parietal_superior",
+    "title": "Right Cortex \u2014 G Parietal Superior",
+    "rgb": [
+      220,
+      180,
+      220
+    ],
+    "a": 255,
+    "hex": "#dcb4dc"
+  },
+  "2125": {
+    "id": 2125,
+    "name": "ctx-rh-G_postcentral",
+    "title": "Right Cortex \u2014 G Postcentral",
+    "rgb": [
+      20,
+      180,
+      140
+    ],
+    "a": 255,
+    "hex": "#14b48c"
+  },
+  "2126": {
+    "id": 2126,
+    "name": "ctx-rh-G_precentral",
+    "title": "Right Cortex \u2014 G Precentral",
+    "rgb": [
+      60,
+      140,
+      180
+    ],
+    "a": 255,
+    "hex": "#3c8cb4"
+  },
+  "2127": {
+    "id": 2127,
+    "name": "ctx-rh-G_precuneus",
+    "title": "Right Cortex \u2014 G Precuneus",
+    "rgb": [
+      25,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#19148c"
+  },
+  "2128": {
+    "id": 2128,
+    "name": "ctx-rh-G_rectus",
+    "title": "Right Cortex \u2014 G Rectus",
+    "rgb": [
+      20,
+      60,
+      100
+    ],
+    "a": 255,
+    "hex": "#143c64"
+  },
+  "2129": {
+    "id": 2129,
+    "name": "ctx-rh-G_subcallosal",
+    "title": "Right Cortex \u2014 G Subcallosal",
+    "rgb": [
+      60,
+      220,
+      20
+    ],
+    "a": 255,
+    "hex": "#3cdc14"
+  },
+  "2130": {
+    "id": 2130,
+    "name": "ctx-rh-G_subcentral",
+    "title": "Right Cortex \u2014 G Subcentral",
+    "rgb": [
+      60,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#3c14dc"
+  },
+  "2131": {
+    "id": 2131,
+    "name": "ctx-rh-G_temporal_inferior",
+    "title": "Right Cortex \u2014 G Temporal Inferior",
+    "rgb": [
+      220,
+      220,
+      100
+    ],
+    "a": 255,
+    "hex": "#dcdc64"
+  },
+  "2132": {
+    "id": 2132,
+    "name": "ctx-rh-G_temporal_middle",
+    "title": "Right Cortex \u2014 G Temporal Middle",
+    "rgb": [
+      180,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#b43c3c"
+  },
+  "2133": {
+    "id": 2133,
+    "name": "ctx-rh-G_temp_sup-G_temp_transv_and_interm_S",
+    "title": "Right Cortex \u2014 G Temp Sup G Temp Transv & Interm S",
+    "rgb": [
+      60,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#3c3cdc"
+  },
+  "2134": {
+    "id": 2134,
+    "name": "ctx-rh-G_temp_sup-Lateral_aspect",
+    "title": "Right Cortex \u2014 G Temp Sup Lateral Aspect",
+    "rgb": [
+      220,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#dc3cdc"
+  },
+  "2135": {
+    "id": 2135,
+    "name": "ctx-rh-G_temp_sup-Planum_polare",
+    "title": "Right Cortex \u2014 G Temp Sup Planum Polare",
+    "rgb": [
+      65,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#41dc3c"
+  },
+  "2136": {
+    "id": 2136,
+    "name": "ctx-rh-G_temp_sup-Planum_tempolare",
+    "title": "Right Cortex \u2014 G Temp Sup Planum Tempolare",
+    "rgb": [
+      25,
+      140,
+      20
+    ],
+    "a": 255,
+    "hex": "#198c14"
+  },
+  "2137": {
+    "id": 2137,
+    "name": "ctx-rh-G_and_S_transverse_frontopolar",
+    "title": "Right Cortex \u2014 G & S Transverse Frontopolar",
+    "rgb": [
+      13,
+      0,
+      250
+    ],
+    "a": 255,
+    "hex": "#0d00fa"
+  },
+  "2138": {
+    "id": 2138,
+    "name": "ctx-rh-Lat_Fissure-ant_sgt-ramus_horizontal",
+    "title": "Right Cortex \u2014 Lat Fissure Ant Sgt Ramus Horizontal",
+    "rgb": [
+      61,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#3d14dc"
+  },
+  "2139": {
+    "id": 2139,
+    "name": "ctx-rh-Lat_Fissure-ant_sgt-ramus_vertical",
+    "title": "Right Cortex \u2014 Lat Fissure Ant Sgt Ramus Vertical",
+    "rgb": [
+      61,
+      20,
+      60
+    ],
+    "a": 255,
+    "hex": "#3d143c"
+  },
+  "2140": {
+    "id": 2140,
+    "name": "ctx-rh-Lat_Fissure-post_sgt",
+    "title": "Right Cortex \u2014 Lat Fissure Post Sgt",
+    "rgb": [
+      61,
+      60,
+      100
+    ],
+    "a": 255,
+    "hex": "#3d3c64"
+  },
+  "2141": {
+    "id": 2141,
+    "name": "ctx-rh-Medial_wall",
+    "title": "Right Cortex \u2014 Medial Wall",
+    "rgb": [
+      25,
+      25,
+      25
+    ],
+    "a": 255,
+    "hex": "#191919"
+  },
+  "2142": {
+    "id": 2142,
+    "name": "ctx-rh-Pole_occipital",
+    "title": "Right Cortex \u2014 Pole Occipital",
+    "rgb": [
+      140,
+      20,
+      60
+    ],
+    "a": 255,
+    "hex": "#8c143c"
+  },
+  "2143": {
+    "id": 2143,
+    "name": "ctx-rh-Pole_temporal",
+    "title": "Right Cortex \u2014 Pole Temporal",
+    "rgb": [
+      220,
+      180,
+      20
+    ],
+    "a": 255,
+    "hex": "#dcb414"
+  },
+  "2144": {
+    "id": 2144,
+    "name": "ctx-rh-S_calcarine",
+    "title": "Right Cortex \u2014 S Calcarine",
+    "rgb": [
+      63,
+      180,
+      180
+    ],
+    "a": 255,
+    "hex": "#3fb4b4"
+  },
+  "2145": {
+    "id": 2145,
+    "name": "ctx-rh-S_central",
+    "title": "Right Cortex \u2014 S Central",
+    "rgb": [
+      221,
+      20,
+      10
+    ],
+    "a": 255,
+    "hex": "#dd140a"
+  },
+  "2146": {
+    "id": 2146,
+    "name": "ctx-rh-S_central_insula",
+    "title": "Right Cortex \u2014 S Central Insula",
+    "rgb": [
+      21,
+      220,
+      20
+    ],
+    "a": 255,
+    "hex": "#15dc14"
+  },
+  "2147": {
+    "id": 2147,
+    "name": "ctx-rh-S_cingulate-Main_part_and_Intracingulate",
+    "title": "Right Cortex \u2014 S Cingulate Main Part & Intracingulate",
+    "rgb": [
+      183,
+      100,
+      20
+    ],
+    "a": 255,
+    "hex": "#b76414"
+  },
+  "2148": {
+    "id": 2148,
+    "name": "ctx-rh-S_cingulate-Marginalis_part",
+    "title": "Right Cortex \u2014 S Cingulate Marginalis Part",
+    "rgb": [
+      221,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#dd1464"
+  },
+  "2149": {
+    "id": 2149,
+    "name": "ctx-rh-S_circular_insula_anterior",
+    "title": "Right Cortex \u2014 S Circular Insula Anterior",
+    "rgb": [
+      221,
+      60,
+      140
+    ],
+    "a": 255,
+    "hex": "#dd3c8c"
+  },
+  "2150": {
+    "id": 2150,
+    "name": "ctx-rh-S_circular_insula_inferior",
+    "title": "Right Cortex \u2014 S Circular Insula Inferior",
+    "rgb": [
+      221,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#dd14dc"
+  },
+  "2151": {
+    "id": 2151,
+    "name": "ctx-rh-S_circular_insula_superior",
+    "title": "Right Cortex \u2014 S Circular Insula Superior",
+    "rgb": [
+      61,
+      220,
+      220
+    ],
+    "a": 255,
+    "hex": "#3ddcdc"
+  },
+  "2152": {
+    "id": 2152,
+    "name": "ctx-rh-S_collateral_transverse_ant",
+    "title": "Right Cortex \u2014 S Collateral Transverse Ant",
+    "rgb": [
+      100,
+      200,
+      200
+    ],
+    "a": 255,
+    "hex": "#64c8c8"
+  },
+  "2153": {
+    "id": 2153,
+    "name": "ctx-rh-S_collateral_transverse_post",
+    "title": "Right Cortex \u2014 S Collateral Transverse Post",
+    "rgb": [
+      10,
+      200,
+      200
+    ],
+    "a": 255,
+    "hex": "#0ac8c8"
+  },
+  "2154": {
+    "id": 2154,
+    "name": "ctx-rh-S_frontal_inferior",
+    "title": "Right Cortex \u2014 S Frontal Inferior",
+    "rgb": [
+      221,
+      220,
+      20
+    ],
+    "a": 255,
+    "hex": "#dddc14"
+  },
+  "2155": {
+    "id": 2155,
+    "name": "ctx-rh-S_frontal_middle",
+    "title": "Right Cortex \u2014 S Frontal Middle",
+    "rgb": [
+      141,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#8d1464"
+  },
+  "2156": {
+    "id": 2156,
+    "name": "ctx-rh-S_frontal_superior",
+    "title": "Right Cortex \u2014 S Frontal Superior",
+    "rgb": [
+      61,
+      220,
+      100
+    ],
+    "a": 255,
+    "hex": "#3ddc64"
+  },
+  "2157": {
+    "id": 2157,
+    "name": "ctx-rh-S_frontomarginal",
+    "title": "Right Cortex \u2014 S Frontomarginal",
+    "rgb": [
+      21,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#15dc3c"
+  },
+  "2158": {
+    "id": 2158,
+    "name": "ctx-rh-S_intermedius_primus-Jensen",
+    "title": "Right Cortex \u2014 S Intermedius Primus Jensen",
+    "rgb": [
+      141,
+      60,
+      20
+    ],
+    "a": 255,
+    "hex": "#8d3c14"
+  },
+  "2159": {
+    "id": 2159,
+    "name": "ctx-rh-S_intraparietal-and_Parietal_transverse",
+    "title": "Right Cortex \u2014 S Intraparietal & Parietal Transverse",
+    "rgb": [
+      143,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#8f14dc"
+  },
+  "2160": {
+    "id": 2160,
+    "name": "ctx-rh-S_occipital_anterior",
+    "title": "Right Cortex \u2014 S Occipital Anterior",
+    "rgb": [
+      61,
+      20,
+      180
+    ],
+    "a": 255,
+    "hex": "#3d14b4"
+  },
+  "2161": {
+    "id": 2161,
+    "name": "ctx-rh-S_occipital_middle_and_Lunatus",
+    "title": "Right Cortex \u2014 S Occipital Middle & Lunatus",
+    "rgb": [
+      101,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#653cdc"
+  },
+  "2162": {
+    "id": 2162,
+    "name": "ctx-rh-S_occipital_superior_and_transversalis",
+    "title": "Right Cortex \u2014 S Occipital Superior & Transversalis",
+    "rgb": [
+      21,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#15148c"
+  },
+  "2163": {
+    "id": 2163,
+    "name": "ctx-rh-S_occipito-temporal_lateral",
+    "title": "Right Cortex \u2014 S Occipito Temporal Lateral",
+    "rgb": [
+      221,
+      140,
+      20
+    ],
+    "a": 255,
+    "hex": "#dd8c14"
+  },
+  "2164": {
+    "id": 2164,
+    "name": "ctx-rh-S_occipito-temporal_medial_and_S_Lingual",
+    "title": "Right Cortex \u2014 S Occipito Temporal Medial & S Lingual",
+    "rgb": [
+      141,
+      100,
+      220
+    ],
+    "a": 255,
+    "hex": "#8d64dc"
+  },
+  "2165": {
+    "id": 2165,
+    "name": "ctx-rh-S_orbital-H_shapped",
+    "title": "Right Cortex \u2014 S Orbital H Shapped",
+    "rgb": [
+      101,
+      20,
+      20
+    ],
+    "a": 255,
+    "hex": "#651414"
+  },
+  "2166": {
+    "id": 2166,
+    "name": "ctx-rh-S_orbital_lateral",
+    "title": "Right Cortex \u2014 S Orbital Lateral",
+    "rgb": [
+      221,
+      100,
+      20
+    ],
+    "a": 255,
+    "hex": "#dd6414"
+  },
+  "2167": {
+    "id": 2167,
+    "name": "ctx-rh-S_orbital_medial-Or_olfactory",
+    "title": "Right Cortex \u2014 S Orbital Medial Or Olfactory",
+    "rgb": [
+      181,
+      200,
+      20
+    ],
+    "a": 255,
+    "hex": "#b5c814"
+  },
+  "2168": {
+    "id": 2168,
+    "name": "ctx-rh-S_paracentral",
+    "title": "Right Cortex \u2014 S Paracentral",
+    "rgb": [
+      21,
+      180,
+      140
+    ],
+    "a": 255,
+    "hex": "#15b48c"
+  },
+  "2169": {
+    "id": 2169,
+    "name": "ctx-rh-S_parieto_occipital",
+    "title": "Right Cortex \u2014 S Parieto Occipital",
+    "rgb": [
+      101,
+      100,
+      180
+    ],
+    "a": 255,
+    "hex": "#6564b4"
+  },
+  "2170": {
+    "id": 2170,
+    "name": "ctx-rh-S_pericallosal",
+    "title": "Right Cortex \u2014 S Pericallosal",
+    "rgb": [
+      181,
+      220,
+      20
+    ],
+    "a": 255,
+    "hex": "#b5dc14"
+  },
+  "2171": {
+    "id": 2171,
+    "name": "ctx-rh-S_postcentral",
+    "title": "Right Cortex \u2014 S Postcentral",
+    "rgb": [
+      21,
+      140,
+      200
+    ],
+    "a": 255,
+    "hex": "#158cc8"
+  },
+  "2172": {
+    "id": 2172,
+    "name": "ctx-rh-S_precentral-Inferior-part",
+    "title": "Right Cortex \u2014 S Precentral Inferior Part",
+    "rgb": [
+      21,
+      20,
+      240
+    ],
+    "a": 255,
+    "hex": "#1514f0"
+  },
+  "2173": {
+    "id": 2173,
+    "name": "ctx-rh-S_precentral-Superior-part",
+    "title": "Right Cortex \u2014 S Precentral Superior Part",
+    "rgb": [
+      21,
+      20,
+      200
+    ],
+    "a": 255,
+    "hex": "#1514c8"
+  },
+  "2174": {
+    "id": 2174,
+    "name": "ctx-rh-S_subcentral_ant",
+    "title": "Right Cortex \u2014 S Subcentral Ant",
+    "rgb": [
+      61,
+      180,
+      60
+    ],
+    "a": 255,
+    "hex": "#3db43c"
+  },
+  "2175": {
+    "id": 2175,
+    "name": "ctx-rh-S_subcentral_post",
+    "title": "Right Cortex \u2014 S Subcentral Post",
+    "rgb": [
+      61,
+      180,
+      250
+    ],
+    "a": 255,
+    "hex": "#3db4fa"
+  },
+  "2176": {
+    "id": 2176,
+    "name": "ctx-rh-S_suborbital",
+    "title": "Right Cortex \u2014 S Suborbital",
+    "rgb": [
+      21,
+      20,
+      60
+    ],
+    "a": 255,
+    "hex": "#15143c"
+  },
+  "2177": {
+    "id": 2177,
+    "name": "ctx-rh-S_subparietal",
+    "title": "Right Cortex \u2014 S Subparietal",
+    "rgb": [
+      101,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#653c3c"
+  },
+  "2178": {
+    "id": 2178,
+    "name": "ctx-rh-S_supracingulate",
+    "title": "Right Cortex \u2014 S Supracingulate",
+    "rgb": [
+      21,
+      220,
+      220
+    ],
+    "a": 255,
+    "hex": "#15dcdc"
+  },
+  "2179": {
+    "id": 2179,
+    "name": "ctx-rh-S_temporal_inferior",
+    "title": "Right Cortex \u2014 S Temporal Inferior",
+    "rgb": [
+      21,
+      180,
+      180
+    ],
+    "a": 255,
+    "hex": "#15b4b4"
+  },
+  "2180": {
+    "id": 2180,
+    "name": "ctx-rh-S_temporal_superior",
+    "title": "Right Cortex \u2014 S Temporal Superior",
+    "rgb": [
+      223,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#dfdc3c"
+  },
+  "2181": {
+    "id": 2181,
+    "name": "ctx-rh-S_temporal_transverse",
+    "title": "Right Cortex \u2014 S Temporal Transverse",
+    "rgb": [
+      221,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#dd3c3c"
+  },
+  "2200": {
+    "id": 2200,
+    "name": "ctx-rh-G_cingulate-caudal_ACC",
+    "title": "Right Cortex \u2014 G Cingulate Caudal Acc",
+    "rgb": [
+      25,
+      60,
+      61
+    ],
+    "a": 255,
+    "hex": "#193c3d"
+  },
+  "11100": {
+    "id": 11100,
+    "name": "ctx_lh_Unknown",
+    "title": "Left Cortex \u2014 Unknown",
+    "rgb": [
+      0,
+      0,
+      0
+    ],
+    "a": 0,
+    "hex": "#000000"
+  },
+  "11101": {
+    "id": 11101,
+    "name": "ctx_lh_G_and_S_frontomargin",
+    "title": "Left Cortex \u2014 G & S Frontomargin",
+    "rgb": [
+      23,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#17dc3c"
+  },
+  "11102": {
+    "id": 11102,
+    "name": "ctx_lh_G_and_S_occipital_inf",
+    "title": "Left Cortex \u2014 G & S Occipital Inf",
+    "rgb": [
+      23,
+      60,
+      180
+    ],
+    "a": 255,
+    "hex": "#173cb4"
+  },
+  "11103": {
+    "id": 11103,
+    "name": "ctx_lh_G_and_S_paracentral",
+    "title": "Left Cortex \u2014 G & S Paracentral",
+    "rgb": [
+      63,
+      100,
+      60
+    ],
+    "a": 255,
+    "hex": "#3f643c"
+  },
+  "11104": {
+    "id": 11104,
+    "name": "ctx_lh_G_and_S_subcentral",
+    "title": "Left Cortex \u2014 G & S Subcentral",
+    "rgb": [
+      63,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#3f14dc"
+  },
+  "11105": {
+    "id": 11105,
+    "name": "ctx_lh_G_and_S_transv_frontopol",
+    "title": "Left Cortex \u2014 G & S Transv Frontopol",
+    "rgb": [
+      13,
+      0,
+      250
+    ],
+    "a": 255,
+    "hex": "#0d00fa"
+  },
+  "11106": {
+    "id": 11106,
+    "name": "ctx_lh_G_and_S_cingul-Ant",
+    "title": "Left Cortex \u2014 G & S Cingul Ant",
+    "rgb": [
+      26,
+      60,
+      0
+    ],
+    "a": 255,
+    "hex": "#1a3c00"
+  },
+  "11107": {
+    "id": 11107,
+    "name": "ctx_lh_G_and_S_cingul-Mid-Ant",
+    "title": "Left Cortex \u2014 G & S Cingul Mid Ant",
+    "rgb": [
+      26,
+      60,
+      75
+    ],
+    "a": 255,
+    "hex": "#1a3c4b"
+  },
+  "11108": {
+    "id": 11108,
+    "name": "ctx_lh_G_and_S_cingul-Mid-Post",
+    "title": "Left Cortex \u2014 G & S Cingul Mid Post",
+    "rgb": [
+      26,
+      60,
+      150
+    ],
+    "a": 255,
+    "hex": "#1a3c96"
+  },
+  "11109": {
+    "id": 11109,
+    "name": "ctx_lh_G_cingul-Post-dorsal",
+    "title": "Left Cortex \u2014 G Cingul Post Dorsal",
+    "rgb": [
+      25,
+      60,
+      250
+    ],
+    "a": 255,
+    "hex": "#193cfa"
+  },
+  "11110": {
+    "id": 11110,
+    "name": "ctx_lh_G_cingul-Post-ventral",
+    "title": "Left Cortex \u2014 G Cingul Post Ventral",
+    "rgb": [
+      60,
+      25,
+      25
+    ],
+    "a": 255,
+    "hex": "#3c1919"
+  },
+  "11111": {
+    "id": 11111,
+    "name": "ctx_lh_G_cuneus",
+    "title": "Left Cortex \u2014 G Cuneus",
+    "rgb": [
+      180,
+      20,
+      20
+    ],
+    "a": 255,
+    "hex": "#b41414"
+  },
+  "11112": {
+    "id": 11112,
+    "name": "ctx_lh_G_front_inf-Opercular",
+    "title": "Left Cortex \u2014 G Front Inf Opercular",
+    "rgb": [
+      220,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#dc1464"
+  },
+  "11113": {
+    "id": 11113,
+    "name": "ctx_lh_G_front_inf-Orbital",
+    "title": "Left Cortex \u2014 G Front Inf Orbital",
+    "rgb": [
+      140,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#8c3c3c"
+  },
+  "11114": {
+    "id": 11114,
+    "name": "ctx_lh_G_front_inf-Triangul",
+    "title": "Left Cortex \u2014 G Front Inf Triangul",
+    "rgb": [
+      180,
+      220,
+      140
+    ],
+    "a": 255,
+    "hex": "#b4dc8c"
+  },
+  "11115": {
+    "id": 11115,
+    "name": "ctx_lh_G_front_middle",
+    "title": "Left Cortex \u2014 G Front Middle",
+    "rgb": [
+      140,
+      100,
+      180
+    ],
+    "a": 255,
+    "hex": "#8c64b4"
+  },
+  "11116": {
+    "id": 11116,
+    "name": "ctx_lh_G_front_sup",
+    "title": "Left Cortex \u2014 G Front Sup",
+    "rgb": [
+      180,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#b4148c"
+  },
+  "11117": {
+    "id": 11117,
+    "name": "ctx_lh_G_Ins_lg_and_S_cent_ins",
+    "title": "Left Cortex \u2014 G Ins Lg & S Cent Ins",
+    "rgb": [
+      23,
+      10,
+      10
+    ],
+    "a": 255,
+    "hex": "#170a0a"
+  },
+  "11118": {
+    "id": 11118,
+    "name": "ctx_lh_G_insular_short",
+    "title": "Left Cortex \u2014 G Insular Short",
+    "rgb": [
+      225,
+      140,
+      140
+    ],
+    "a": 255,
+    "hex": "#e18c8c"
+  },
+  "11119": {
+    "id": 11119,
+    "name": "ctx_lh_G_occipital_middle",
+    "title": "Left Cortex \u2014 G Occipital Middle",
+    "rgb": [
+      180,
+      60,
+      180
+    ],
+    "a": 255,
+    "hex": "#b43cb4"
+  },
+  "11120": {
+    "id": 11120,
+    "name": "ctx_lh_G_occipital_sup",
+    "title": "Left Cortex \u2014 G Occipital Sup",
+    "rgb": [
+      20,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#14dc3c"
+  },
+  "11121": {
+    "id": 11121,
+    "name": "ctx_lh_G_oc-temp_lat-fusifor",
+    "title": "Left Cortex \u2014 G Oc Temp Lat Fusifor",
+    "rgb": [
+      60,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#3c148c"
+  },
+  "11122": {
+    "id": 11122,
+    "name": "ctx_lh_G_oc-temp_med-Lingual",
+    "title": "Left Cortex \u2014 G Oc Temp Med Lingual",
+    "rgb": [
+      220,
+      180,
+      140
+    ],
+    "a": 255,
+    "hex": "#dcb48c"
+  },
+  "11123": {
+    "id": 11123,
+    "name": "ctx_lh_G_oc-temp_med-Parahip",
+    "title": "Left Cortex \u2014 G Oc Temp Med Parahip",
+    "rgb": [
+      65,
+      100,
+      20
+    ],
+    "a": 255,
+    "hex": "#416414"
+  },
+  "11124": {
+    "id": 11124,
+    "name": "ctx_lh_G_orbital",
+    "title": "Left Cortex \u2014 G Orbital",
+    "rgb": [
+      220,
+      60,
+      20
+    ],
+    "a": 255,
+    "hex": "#dc3c14"
+  },
+  "11125": {
+    "id": 11125,
+    "name": "ctx_lh_G_pariet_inf-Angular",
+    "title": "Left Cortex \u2014 G Pariet Inf Angular",
+    "rgb": [
+      20,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#143cdc"
+  },
+  "11126": {
+    "id": 11126,
+    "name": "ctx_lh_G_pariet_inf-Supramar",
+    "title": "Left Cortex \u2014 G Pariet Inf Supramar",
+    "rgb": [
+      100,
+      100,
+      60
+    ],
+    "a": 255,
+    "hex": "#64643c"
+  },
+  "11127": {
+    "id": 11127,
+    "name": "ctx_lh_G_parietal_sup",
+    "title": "Left Cortex \u2014 G Parietal Sup",
+    "rgb": [
+      220,
+      180,
+      220
+    ],
+    "a": 255,
+    "hex": "#dcb4dc"
+  },
+  "11128": {
+    "id": 11128,
+    "name": "ctx_lh_G_postcentral",
+    "title": "Left Cortex \u2014 G Postcentral",
+    "rgb": [
+      20,
+      180,
+      140
+    ],
+    "a": 255,
+    "hex": "#14b48c"
+  },
+  "11129": {
+    "id": 11129,
+    "name": "ctx_lh_G_precentral",
+    "title": "Left Cortex \u2014 G Precentral",
+    "rgb": [
+      60,
+      140,
+      180
+    ],
+    "a": 255,
+    "hex": "#3c8cb4"
+  },
+  "11130": {
+    "id": 11130,
+    "name": "ctx_lh_G_precuneus",
+    "title": "Left Cortex \u2014 G Precuneus",
+    "rgb": [
+      25,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#19148c"
+  },
+  "11131": {
+    "id": 11131,
+    "name": "ctx_lh_G_rectus",
+    "title": "Left Cortex \u2014 G Rectus",
+    "rgb": [
+      20,
+      60,
+      100
+    ],
+    "a": 255,
+    "hex": "#143c64"
+  },
+  "11132": {
+    "id": 11132,
+    "name": "ctx_lh_G_subcallosal",
+    "title": "Left Cortex \u2014 G Subcallosal",
+    "rgb": [
+      60,
+      220,
+      20
+    ],
+    "a": 255,
+    "hex": "#3cdc14"
+  },
+  "11133": {
+    "id": 11133,
+    "name": "ctx_lh_G_temp_sup-G_T_transv",
+    "title": "Left Cortex \u2014 G Temp Sup G T Transv",
+    "rgb": [
+      60,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#3c3cdc"
+  },
+  "11134": {
+    "id": 11134,
+    "name": "ctx_lh_G_temp_sup-Lateral",
+    "title": "Left Cortex \u2014 G Temp Sup Lateral",
+    "rgb": [
+      220,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#dc3cdc"
+  },
+  "11135": {
+    "id": 11135,
+    "name": "ctx_lh_G_temp_sup-Plan_polar",
+    "title": "Left Cortex \u2014 G Temp Sup Plan Polar",
+    "rgb": [
+      65,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#41dc3c"
+  },
+  "11136": {
+    "id": 11136,
+    "name": "ctx_lh_G_temp_sup-Plan_tempo",
+    "title": "Left Cortex \u2014 G Temp Sup Plan Tempo",
+    "rgb": [
+      25,
+      140,
+      20
+    ],
+    "a": 255,
+    "hex": "#198c14"
+  },
+  "11137": {
+    "id": 11137,
+    "name": "ctx_lh_G_temporal_inf",
+    "title": "Left Cortex \u2014 G Temporal Inf",
+    "rgb": [
+      220,
+      220,
+      100
+    ],
+    "a": 255,
+    "hex": "#dcdc64"
+  },
+  "11138": {
+    "id": 11138,
+    "name": "ctx_lh_G_temporal_middle",
+    "title": "Left Cortex \u2014 G Temporal Middle",
+    "rgb": [
+      180,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#b43c3c"
+  },
+  "11139": {
+    "id": 11139,
+    "name": "ctx_lh_Lat_Fis-ant-Horizont",
+    "title": "Left Cortex \u2014 Lat Fis Ant Horizont",
+    "rgb": [
+      61,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#3d14dc"
+  },
+  "11140": {
+    "id": 11140,
+    "name": "ctx_lh_Lat_Fis-ant-Vertical",
+    "title": "Left Cortex \u2014 Lat Fis Ant Vertical",
+    "rgb": [
+      61,
+      20,
+      60
+    ],
+    "a": 255,
+    "hex": "#3d143c"
+  },
+  "11141": {
+    "id": 11141,
+    "name": "ctx_lh_Lat_Fis-post",
+    "title": "Left Cortex \u2014 Lat Fis Post",
+    "rgb": [
+      61,
+      60,
+      100
+    ],
+    "a": 255,
+    "hex": "#3d3c64"
+  },
+  "11142": {
+    "id": 11142,
+    "name": "ctx_lh_Medial_wall",
+    "title": "Left Cortex \u2014 Medial Wall",
+    "rgb": [
+      25,
+      25,
+      25
+    ],
+    "a": 255,
+    "hex": "#191919"
+  },
+  "11143": {
+    "id": 11143,
+    "name": "ctx_lh_Pole_occipital",
+    "title": "Left Cortex \u2014 Pole Occipital",
+    "rgb": [
+      140,
+      20,
+      60
+    ],
+    "a": 255,
+    "hex": "#8c143c"
+  },
+  "11144": {
+    "id": 11144,
+    "name": "ctx_lh_Pole_temporal",
+    "title": "Left Cortex \u2014 Pole Temporal",
+    "rgb": [
+      220,
+      180,
+      20
+    ],
+    "a": 255,
+    "hex": "#dcb414"
+  },
+  "11145": {
+    "id": 11145,
+    "name": "ctx_lh_S_calcarine",
+    "title": "Left Cortex \u2014 S Calcarine",
+    "rgb": [
+      63,
+      180,
+      180
+    ],
+    "a": 255,
+    "hex": "#3fb4b4"
+  },
+  "11146": {
+    "id": 11146,
+    "name": "ctx_lh_S_central",
+    "title": "Left Cortex \u2014 S Central",
+    "rgb": [
+      221,
+      20,
+      10
+    ],
+    "a": 255,
+    "hex": "#dd140a"
+  },
+  "11147": {
+    "id": 11147,
+    "name": "ctx_lh_S_cingul-Marginalis",
+    "title": "Left Cortex \u2014 S Cingul Marginalis",
+    "rgb": [
+      221,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#dd1464"
+  },
+  "11148": {
+    "id": 11148,
+    "name": "ctx_lh_S_circular_insula_ant",
+    "title": "Left Cortex \u2014 S Circular Insula Ant",
+    "rgb": [
+      221,
+      60,
+      140
+    ],
+    "a": 255,
+    "hex": "#dd3c8c"
+  },
+  "11149": {
+    "id": 11149,
+    "name": "ctx_lh_S_circular_insula_inf",
+    "title": "Left Cortex \u2014 S Circular Insula Inf",
+    "rgb": [
+      221,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#dd14dc"
+  },
+  "11150": {
+    "id": 11150,
+    "name": "ctx_lh_S_circular_insula_sup",
+    "title": "Left Cortex \u2014 S Circular Insula Sup",
+    "rgb": [
+      61,
+      220,
+      220
+    ],
+    "a": 255,
+    "hex": "#3ddcdc"
+  },
+  "11151": {
+    "id": 11151,
+    "name": "ctx_lh_S_collat_transv_ant",
+    "title": "Left Cortex \u2014 S Collat Transv Ant",
+    "rgb": [
+      100,
+      200,
+      200
+    ],
+    "a": 255,
+    "hex": "#64c8c8"
+  },
+  "11152": {
+    "id": 11152,
+    "name": "ctx_lh_S_collat_transv_post",
+    "title": "Left Cortex \u2014 S Collat Transv Post",
+    "rgb": [
+      10,
+      200,
+      200
+    ],
+    "a": 255,
+    "hex": "#0ac8c8"
+  },
+  "11153": {
+    "id": 11153,
+    "name": "ctx_lh_S_front_inf",
+    "title": "Left Cortex \u2014 S Front Inf",
+    "rgb": [
+      221,
+      220,
+      20
+    ],
+    "a": 255,
+    "hex": "#dddc14"
+  },
+  "11154": {
+    "id": 11154,
+    "name": "ctx_lh_S_front_middle",
+    "title": "Left Cortex \u2014 S Front Middle",
+    "rgb": [
+      141,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#8d1464"
+  },
+  "11155": {
+    "id": 11155,
+    "name": "ctx_lh_S_front_sup",
+    "title": "Left Cortex \u2014 S Front Sup",
+    "rgb": [
+      61,
+      220,
+      100
+    ],
+    "a": 255,
+    "hex": "#3ddc64"
+  },
+  "11156": {
+    "id": 11156,
+    "name": "ctx_lh_S_interm_prim-Jensen",
+    "title": "Left Cortex \u2014 S Interm Prim Jensen",
+    "rgb": [
+      141,
+      60,
+      20
+    ],
+    "a": 255,
+    "hex": "#8d3c14"
+  },
+  "11157": {
+    "id": 11157,
+    "name": "ctx_lh_S_intrapariet_and_P_trans",
+    "title": "Left Cortex \u2014 S Intrapariet & P Trans",
+    "rgb": [
+      143,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#8f14dc"
+  },
+  "11158": {
+    "id": 11158,
+    "name": "ctx_lh_S_oc_middle_and_Lunatus",
+    "title": "Left Cortex \u2014 S Oc Middle & Lunatus",
+    "rgb": [
+      101,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#653cdc"
+  },
+  "11159": {
+    "id": 11159,
+    "name": "ctx_lh_S_oc_sup_and_transversal",
+    "title": "Left Cortex \u2014 S Oc Sup & Transversal",
+    "rgb": [
+      21,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#15148c"
+  },
+  "11160": {
+    "id": 11160,
+    "name": "ctx_lh_S_occipital_ant",
+    "title": "Left Cortex \u2014 S Occipital Ant",
+    "rgb": [
+      61,
+      20,
+      180
+    ],
+    "a": 255,
+    "hex": "#3d14b4"
+  },
+  "11161": {
+    "id": 11161,
+    "name": "ctx_lh_S_oc-temp_lat",
+    "title": "Left Cortex \u2014 S Oc Temp Lat",
+    "rgb": [
+      221,
+      140,
+      20
+    ],
+    "a": 255,
+    "hex": "#dd8c14"
+  },
+  "11162": {
+    "id": 11162,
+    "name": "ctx_lh_S_oc-temp_med_and_Lingual",
+    "title": "Left Cortex \u2014 S Oc Temp Med & Lingual",
+    "rgb": [
+      141,
+      100,
+      220
+    ],
+    "a": 255,
+    "hex": "#8d64dc"
+  },
+  "11163": {
+    "id": 11163,
+    "name": "ctx_lh_S_orbital_lateral",
+    "title": "Left Cortex \u2014 S Orbital Lateral",
+    "rgb": [
+      221,
+      100,
+      20
+    ],
+    "a": 255,
+    "hex": "#dd6414"
+  },
+  "11164": {
+    "id": 11164,
+    "name": "ctx_lh_S_orbital_med-olfact",
+    "title": "Left Cortex \u2014 S Orbital Med Olfact",
+    "rgb": [
+      181,
+      200,
+      20
+    ],
+    "a": 255,
+    "hex": "#b5c814"
+  },
+  "11165": {
+    "id": 11165,
+    "name": "ctx_lh_S_orbital-H_Shaped",
+    "title": "Left Cortex \u2014 S Orbital H Shaped",
+    "rgb": [
+      101,
+      20,
+      20
+    ],
+    "a": 255,
+    "hex": "#651414"
+  },
+  "11166": {
+    "id": 11166,
+    "name": "ctx_lh_S_parieto_occipital",
+    "title": "Left Cortex \u2014 S Parieto Occipital",
+    "rgb": [
+      101,
+      100,
+      180
+    ],
+    "a": 255,
+    "hex": "#6564b4"
+  },
+  "11167": {
+    "id": 11167,
+    "name": "ctx_lh_S_pericallosal",
+    "title": "Left Cortex \u2014 S Pericallosal",
+    "rgb": [
+      181,
+      220,
+      20
+    ],
+    "a": 255,
+    "hex": "#b5dc14"
+  },
+  "11168": {
+    "id": 11168,
+    "name": "ctx_lh_S_postcentral",
+    "title": "Left Cortex \u2014 S Postcentral",
+    "rgb": [
+      21,
+      140,
+      200
+    ],
+    "a": 255,
+    "hex": "#158cc8"
+  },
+  "11169": {
+    "id": 11169,
+    "name": "ctx_lh_S_precentral-inf-part",
+    "title": "Left Cortex \u2014 S Precentral Inf Part",
+    "rgb": [
+      21,
+      20,
+      240
+    ],
+    "a": 255,
+    "hex": "#1514f0"
+  },
+  "11170": {
+    "id": 11170,
+    "name": "ctx_lh_S_precentral-sup-part",
+    "title": "Left Cortex \u2014 S Precentral Sup Part",
+    "rgb": [
+      21,
+      20,
+      200
+    ],
+    "a": 255,
+    "hex": "#1514c8"
+  },
+  "11171": {
+    "id": 11171,
+    "name": "ctx_lh_S_suborbital",
+    "title": "Left Cortex \u2014 S Suborbital",
+    "rgb": [
+      21,
+      20,
+      60
+    ],
+    "a": 255,
+    "hex": "#15143c"
+  },
+  "11172": {
+    "id": 11172,
+    "name": "ctx_lh_S_subparietal",
+    "title": "Left Cortex \u2014 S Subparietal",
+    "rgb": [
+      101,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#653c3c"
+  },
+  "11173": {
+    "id": 11173,
+    "name": "ctx_lh_S_temporal_inf",
+    "title": "Left Cortex \u2014 S Temporal Inf",
+    "rgb": [
+      21,
+      180,
+      180
+    ],
+    "a": 255,
+    "hex": "#15b4b4"
+  },
+  "11174": {
+    "id": 11174,
+    "name": "ctx_lh_S_temporal_sup",
+    "title": "Left Cortex \u2014 S Temporal Sup",
+    "rgb": [
+      223,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#dfdc3c"
+  },
+  "11175": {
+    "id": 11175,
+    "name": "ctx_lh_S_temporal_transverse",
+    "title": "Left Cortex \u2014 S Temporal Transverse",
+    "rgb": [
+      221,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#dd3c3c"
+  },
+  "12100": {
+    "id": 12100,
+    "name": "ctx_rh_Unknown",
+    "title": "Right Cortex \u2014 Unknown",
+    "rgb": [
+      0,
+      0,
+      0
+    ],
+    "a": 0,
+    "hex": "#000000"
+  },
+  "12101": {
+    "id": 12101,
+    "name": "ctx_rh_G_and_S_frontomargin",
+    "title": "Right Cortex \u2014 G & S Frontomargin",
+    "rgb": [
+      23,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#17dc3c"
+  },
+  "12102": {
+    "id": 12102,
+    "name": "ctx_rh_G_and_S_occipital_inf",
+    "title": "Right Cortex \u2014 G & S Occipital Inf",
+    "rgb": [
+      23,
+      60,
+      180
+    ],
+    "a": 255,
+    "hex": "#173cb4"
+  },
+  "12103": {
+    "id": 12103,
+    "name": "ctx_rh_G_and_S_paracentral",
+    "title": "Right Cortex \u2014 G & S Paracentral",
+    "rgb": [
+      63,
+      100,
+      60
+    ],
+    "a": 255,
+    "hex": "#3f643c"
+  },
+  "12104": {
+    "id": 12104,
+    "name": "ctx_rh_G_and_S_subcentral",
+    "title": "Right Cortex \u2014 G & S Subcentral",
+    "rgb": [
+      63,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#3f14dc"
+  },
+  "12105": {
+    "id": 12105,
+    "name": "ctx_rh_G_and_S_transv_frontopol",
+    "title": "Right Cortex \u2014 G & S Transv Frontopol",
+    "rgb": [
+      13,
+      0,
+      250
+    ],
+    "a": 255,
+    "hex": "#0d00fa"
+  },
+  "12106": {
+    "id": 12106,
+    "name": "ctx_rh_G_and_S_cingul-Ant",
+    "title": "Right Cortex \u2014 G & S Cingul Ant",
+    "rgb": [
+      26,
+      60,
+      0
+    ],
+    "a": 255,
+    "hex": "#1a3c00"
+  },
+  "12107": {
+    "id": 12107,
+    "name": "ctx_rh_G_and_S_cingul-Mid-Ant",
+    "title": "Right Cortex \u2014 G & S Cingul Mid Ant",
+    "rgb": [
+      26,
+      60,
+      75
+    ],
+    "a": 255,
+    "hex": "#1a3c4b"
+  },
+  "12108": {
+    "id": 12108,
+    "name": "ctx_rh_G_and_S_cingul-Mid-Post",
+    "title": "Right Cortex \u2014 G & S Cingul Mid Post",
+    "rgb": [
+      26,
+      60,
+      150
+    ],
+    "a": 255,
+    "hex": "#1a3c96"
+  },
+  "12109": {
+    "id": 12109,
+    "name": "ctx_rh_G_cingul-Post-dorsal",
+    "title": "Right Cortex \u2014 G Cingul Post Dorsal",
+    "rgb": [
+      25,
+      60,
+      250
+    ],
+    "a": 255,
+    "hex": "#193cfa"
+  },
+  "12110": {
+    "id": 12110,
+    "name": "ctx_rh_G_cingul-Post-ventral",
+    "title": "Right Cortex \u2014 G Cingul Post Ventral",
+    "rgb": [
+      60,
+      25,
+      25
+    ],
+    "a": 255,
+    "hex": "#3c1919"
+  },
+  "12111": {
+    "id": 12111,
+    "name": "ctx_rh_G_cuneus",
+    "title": "Right Cortex \u2014 G Cuneus",
+    "rgb": [
+      180,
+      20,
+      20
+    ],
+    "a": 255,
+    "hex": "#b41414"
+  },
+  "12112": {
+    "id": 12112,
+    "name": "ctx_rh_G_front_inf-Opercular",
+    "title": "Right Cortex \u2014 G Front Inf Opercular",
+    "rgb": [
+      220,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#dc1464"
+  },
+  "12113": {
+    "id": 12113,
+    "name": "ctx_rh_G_front_inf-Orbital",
+    "title": "Right Cortex \u2014 G Front Inf Orbital",
+    "rgb": [
+      140,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#8c3c3c"
+  },
+  "12114": {
+    "id": 12114,
+    "name": "ctx_rh_G_front_inf-Triangul",
+    "title": "Right Cortex \u2014 G Front Inf Triangul",
+    "rgb": [
+      180,
+      220,
+      140
+    ],
+    "a": 255,
+    "hex": "#b4dc8c"
+  },
+  "12115": {
+    "id": 12115,
+    "name": "ctx_rh_G_front_middle",
+    "title": "Right Cortex \u2014 G Front Middle",
+    "rgb": [
+      140,
+      100,
+      180
+    ],
+    "a": 255,
+    "hex": "#8c64b4"
+  },
+  "12116": {
+    "id": 12116,
+    "name": "ctx_rh_G_front_sup",
+    "title": "Right Cortex \u2014 G Front Sup",
+    "rgb": [
+      180,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#b4148c"
+  },
+  "12117": {
+    "id": 12117,
+    "name": "ctx_rh_G_Ins_lg_and_S_cent_ins",
+    "title": "Right Cortex \u2014 G Ins Lg & S Cent Ins",
+    "rgb": [
+      23,
+      10,
+      10
+    ],
+    "a": 255,
+    "hex": "#170a0a"
+  },
+  "12118": {
+    "id": 12118,
+    "name": "ctx_rh_G_insular_short",
+    "title": "Right Cortex \u2014 G Insular Short",
+    "rgb": [
+      225,
+      140,
+      140
+    ],
+    "a": 255,
+    "hex": "#e18c8c"
+  },
+  "12119": {
+    "id": 12119,
+    "name": "ctx_rh_G_occipital_middle",
+    "title": "Right Cortex \u2014 G Occipital Middle",
+    "rgb": [
+      180,
+      60,
+      180
+    ],
+    "a": 255,
+    "hex": "#b43cb4"
+  },
+  "12120": {
+    "id": 12120,
+    "name": "ctx_rh_G_occipital_sup",
+    "title": "Right Cortex \u2014 G Occipital Sup",
+    "rgb": [
+      20,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#14dc3c"
+  },
+  "12121": {
+    "id": 12121,
+    "name": "ctx_rh_G_oc-temp_lat-fusifor",
+    "title": "Right Cortex \u2014 G Oc Temp Lat Fusifor",
+    "rgb": [
+      60,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#3c148c"
+  },
+  "12122": {
+    "id": 12122,
+    "name": "ctx_rh_G_oc-temp_med-Lingual",
+    "title": "Right Cortex \u2014 G Oc Temp Med Lingual",
+    "rgb": [
+      220,
+      180,
+      140
+    ],
+    "a": 255,
+    "hex": "#dcb48c"
+  },
+  "12123": {
+    "id": 12123,
+    "name": "ctx_rh_G_oc-temp_med-Parahip",
+    "title": "Right Cortex \u2014 G Oc Temp Med Parahip",
+    "rgb": [
+      65,
+      100,
+      20
+    ],
+    "a": 255,
+    "hex": "#416414"
+  },
+  "12124": {
+    "id": 12124,
+    "name": "ctx_rh_G_orbital",
+    "title": "Right Cortex \u2014 G Orbital",
+    "rgb": [
+      220,
+      60,
+      20
+    ],
+    "a": 255,
+    "hex": "#dc3c14"
+  },
+  "12125": {
+    "id": 12125,
+    "name": "ctx_rh_G_pariet_inf-Angular",
+    "title": "Right Cortex \u2014 G Pariet Inf Angular",
+    "rgb": [
+      20,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#143cdc"
+  },
+  "12126": {
+    "id": 12126,
+    "name": "ctx_rh_G_pariet_inf-Supramar",
+    "title": "Right Cortex \u2014 G Pariet Inf Supramar",
+    "rgb": [
+      100,
+      100,
+      60
+    ],
+    "a": 255,
+    "hex": "#64643c"
+  },
+  "12127": {
+    "id": 12127,
+    "name": "ctx_rh_G_parietal_sup",
+    "title": "Right Cortex \u2014 G Parietal Sup",
+    "rgb": [
+      220,
+      180,
+      220
+    ],
+    "a": 255,
+    "hex": "#dcb4dc"
+  },
+  "12128": {
+    "id": 12128,
+    "name": "ctx_rh_G_postcentral",
+    "title": "Right Cortex \u2014 G Postcentral",
+    "rgb": [
+      20,
+      180,
+      140
+    ],
+    "a": 255,
+    "hex": "#14b48c"
+  },
+  "12129": {
+    "id": 12129,
+    "name": "ctx_rh_G_precentral",
+    "title": "Right Cortex \u2014 G Precentral",
+    "rgb": [
+      60,
+      140,
+      180
+    ],
+    "a": 255,
+    "hex": "#3c8cb4"
+  },
+  "12130": {
+    "id": 12130,
+    "name": "ctx_rh_G_precuneus",
+    "title": "Right Cortex \u2014 G Precuneus",
+    "rgb": [
+      25,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#19148c"
+  },
+  "12131": {
+    "id": 12131,
+    "name": "ctx_rh_G_rectus",
+    "title": "Right Cortex \u2014 G Rectus",
+    "rgb": [
+      20,
+      60,
+      100
+    ],
+    "a": 255,
+    "hex": "#143c64"
+  },
+  "12132": {
+    "id": 12132,
+    "name": "ctx_rh_G_subcallosal",
+    "title": "Right Cortex \u2014 G Subcallosal",
+    "rgb": [
+      60,
+      220,
+      20
+    ],
+    "a": 255,
+    "hex": "#3cdc14"
+  },
+  "12133": {
+    "id": 12133,
+    "name": "ctx_rh_G_temp_sup-G_T_transv",
+    "title": "Right Cortex \u2014 G Temp Sup G T Transv",
+    "rgb": [
+      60,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#3c3cdc"
+  },
+  "12134": {
+    "id": 12134,
+    "name": "ctx_rh_G_temp_sup-Lateral",
+    "title": "Right Cortex \u2014 G Temp Sup Lateral",
+    "rgb": [
+      220,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#dc3cdc"
+  },
+  "12135": {
+    "id": 12135,
+    "name": "ctx_rh_G_temp_sup-Plan_polar",
+    "title": "Right Cortex \u2014 G Temp Sup Plan Polar",
+    "rgb": [
+      65,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#41dc3c"
+  },
+  "12136": {
+    "id": 12136,
+    "name": "ctx_rh_G_temp_sup-Plan_tempo",
+    "title": "Right Cortex \u2014 G Temp Sup Plan Tempo",
+    "rgb": [
+      25,
+      140,
+      20
+    ],
+    "a": 255,
+    "hex": "#198c14"
+  },
+  "12137": {
+    "id": 12137,
+    "name": "ctx_rh_G_temporal_inf",
+    "title": "Right Cortex \u2014 G Temporal Inf",
+    "rgb": [
+      220,
+      220,
+      100
+    ],
+    "a": 255,
+    "hex": "#dcdc64"
+  },
+  "12138": {
+    "id": 12138,
+    "name": "ctx_rh_G_temporal_middle",
+    "title": "Right Cortex \u2014 G Temporal Middle",
+    "rgb": [
+      180,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#b43c3c"
+  },
+  "12139": {
+    "id": 12139,
+    "name": "ctx_rh_Lat_Fis-ant-Horizont",
+    "title": "Right Cortex \u2014 Lat Fis Ant Horizont",
+    "rgb": [
+      61,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#3d14dc"
+  },
+  "12140": {
+    "id": 12140,
+    "name": "ctx_rh_Lat_Fis-ant-Vertical",
+    "title": "Right Cortex \u2014 Lat Fis Ant Vertical",
+    "rgb": [
+      61,
+      20,
+      60
+    ],
+    "a": 255,
+    "hex": "#3d143c"
+  },
+  "12141": {
+    "id": 12141,
+    "name": "ctx_rh_Lat_Fis-post",
+    "title": "Right Cortex \u2014 Lat Fis Post",
+    "rgb": [
+      61,
+      60,
+      100
+    ],
+    "a": 255,
+    "hex": "#3d3c64"
+  },
+  "12142": {
+    "id": 12142,
+    "name": "ctx_rh_Medial_wall",
+    "title": "Right Cortex \u2014 Medial Wall",
+    "rgb": [
+      25,
+      25,
+      25
+    ],
+    "a": 255,
+    "hex": "#191919"
+  },
+  "12143": {
+    "id": 12143,
+    "name": "ctx_rh_Pole_occipital",
+    "title": "Right Cortex \u2014 Pole Occipital",
+    "rgb": [
+      140,
+      20,
+      60
+    ],
+    "a": 255,
+    "hex": "#8c143c"
+  },
+  "12144": {
+    "id": 12144,
+    "name": "ctx_rh_Pole_temporal",
+    "title": "Right Cortex \u2014 Pole Temporal",
+    "rgb": [
+      220,
+      180,
+      20
+    ],
+    "a": 255,
+    "hex": "#dcb414"
+  },
+  "12145": {
+    "id": 12145,
+    "name": "ctx_rh_S_calcarine",
+    "title": "Right Cortex \u2014 S Calcarine",
+    "rgb": [
+      63,
+      180,
+      180
+    ],
+    "a": 255,
+    "hex": "#3fb4b4"
+  },
+  "12146": {
+    "id": 12146,
+    "name": "ctx_rh_S_central",
+    "title": "Right Cortex \u2014 S Central",
+    "rgb": [
+      221,
+      20,
+      10
+    ],
+    "a": 255,
+    "hex": "#dd140a"
+  },
+  "12147": {
+    "id": 12147,
+    "name": "ctx_rh_S_cingul-Marginalis",
+    "title": "Right Cortex \u2014 S Cingul Marginalis",
+    "rgb": [
+      221,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#dd1464"
+  },
+  "12148": {
+    "id": 12148,
+    "name": "ctx_rh_S_circular_insula_ant",
+    "title": "Right Cortex \u2014 S Circular Insula Ant",
+    "rgb": [
+      221,
+      60,
+      140
+    ],
+    "a": 255,
+    "hex": "#dd3c8c"
+  },
+  "12149": {
+    "id": 12149,
+    "name": "ctx_rh_S_circular_insula_inf",
+    "title": "Right Cortex \u2014 S Circular Insula Inf",
+    "rgb": [
+      221,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#dd14dc"
+  },
+  "12150": {
+    "id": 12150,
+    "name": "ctx_rh_S_circular_insula_sup",
+    "title": "Right Cortex \u2014 S Circular Insula Sup",
+    "rgb": [
+      61,
+      220,
+      220
+    ],
+    "a": 255,
+    "hex": "#3ddcdc"
+  },
+  "12151": {
+    "id": 12151,
+    "name": "ctx_rh_S_collat_transv_ant",
+    "title": "Right Cortex \u2014 S Collat Transv Ant",
+    "rgb": [
+      100,
+      200,
+      200
+    ],
+    "a": 255,
+    "hex": "#64c8c8"
+  },
+  "12152": {
+    "id": 12152,
+    "name": "ctx_rh_S_collat_transv_post",
+    "title": "Right Cortex \u2014 S Collat Transv Post",
+    "rgb": [
+      10,
+      200,
+      200
+    ],
+    "a": 255,
+    "hex": "#0ac8c8"
+  },
+  "12153": {
+    "id": 12153,
+    "name": "ctx_rh_S_front_inf",
+    "title": "Right Cortex \u2014 S Front Inf",
+    "rgb": [
+      221,
+      220,
+      20
+    ],
+    "a": 255,
+    "hex": "#dddc14"
+  },
+  "12154": {
+    "id": 12154,
+    "name": "ctx_rh_S_front_middle",
+    "title": "Right Cortex \u2014 S Front Middle",
+    "rgb": [
+      141,
+      20,
+      100
+    ],
+    "a": 255,
+    "hex": "#8d1464"
+  },
+  "12155": {
+    "id": 12155,
+    "name": "ctx_rh_S_front_sup",
+    "title": "Right Cortex \u2014 S Front Sup",
+    "rgb": [
+      61,
+      220,
+      100
+    ],
+    "a": 255,
+    "hex": "#3ddc64"
+  },
+  "12156": {
+    "id": 12156,
+    "name": "ctx_rh_S_interm_prim-Jensen",
+    "title": "Right Cortex \u2014 S Interm Prim Jensen",
+    "rgb": [
+      141,
+      60,
+      20
+    ],
+    "a": 255,
+    "hex": "#8d3c14"
+  },
+  "12157": {
+    "id": 12157,
+    "name": "ctx_rh_S_intrapariet_and_P_trans",
+    "title": "Right Cortex \u2014 S Intrapariet & P Trans",
+    "rgb": [
+      143,
+      20,
+      220
+    ],
+    "a": 255,
+    "hex": "#8f14dc"
+  },
+  "12158": {
+    "id": 12158,
+    "name": "ctx_rh_S_oc_middle_and_Lunatus",
+    "title": "Right Cortex \u2014 S Oc Middle & Lunatus",
+    "rgb": [
+      101,
+      60,
+      220
+    ],
+    "a": 255,
+    "hex": "#653cdc"
+  },
+  "12159": {
+    "id": 12159,
+    "name": "ctx_rh_S_oc_sup_and_transversal",
+    "title": "Right Cortex \u2014 S Oc Sup & Transversal",
+    "rgb": [
+      21,
+      20,
+      140
+    ],
+    "a": 255,
+    "hex": "#15148c"
+  },
+  "12160": {
+    "id": 12160,
+    "name": "ctx_rh_S_occipital_ant",
+    "title": "Right Cortex \u2014 S Occipital Ant",
+    "rgb": [
+      61,
+      20,
+      180
+    ],
+    "a": 255,
+    "hex": "#3d14b4"
+  },
+  "12161": {
+    "id": 12161,
+    "name": "ctx_rh_S_oc-temp_lat",
+    "title": "Right Cortex \u2014 S Oc Temp Lat",
+    "rgb": [
+      221,
+      140,
+      20
+    ],
+    "a": 255,
+    "hex": "#dd8c14"
+  },
+  "12162": {
+    "id": 12162,
+    "name": "ctx_rh_S_oc-temp_med_and_Lingual",
+    "title": "Right Cortex \u2014 S Oc Temp Med & Lingual",
+    "rgb": [
+      141,
+      100,
+      220
+    ],
+    "a": 255,
+    "hex": "#8d64dc"
+  },
+  "12163": {
+    "id": 12163,
+    "name": "ctx_rh_S_orbital_lateral",
+    "title": "Right Cortex \u2014 S Orbital Lateral",
+    "rgb": [
+      221,
+      100,
+      20
+    ],
+    "a": 255,
+    "hex": "#dd6414"
+  },
+  "12164": {
+    "id": 12164,
+    "name": "ctx_rh_S_orbital_med-olfact",
+    "title": "Right Cortex \u2014 S Orbital Med Olfact",
+    "rgb": [
+      181,
+      200,
+      20
+    ],
+    "a": 255,
+    "hex": "#b5c814"
+  },
+  "12165": {
+    "id": 12165,
+    "name": "ctx_rh_S_orbital-H_Shaped",
+    "title": "Right Cortex \u2014 S Orbital H Shaped",
+    "rgb": [
+      101,
+      20,
+      20
+    ],
+    "a": 255,
+    "hex": "#651414"
+  },
+  "12166": {
+    "id": 12166,
+    "name": "ctx_rh_S_parieto_occipital",
+    "title": "Right Cortex \u2014 S Parieto Occipital",
+    "rgb": [
+      101,
+      100,
+      180
+    ],
+    "a": 255,
+    "hex": "#6564b4"
+  },
+  "12167": {
+    "id": 12167,
+    "name": "ctx_rh_S_pericallosal",
+    "title": "Right Cortex \u2014 S Pericallosal",
+    "rgb": [
+      181,
+      220,
+      20
+    ],
+    "a": 255,
+    "hex": "#b5dc14"
+  },
+  "12168": {
+    "id": 12168,
+    "name": "ctx_rh_S_postcentral",
+    "title": "Right Cortex \u2014 S Postcentral",
+    "rgb": [
+      21,
+      140,
+      200
+    ],
+    "a": 255,
+    "hex": "#158cc8"
+  },
+  "12169": {
+    "id": 12169,
+    "name": "ctx_rh_S_precentral-inf-part",
+    "title": "Right Cortex \u2014 S Precentral Inf Part",
+    "rgb": [
+      21,
+      20,
+      240
+    ],
+    "a": 255,
+    "hex": "#1514f0"
+  },
+  "12170": {
+    "id": 12170,
+    "name": "ctx_rh_S_precentral-sup-part",
+    "title": "Right Cortex \u2014 S Precentral Sup Part",
+    "rgb": [
+      21,
+      20,
+      200
+    ],
+    "a": 255,
+    "hex": "#1514c8"
+  },
+  "12171": {
+    "id": 12171,
+    "name": "ctx_rh_S_suborbital",
+    "title": "Right Cortex \u2014 S Suborbital",
+    "rgb": [
+      21,
+      20,
+      60
+    ],
+    "a": 255,
+    "hex": "#15143c"
+  },
+  "12172": {
+    "id": 12172,
+    "name": "ctx_rh_S_subparietal",
+    "title": "Right Cortex \u2014 S Subparietal",
+    "rgb": [
+      101,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#653c3c"
+  },
+  "12173": {
+    "id": 12173,
+    "name": "ctx_rh_S_temporal_inf",
+    "title": "Right Cortex \u2014 S Temporal Inf",
+    "rgb": [
+      21,
+      180,
+      180
+    ],
+    "a": 255,
+    "hex": "#15b4b4"
+  },
+  "12174": {
+    "id": 12174,
+    "name": "ctx_rh_S_temporal_sup",
+    "title": "Right Cortex \u2014 S Temporal Sup",
+    "rgb": [
+      223,
+      220,
+      60
+    ],
+    "a": 255,
+    "hex": "#dfdc3c"
+  },
+  "12175": {
+    "id": 12175,
+    "name": "ctx_rh_S_temporal_transverse",
+    "title": "Right Cortex \u2014 S Temporal Transverse",
+    "rgb": [
+      221,
+      60,
+      60
+    ],
+    "a": 255,
+    "hex": "#dd3c3c"
   }
 }
