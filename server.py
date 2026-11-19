@@ -31,6 +31,8 @@ from scipy.ndimage import (
     binary_dilation,
     binary_closing,
     binary_fill_holes,
+    distance_transform_edt,
+    generate_binary_structure,
     label as nd_label,
 )
 from scipy.optimize import minimize
@@ -169,9 +171,9 @@ def get_default_projects_dir(sub_path: str = "") -> str:
 
 
 def strip_neuro_ext(filename: str) -> str:
-    """Case-insensitively strips .nii.gz, .nii, .mgz, .mgh, or .dcm from a filename."""
+    """Case-insensitively strips .nii.gz, .nii, .voi, .mgz, .mgh, or .dcm from a filename."""
     base = os.path.basename(filename or "volume")
-    return re.sub(r"\.(nii\.gz|nii|mgz|mgh|dcm)$", "", base, flags=re.IGNORECASE) or "volume"
+    return re.sub(r"\.(nii\.gz|nii|voi|mgz|mgh|dcm)$", "", base, flags=re.IGNORECASE) or "volume"
 
 
 def get_best_affine(img) -> np.ndarray:
@@ -226,6 +228,287 @@ def get_clean_3d_data(img, dtype=np.float32) -> np.ndarray:
         arr = arr + inter
     arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
     return arr.astype(dtype)
+
+
+def build_canonical_uint8_nifti(voxels_3d: np.ndarray, affine_4x4: np.ndarray) -> nib.Nifti1Image:
+    """
+    Constructs a canonical uint8 NIfTI-1 image compatible with MRIcroGL/MRIcron (.voi),
+    NiiVue, FSLeyes, and 3D Slicer with explicit sform=1, qform=1, scl_slope=1, scl_inter=0.
+    """
+    arr = np.asarray(voxels_3d, dtype=np.uint8)
+    aff = np.asarray(affine_4x4, dtype=np.float64)
+    if aff.shape != (4, 4) or not np.all(np.isfinite(aff)) or abs(np.linalg.det(aff[:3, :3])) < 1e-10:
+        aff = np.eye(4, dtype=np.float64)
+    out_nii = nib.Nifti1Image(arr, aff)
+    out_nii.set_data_dtype(np.uint8)
+    out_nii.set_sform(aff, code=1)
+    out_nii.set_qform(aff, code=1)
+    out_nii.header["scl_slope"] = 1.0
+    out_nii.header["scl_inter"] = 0.0
+    return out_nii
+
+
+def save_nifti_bytes_for_format(nii_img: nib.Nifti1Image, fmt: str = "voi") -> bytes:
+    """
+    Saves a nibabel NIfTI-1 image as bytes for '.voi' (gzipped uint8 NIfTI), '.nii.gz', or '.nii'.
+    Never passes '.voi' directly to nib.save() since nibabel infers format by file extension.
+    """
+    norm_fmt = (fmt or "voi").lower().lstrip(".")
+    disk_ext = ".nii" if norm_fmt == "nii" else ".nii.gz"
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = os.path.join(tmpdir, f"drawing{disk_ext}")
+        nib.save(nii_img, tmp_path)
+        with open(tmp_path, "rb") as f:
+            return f.read()
+
+
+def load_neuro_image_from_bytes(raw_bytes: bytes, source_name: str, tmpdir: str):
+    """
+    Writes raw neuroimaging bytes (.voi, .nii.gz, .nii, .mgz, .mgh) to a nibabel-safe extension
+    inside tmpdir and returns the loaded nibabel image object.
+    """
+    lower = (source_name or "").lower()
+    if lower.endswith(".mgz"):
+        ext = ".mgz"
+    elif lower.endswith(".mgh"):
+        ext = ".mgh"
+    elif len(raw_bytes) >= 2 and raw_bytes[:2] == b"\x1f\x8b":
+        ext = ".nii.gz"
+    else:
+        ext = ".nii"
+    safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", strip_neuro_ext(source_name or "vol"))
+    tmp_path = os.path.join(tmpdir, f"{safe_name}{ext}")
+    with open(tmp_path, "wb") as f:
+        f.write(raw_bytes)
+    return nib.load(tmp_path)
+
+
+def _write_label_mask(out_view: np.ndarray, mask: np.ndarray, lbl: int, overwrite: bool):
+    """Writes integer label `lbl` into `out_view` where `mask` is True, respecting overwrite."""
+    if overwrite:
+        out_view[mask] = lbl
+    else:
+        out_view[mask & (out_view == 0)] = lbl
+
+
+def _pick_interpolation_axis(mask: np.ndarray, axis_pref="auto") -> int:
+    """Selects slice axis (0, 1, or 2) with multi-slice gaps for signed-distance interpolation."""
+    if str(axis_pref) in ("0", "1", "2"):
+        return int(axis_pref)
+    best_score = (-1, -1, -1)
+    best_ax = 2
+    for ax in (2, 1, 0):
+        n_slices = mask.shape[ax]
+        annotated = [idx for idx in range(n_slices) if np.any(np.take(mask, idx, axis=ax))]
+        if len(annotated) >= 2:
+            gaps = sum(1 for a, b in zip(annotated, annotated[1:]) if b - a > 1)
+            span = annotated[-1] - annotated[0]
+            score = (1 if gaps > 0 else 0, gaps, span + (1 if ax == 2 else 0))
+            if score > best_score:
+                best_score = score
+                best_ax = ax
+    return best_ax
+
+
+def apply_drawing_morph_op(
+    arr: np.ndarray,
+    affine: np.ndarray,
+    op: str,
+    target_label: int = 1,
+    overwrite: bool = True,
+    params: dict = None,
+) -> tuple:
+    """
+    Runs 3D morphological cleanup, signed-distance slice interpolation, or intensity-guided
+    region growing on a uint8 3D drawing array.
+    Returns (updated_uint8_arr, changed_voxel_count, status_message).
+    """
+    params = params or {}
+    out = arr.copy()
+    op_norm = (op or "").lower()
+
+    if target_label and target_label > 0:
+        labels_to_process = [int(target_label)]
+    else:
+        labels_to_process = [int(v) for v in np.unique(arr) if int(v) > 0]
+
+    if op_norm == "region_grow":
+        src_b64 = params.get("sourceBase64")
+        seed = params.get("seedVoxel")
+        if not src_b64 or not seed or len(seed) != 3:
+            raise ValueError("region_grow requires sourceBase64 and seedVoxel [ix, iy, iz].")
+        sx, sy, sz = (int(round(seed[0])), int(round(seed[1])), int(round(seed[2])))
+        nx, ny, nz = arr.shape
+        if not (0 <= sx < nx and 0 <= sy < ny and 0 <= sz < nz):
+            raise ValueError("Seed voxel is outside volume bounds.")
+
+        src_bytes = base64.b64decode(src_b64)
+        src_name = params.get("sourceName") or "source.nii.gz"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            src_img = load_neuro_image_from_bytes(src_bytes, src_name, tmpdir)
+            src_3d = get_clean_3d_data(src_img, dtype=np.float32)
+            src_aff_raw = params.get("sourceAffine")
+            src_aff = np.asarray(src_aff_raw, dtype=np.float64) if src_aff_raw else get_best_affine(src_img)
+
+        if src_3d.shape != arr.shape or not np.allclose(src_aff, affine, atol=1e-2):
+            vox_to_vox = safe_inv4x4(src_aff) @ affine
+            vol_on_grid = affine_transform(
+                src_3d,
+                vox_to_vox[:3, :3],
+                offset=vox_to_vox[:3, 3],
+                output_shape=arr.shape,
+                order=1,
+                mode="constant",
+                cval=0.0,
+            )
+        else:
+            vol_on_grid = src_3d
+
+        nz_vals = vol_on_grid[vol_on_grid != 0]
+        if nz_vals.size >= 16 and float(np.min(vol_on_grid)) >= 0.0:
+            p2, p98 = np.percentile(nz_vals, [2, 98])
+        else:
+            p2, p98 = np.percentile(vol_on_grid, [2, 98])
+        span = max(1e-5, float(p98 - p2))
+        tol_pct = max(0.5, min(80.0, float(params.get("tolerancePct", 15.0))))
+        tol = max(1e-5, span * (tol_pct / 100.0))
+
+        max_rad_mm = max(2.0, min(150.0, float(params.get("maxRadiusMm", 35.0))))
+        vx = max(0.2, float(np.linalg.norm(affine[:3, 0])))
+        vy = max(0.2, float(np.linalg.norm(affine[:3, 1])))
+        vz = max(0.2, float(np.linalg.norm(affine[:3, 2])))
+        rx = min(nx - 1, int(np.ceil(max_rad_mm / vx)))
+        ry = min(ny - 1, int(np.ceil(max_rad_mm / vy)))
+        rz = min(nz - 1, int(np.ceil(max_rad_mm / vz)))
+
+        seed_val = float(vol_on_grid[sx, sy, sz])
+        scope = (params.get("scope") or "3d").lower()
+        slice_ax = int(params.get("sliceAxis", 2))
+        if slice_ax not in (0, 1, 2):
+            slice_ax = 2
+
+        x0, x1 = max(0, sx - rx), min(nx, sx + rx + 1)
+        y0, y1 = max(0, sy - ry), min(ny, sy + ry + 1)
+        z0, z1 = max(0, sz - rz), min(nz, sz + rz + 1)
+        if scope == "2d":
+            if slice_ax == 0:
+                x0, x1 = sx, sx + 1
+            elif slice_ax == 1:
+                y0, y1 = sy, sy + 1
+            else:
+                z0, z1 = sz, sz + 1
+
+        sub_vol = vol_on_grid[x0:x1, y0:y1, z0:z1]
+        gx = (np.arange(x0, x1, dtype=np.float32)[:, None, None] - sx) * vx
+        gy = (np.arange(y0, y1, dtype=np.float32)[None, :, None] - sy) * vy
+        gz = (np.arange(z0, z1, dtype=np.float32)[None, None, :] - sz) * vz
+        dist2 = gx * gx + gy * gy + gz * gz
+        cand = (np.abs(sub_vol - seed_val) <= tol) & (dist2 <= (max_rad_mm * max_rad_mm))
+        lsx, lsy, lsz = sx - x0, sy - y0, sz - z0
+        cand[lsx, lsy, lsz] = True
+
+        struct6 = generate_binary_structure(3, 1)
+        labeled, _ = nd_label(cand, structure=struct6)
+        seed_id = int(labeled[lsx, lsy, lsz])
+        grown_sub = labeled == seed_id
+        lbl = max(1, int(target_label or 1))
+        _write_label_mask(out[x0:x1, y0:y1, z0:z1], grown_sub, lbl, overwrite)
+        changed = int(np.count_nonzero(out != arr))
+        grown_cnt = int(np.count_nonzero(grown_sub))
+        return out, changed, f"Region grow ({scope.upper()}) captured {grown_cnt} voxels around seed."
+
+    if not labels_to_process:
+        return out, 0, "Layer is currently empty; paint a region first."
+
+    if op_norm == "fill_holes":
+        for lbl in labels_to_process:
+            mask = arr == lbl
+            if not np.any(mask):
+                continue
+            filled = binary_fill_holes(mask)
+            _write_label_mask(out, filled, lbl, overwrite)
+        changed = int(np.count_nonzero(out != arr))
+        return out, changed, f"Filled 3D interior holes ({changed} voxels added)."
+
+    if op_norm == "largest_island":
+        struct26 = generate_binary_structure(3, 3)
+        for lbl in labels_to_process:
+            mask = arr == lbl
+            if not np.any(mask):
+                continue
+            labeled, ncomp = nd_label(mask, structure=struct26)
+            if ncomp <= 1:
+                continue
+            counts = np.bincount(labeled.ravel())
+            counts[0] = 0
+            keep_id = int(np.argmax(counts))
+            out[mask & (labeled != keep_id)] = 0
+        changed = int(np.count_nonzero(out != arr))
+        return out, changed, f"Retained largest 3D connected component ({changed} stray voxels removed)."
+
+    if op_norm == "dilate":
+        struct6 = generate_binary_structure(3, 1)
+        for lbl in labels_to_process:
+            mask = arr == lbl
+            if not np.any(mask):
+                continue
+            dil = binary_dilation(mask, structure=struct6)
+            _write_label_mask(out, dil, lbl, overwrite)
+        changed = int(np.count_nonzero(out != arr))
+        return out, changed, f"Dilated mask by 1 voxel ({changed} voxels added)."
+
+    if op_norm == "erode":
+        struct6 = generate_binary_structure(3, 1)
+        for lbl in labels_to_process:
+            mask = arr == lbl
+            if not np.any(mask):
+                continue
+            ero = binary_erosion(mask, structure=struct6)
+            out[mask & (~ero)] = 0
+        changed = int(np.count_nonzero(out != arr))
+        return out, changed, f"Eroded mask by 1 voxel ({changed} boundary voxels removed)."
+
+    if op_norm == "interpolate_slices":
+        axis_pref = params.get("axis", "auto")
+        any_interp = False
+        used_ax = 2
+        for lbl in labels_to_process:
+            mask = arr == lbl
+            ax = _pick_interpolation_axis(mask, axis_pref)
+            used_ax = ax
+            n_slices = mask.shape[ax]
+            annotated = [idx for idx in range(n_slices) if np.any(np.take(mask, idx, axis=ax))]
+            if len(annotated) < 2:
+                continue
+            for s1, s2 in zip(annotated, annotated[1:]):
+                if s2 - s1 <= 1:
+                    continue
+                any_interp = True
+                m1 = np.take(mask, s1, axis=ax)
+                m2 = np.take(mask, s2, axis=ax)
+                sd1 = (
+                    np.full(m1.shape, 1e4, dtype=np.float32)
+                    if np.all(m1)
+                    else (distance_transform_edt(m1) - distance_transform_edt(~m1)).astype(np.float32)
+                )
+                sd2 = (
+                    np.full(m2.shape, 1e4, dtype=np.float32)
+                    if np.all(m2)
+                    else (distance_transform_edt(m2) - distance_transform_edt(~m2)).astype(np.float32)
+                )
+                for s in range(s1 + 1, s2):
+                    t = (s - s1) / float(s2 - s1)
+                    interp_mask = ((1.0 - t) * sd1 + t * sd2) > 0.0
+                    slc = [slice(None), slice(None), slice(None)]
+                    slc[ax] = s
+                    _write_label_mask(out[tuple(slc)], interp_mask, lbl, overwrite)
+        changed = int(np.count_nonzero(out != arr))
+        if not any_interp:
+            return out, 0, "Need painted contours on at least 2 non-adjacent slices to interpolate."
+        ax_name = {0: "X", 1: "Y", 2: "Z"}.get(used_ax, str(used_ax))
+        return out, changed, f"Interpolated between slices along axis {ax_name} ({changed} voxels added)."
+
+    raise ValueError(f"Unsupported drawing morphological operation: {op}")
 
 
 def scipy_morphological_skull_strip(data_3d: np.ndarray, zooms=(1.0, 1.0, 1.0), frac: float = 0.5):
@@ -1036,6 +1319,12 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
             self._handle_set_fs_license(body)
         elif parsed.path == "/api/convert-volume":
             self._handle_convert_volume(body)
+        elif parsed.path == "/api/drawing-save":
+            self._handle_drawing_save(body)
+        elif parsed.path == "/api/drawing-import":
+            self._handle_drawing_import(body)
+        elif parsed.path == "/api/drawing-morph":
+            self._handle_drawing_morph(body)
         elif parsed.path == "/api/shutdown":
             self._handle_shutdown(body)
         else:
@@ -1330,7 +1619,12 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
 
         if sys_plat == "Darwin" and os.path.exists("/usr/bin/osascript"):
             try:
-                script = f'POSIX path of (choose folder with prompt "{safe_prompt}")'
+                script = (
+                    'tell current application\n'
+                    'activate\n'
+                    f'POSIX path of (choose folder with prompt "{safe_prompt}")\n'
+                    'end tell'
+                )
                 proc = subprocess.run(
                     ["/usr/bin/osascript", "-e", script],
                     capture_output=True,
@@ -1339,8 +1633,14 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                 )
                 if proc.returncode == 0 and proc.stdout.strip():
                     return proc.stdout.strip(), False
-                if "User canceled" in (proc.stderr or "") or proc.returncode == 1:
+                stderr_low = (proc.stderr or "").lower()
+                if "user canceled" in stderr_low or "(-128)" in stderr_low:
                     return None, True
+                if proc.returncode != 0:
+                    print(
+                        f"[NeuroCoreg] osascript folder dialog unavailable (rc={proc.returncode}): {(proc.stderr or '').strip()}",
+                        flush=True,
+                    )
             except Exception:
                 pass
 
@@ -1425,6 +1725,147 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
 
         return None, False
 
+    def _pick_native_save_file(self, prompt_text: str, default_filename: str, default_ext: str = ".voi"):
+        """
+        Cross-platform native Save File dialog across macOS, Linux, and Windows.
+        Supports mounted network drives (/Volumes, /mnt, Z:\\, \\\\server\\share).
+        Returns (chosen_path, user_cancelled).
+        """
+        sys_plat = platform.system()
+        safe_prompt = (prompt_text or "Save file").replace('"', '\\"').replace("'", "")
+        safe_name = os.path.basename(default_filename or f"drawing{default_ext}").replace('"', "").replace("'", "")
+        norm_ext = default_ext if default_ext.startswith(".") else f".{default_ext}"
+
+        chosen = None
+        cancelled = False
+
+        if sys_plat == "Darwin" and os.path.exists("/usr/bin/osascript"):
+            try:
+                script = (
+                    'tell current application\n'
+                    'activate\n'
+                    f'POSIX path of (choose file name with prompt "{safe_prompt}" default name "{safe_name}")\n'
+                    'end tell'
+                )
+                proc = subprocess.run(
+                    ["/usr/bin/osascript", "-e", script],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                if proc.returncode == 0 and proc.stdout.strip():
+                    chosen = proc.stdout.strip()
+                else:
+                    stderr_low = (proc.stderr or "").lower()
+                    if "user canceled" in stderr_low or "(-128)" in stderr_low:
+                        return None, True
+                    if proc.returncode != 0:
+                        print(
+                            f"[NeuroCoreg] osascript save dialog unavailable (rc={proc.returncode}): {(proc.stderr or '').strip()}",
+                            flush=True,
+                        )
+            except Exception:
+                pass
+
+        elif sys_plat == "Linux" and (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+            zenity_bin = shutil.which("zenity")
+            if zenity_bin:
+                try:
+                    proc = subprocess.run(
+                        [
+                            zenity_bin,
+                            "--file-selection",
+                            "--save",
+                            "--confirm-overwrite",
+                            f"--filename={safe_name}",
+                            f"--title={safe_prompt}",
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                    )
+                    if proc.returncode == 0 and proc.stdout.strip():
+                        chosen = proc.stdout.strip()
+                    elif proc.returncode == 1:
+                        return None, True
+                except Exception:
+                    pass
+            if not chosen:
+                kdialog_bin = shutil.which("kdialog")
+                if kdialog_bin:
+                    try:
+                        proc = subprocess.run(
+                            [kdialog_bin, "--getsavefilename", os.path.join(os.path.expanduser("~"), safe_name), f"*{norm_ext}", "--title", safe_prompt],
+                            capture_output=True,
+                            text=True,
+                            timeout=60,
+                        )
+                        if proc.returncode == 0 and proc.stdout.strip():
+                            chosen = proc.stdout.strip()
+                        elif proc.returncode == 1:
+                            return None, True
+                    except Exception:
+                        pass
+
+        elif sys_plat == "Windows":
+            ps_bin = shutil.which("powershell") or shutil.which("pwsh")
+            if ps_bin:
+                try:
+                    ps_cmd = (
+                        "Add-Type -AssemblyName System.Windows.Forms; "
+                        "$s = New-Object System.Windows.Forms.SaveFileDialog; "
+                        f"$s.Title = '{safe_prompt}'; "
+                        f"$s.FileName = '{safe_name}'; "
+                        "$s.OverwritePrompt = $true; "
+                        "$s.Filter = 'MRIcroGL VOI (*.voi)|*.voi|Gzipped NIfTI (*.nii.gz)|*.nii.gz|NIfTI (*.nii)|*.nii|All files (*.*)|*.*'; "
+                        "if ($s.ShowDialog() -eq 'OK') { Write-Output $s.FileName } else { exit 2 }"
+                    )
+                    proc = subprocess.run(
+                        [ps_bin, "-NoProfile", "-STA", "-Command", ps_cmd],
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                    )
+                    if proc.returncode == 0 and proc.stdout.strip():
+                        chosen = proc.stdout.strip()
+                    elif proc.returncode == 2:
+                        return None, True
+                except Exception:
+                    pass
+
+        if not chosen and not cancelled and (
+            sys_plat in ("Darwin", "Windows") or os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")
+        ):
+            try:
+                tk_code = (
+                    "import sys, tkinter as tk; from tkinter import filedialog; "
+                    "root = tk.Tk(); root.withdraw(); root.attributes('-topmost', True); "
+                    f"p = filedialog.asksaveasfilename(title={repr(safe_prompt)}, initialfile={repr(safe_name)}, defaultextension={repr(norm_ext)}); "
+                    "root.destroy(); "
+                    "print(p) if p else sys.exit(2)"
+                )
+                proc = subprocess.run(
+                    [sys.executable, "-c", tk_code],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                if proc.returncode == 0 and proc.stdout.strip():
+                    chosen = proc.stdout.strip()
+                elif proc.returncode == 2:
+                    return None, True
+            except Exception:
+                pass
+
+        if not chosen:
+            return None, False
+
+        chosen = normalize_user_path(chosen)
+        lower = chosen.lower()
+        if not (lower.endswith(".voi") or lower.endswith(".nii.gz") or lower.endswith(".nii")):
+            chosen = f"{chosen}{norm_ext}"
+        return chosen, False
+
     def _handle_save_project(self, body):
         """
         Saves the full NeuroCoreg workspace bundle into a user-chosen local or mounted network folder:
@@ -1468,8 +1909,10 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
             manifest = body.get("manifest", {})
             volumes_payload = body.get("volumes", [])
             transforms_payload = body.get("transformFiles", [])
+            drawings_payload = body.get("drawingFiles", [])
 
             saved_nifti_files = []
+            saved_drawing_files = []
             with tempfile.TemporaryDirectory() as tmpdir:
                 for idx, v in enumerate(volumes_payload):
                     raw_fname = os.path.basename(v.get("fileName") or f"volume_{idx}.nii.gz")
@@ -1494,6 +1937,31 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                         shutil.copyfile(tmp_out, dest_path)
                         saved_nifti_files.append(fname)
 
+                if drawings_payload:
+                    drawings_dir = os.path.join(target_dir, "drawings")
+                    os.makedirs(drawings_dir, exist_ok=True)
+                    for idx, d in enumerate(drawings_payload):
+                        raw_dname = os.path.basename(d.get("fileName") or f"drawing_{idx}.voi")
+                        dname = f"{strip_neuro_ext(raw_dname)}.voi"
+                        dest_draw = os.path.join(drawings_dir, dname)
+                        if d.get("voxelsBase64") and d.get("dims"):
+                            nx, ny, nz = [int(x) for x in d["dims"][:3]]
+                            vox_raw = base64.b64decode(d["voxelsBase64"])
+                            arr_3d = np.frombuffer(vox_raw, dtype=np.uint8).reshape((nx, ny, nz), order="F")
+                            d_aff = np.asarray(d.get("affine", np.eye(4)), dtype=np.float64)
+                            out_nii = build_canonical_uint8_nifti(arr_3d, d_aff)
+                            tmp_draw = os.path.join(tmpdir, f"draw_{idx}.nii.gz")
+                            nib.save(out_nii, tmp_draw)
+                            shutil.copyfile(tmp_draw, dest_draw)
+                            saved_drawing_files.append(dname)
+                        elif d.get("voiBase64"):
+                            voi_bytes = base64.b64decode(d["voiBase64"])
+                            tmp_draw = os.path.join(tmpdir, f"draw_{idx}.voi")
+                            with open(tmp_draw, "wb") as df:
+                                df.write(voi_bytes)
+                            shutil.copyfile(tmp_draw, dest_draw)
+                            saved_drawing_files.append(dname)
+
             saved_mat_files = []
             for tfm in transforms_payload:
                 tname = os.path.basename(tfm.get("fileName") or "transform.mat")
@@ -1512,6 +1980,7 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                 "projectDir": target_dir,
                 "niftiFiles": saved_nifti_files,
                 "transformFiles": saved_mat_files,
+                "drawingFiles": saved_drawing_files,
             })
         except Exception as e:
             self._send_json(500, {"error": str(e)})
@@ -1532,8 +2001,8 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                 target_dir = chosen_dir
 
             target_dir = normalize_user_path(target_dir)
-            # If user selected the "nifti" subfolder inside a project, step up one level
-            if os.path.basename(os.path.normpath(target_dir)).lower() == "nifti":
+            # If user selected the "nifti" or "drawings" subfolder inside a project, step up one level
+            if os.path.basename(os.path.normpath(target_dir)).lower() in ("nifti", "drawings"):
                 parent_cand = os.path.dirname(os.path.normpath(target_dir))
                 if os.path.isfile(os.path.join(parent_cand, "project.json")):
                     target_dir = parent_cand
@@ -1585,10 +2054,37 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                         "meta": v_entry,
                     })
 
+            drawings_dir = os.path.join(target_dir, "drawings")
+            drawings_out = []
+            for d_entry in manifest.get("drawingLayers", []):
+                dname = os.path.basename(d_entry.get("fileName") or "")
+                if not dname:
+                    continue
+                cand_dnames = [dname, f"{strip_neuro_ext(dname)}.voi", f"{strip_neuro_ext(dname)}.nii.gz", f"{strip_neuro_ext(dname)}.nii"]
+                found_dpath = None
+                for cname in cand_dnames:
+                    for folder in (drawings_dir, target_dir):
+                        p = os.path.join(folder, cname)
+                        if os.path.isfile(p):
+                            found_dpath = p
+                            dname = cname
+                            break
+                    if found_dpath:
+                        break
+                if found_dpath:
+                    with open(found_dpath, "rb") as df:
+                        b64 = base64.b64encode(df.read()).decode("ascii")
+                    drawings_out.append({
+                        "fileName": dname,
+                        "voiBase64": b64,
+                        "meta": d_entry,
+                    })
+
             self._send_json(200, {
                 "projectDir": target_dir,
                 "manifest": manifest,
                 "volumes": volumes_out,
+                "drawings": drawings_out,
             })
         except Exception as e:
             self._send_json(500, {"error": str(e)})
@@ -2271,6 +2767,210 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                     "atlasType": detected_atlas_type,
                     "dktLut": load_dkt_lut() if is_dkt else None,
                 })
+        except Exception as e:
+            self._send_json(500, {"error": str(e)})
+
+    def _handle_drawing_save(self, body):
+        """
+        Exports a uint8 drawing layer as MRIcroGL .voi (gzipped uint8 NIfTI), .nii.gz, or .nii,
+        and either returns base64 bytes for browser download or writes directly via native OS Save File dialog.
+        """
+        try:
+            dims = body.get("dims") or []
+            if len(dims) < 3:
+                self._send_json(400, {"error": "Missing drawing dims [nx, ny, nz]."})
+                return
+            nx, ny, nz = (int(dims[0]), int(dims[1]), int(dims[2]))
+            vox_bytes = base64.b64decode(body["voxelsBase64"])
+            expected_len = nx * ny * nz
+            if len(vox_bytes) != expected_len:
+                self._send_json(400, {"error": f"Voxel buffer length {len(vox_bytes)} != {nx}*{ny}*{nz}."})
+                return
+
+            arr = np.frombuffer(vox_bytes, dtype=np.uint8).reshape((nx, ny, nz), order="F")
+            aff = np.asarray(body.get("affine", np.eye(4)), dtype=np.float64)
+            fmt = (body.get("format") or "voi").lower().lstrip(".")
+            if fmt not in ("voi", "nii.gz", "nii"):
+                fmt = "voi"
+            ext = f".{fmt}"
+            base_stem = strip_neuro_ext(os.path.basename(body.get("fileName") or "drawing_voi"))
+            base_stem = re.sub(r"[^a-zA-Z0-9._-]", "_", base_stem) or "drawing_voi"
+            suggested_name = f"{base_stem}{ext}"
+
+            out_nii = build_canonical_uint8_nifti(arr, aff)
+            out_bytes = save_nifti_bytes_for_format(out_nii, fmt)
+            out_b64 = base64.b64encode(out_bytes).decode("ascii")
+
+            mode = (body.get("mode") or "download").lower()
+            if mode != "save_as":
+                self._send_json(200, {
+                    "fileName": suggested_name,
+                    "format": fmt,
+                    "fileBase64": out_b64,
+                    "byteLength": len(out_bytes),
+                })
+                return
+
+            target_path = body.get("targetPath")
+            if target_path:
+                dest_path = normalize_user_path(target_path)
+            else:
+                chosen_path, cancelled = self._pick_native_save_file(
+                    f"Save Drawing Layer ({suggested_name}):",
+                    suggested_name,
+                    ext,
+                )
+                if cancelled:
+                    self._send_json(200, {"cancelled": True})
+                    return
+                if not chosen_path:
+                    self._send_json(200, {
+                        "needsFallback": True,
+                        "fileName": suggested_name,
+                        "format": fmt,
+                        "fileBase64": out_b64,
+                        "byteLength": len(out_bytes),
+                    })
+                    return
+                dest_path = chosen_path
+
+            dest_dir = os.path.dirname(os.path.abspath(dest_path))
+            if dest_dir:
+                os.makedirs(dest_dir, exist_ok=True)
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp_out = os.path.join(tmpdir, "export_draw.bin")
+                with open(tmp_out, "wb") as tf:
+                    tf.write(out_bytes)
+                shutil.copyfile(tmp_out, dest_path)
+
+                labels_path = None
+                labels_meta = body.get("labelsMetadata")
+                if labels_meta:
+                    labels_fname = f"{strip_neuro_ext(os.path.basename(dest_path))}_labels.json"
+                    labels_path = os.path.join(dest_dir, labels_fname)
+                    tmp_lbl = os.path.join(tmpdir, "labels.json")
+                    with open(tmp_lbl, "w", encoding="utf-8") as lf:
+                        json.dump(labels_meta, lf, indent=2)
+                    shutil.copyfile(tmp_lbl, labels_path)
+
+            self._send_json(200, {
+                "saved": True,
+                "savedPath": dest_path,
+                "labelsPath": labels_path,
+                "fileName": os.path.basename(dest_path),
+            })
+        except Exception as e:
+            self._send_json(500, {"error": str(e)})
+
+    def _handle_drawing_import(self, body):
+        """
+        Loads a .voi, .nii.gz, .nii, or .mgz file and optionally resamples it via nearest-neighbor
+        (order=0) onto the workspace Reference grid as a clean uint8 voxel buffer.
+        """
+        try:
+            src_bytes = base64.b64decode(body["sourceBase64"])
+            src_name = body.get("sourceName") or "imported.voi"
+            with tempfile.TemporaryDirectory() as tmpdir:
+                src_img = load_neuro_image_from_bytes(src_bytes, src_name, tmpdir)
+                src_3d = get_clean_3d_data(src_img, dtype=np.float32)
+                src_aff = (
+                    np.asarray(body["sourceAffine"], dtype=np.float64)
+                    if body.get("sourceAffine")
+                    else get_best_affine(src_img)
+                )
+
+            thresh_min = body.get("thresholdMin")
+            if thresh_min is not None:
+                try:
+                    tval = float(thresh_min)
+                    src_3d = (src_3d >= tval).astype(np.float32)
+                except Exception:
+                    pass
+
+            ref_dims = body.get("refDims")
+            ref_aff_raw = body.get("refAffine")
+            resampled = False
+            if ref_dims and len(ref_dims) >= 3 and ref_aff_raw:
+                target_shape = (int(ref_dims[0]), int(ref_dims[1]), int(ref_dims[2]))
+                ref_aff = np.asarray(ref_aff_raw, dtype=np.float64)
+                if src_3d.shape == target_shape and np.allclose(src_aff, ref_aff, atol=1e-2):
+                    out_arr = np.rint(np.clip(src_3d, 0, 255)).astype(np.uint8)
+                    out_aff = ref_aff
+                else:
+                    vox_to_vox = safe_inv4x4(src_aff) @ ref_aff
+                    res = affine_transform(
+                        src_3d,
+                        vox_to_vox[:3, :3],
+                        offset=vox_to_vox[:3, 3],
+                        output_shape=target_shape,
+                        order=0,
+                        mode="constant",
+                        cval=0.0,
+                    )
+                    out_arr = np.rint(np.clip(res, 0, 255)).astype(np.uint8)
+                    out_aff = ref_aff
+                    resampled = True
+            else:
+                out_arr = np.rint(np.clip(src_3d, 0, 255)).astype(np.uint8)
+                out_aff = src_aff
+
+            uniq = [int(x) for x in np.unique(out_arr) if int(x) > 0]
+            if len(uniq) == 1 and uniq[0] > 6:
+                out_arr[out_arr > 0] = 1
+                uniq = [1]
+
+            suggested_mode = "multilabel" if len(uniq) > 1 else "binary"
+            vox_b64 = base64.b64encode(out_arr.tobytes(order="F")).decode("ascii")
+            self._send_json(200, {
+                "voxelsBase64": vox_b64,
+                "dims": list(out_arr.shape),
+                "affine": out_aff.tolist(),
+                "resampled": resampled,
+                "uniqueLabels": uniq,
+                "suggestedMode": suggested_mode,
+                "voxelCount": int(np.count_nonzero(out_arr)),
+            })
+        except Exception as e:
+            self._send_json(500, {"error": str(e)})
+
+    def _handle_drawing_morph(self, body):
+        """
+        Applies server-side 3D morphological cleanup (fill_holes, largest_island, dilate, erode),
+        signed-distance slice interpolation (interpolate_slices), or intensity-guided region growing.
+        """
+        try:
+            dims = body.get("dims") or []
+            if len(dims) < 3:
+                self._send_json(400, {"error": "Missing drawing dims [nx, ny, nz]."})
+                return
+            nx, ny, nz = (int(dims[0]), int(dims[1]), int(dims[2]))
+            vox_bytes = base64.b64decode(body["voxelsBase64"])
+            if len(vox_bytes) != nx * ny * nz:
+                self._send_json(400, {"error": "Drawing buffer size mismatch."})
+                return
+
+            arr = np.frombuffer(vox_bytes, dtype=np.uint8).reshape((nx, ny, nz), order="F")
+            aff = np.asarray(body.get("affine", np.eye(4)), dtype=np.float64)
+            op = body.get("op") or ""
+            target_label = int(body.get("targetLabel", 1))
+            overwrite = bool(body.get("overwrite", True))
+
+            out_arr, changed, msg = apply_drawing_morph_op(
+                arr,
+                aff,
+                op,
+                target_label=target_label,
+                overwrite=overwrite,
+                params=body,
+            )
+
+            self._send_json(200, {
+                "voxelsBase64": base64.b64encode(out_arr.tobytes(order="F")).decode("ascii"),
+                "changedVoxels": int(changed),
+                "voxelCount": int(np.count_nonzero(out_arr)),
+                "message": msg,
+            })
         except Exception as e:
             self._send_json(500, {"error": str(e)})
 

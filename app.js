@@ -66,6 +66,28 @@ const state = {
   popouts: new Map(),
   popoutTopZ: 1210,
   focusedPopoutId: null,
+  drawing: {
+    popout: null,
+    paintEnabled: false,
+    tool: "pen", // "pen" | "filled_pen" | "eraser" | "flood_fill" | "region_grow"
+    brushRadius: 2, // 1..5 voxels
+    brush3D: false,
+    overwriteLabels: true,
+    activeLayerId: null,
+    layers: [],
+    nextLayerCounter: 1,
+    lastSliceAxis: 2,
+    lastAxCorSag: 0,
+    isStroking: false,
+    exportFormat: "voi", // "voi" | "nii.gz" | "nii"
+    interpAxis: "auto",
+    regionGrow: {
+      sourceVolId: null,
+      scope: "3d",
+      tolerancePct: 15,
+      maxRadiusMm: 35,
+    },
+  },
 };
 
 // Utility: Show temporary toast notification
@@ -542,6 +564,9 @@ function resizeWorkspaceCanvas() {
       }
       state.nv.drawScene();
     }
+    if (typeof syncStrokeOverlayCanvasSize === "function") {
+      syncStrokeOverlayCanvasSize();
+    }
   });
 }
 
@@ -628,22 +653,25 @@ function registerVolumeMeta(vol, overrides = {}) {
 
   const origAffine = vol.hdr && vol.hdr.affine ? cloneMat4(vol.hdr.affine) : identityMat4();
   const isChild = Boolean(overrides.isChildOfMov || overrides.role === "child");
-  const isMask = overrides.isMask !== undefined ? Boolean(overrides.isMask) : inferred.isMask;
-  const isDktAtlas = overrides.isDktAtlas !== undefined ? Boolean(overrides.isDktAtlas) : Boolean(inferred.isDktAtlas);
+  const isDrawingLayer = Boolean(overrides.isDrawingLayer);
+  const isMask = overrides.isMask !== undefined ? Boolean(overrides.isMask) : isDrawingLayer || inferred.isMask;
+  const isDktAtlas = !isDrawingLayer && (overrides.isDktAtlas !== undefined ? Boolean(overrides.isDktAtlas) : Boolean(inferred.isDktAtlas));
   const atlasType = overrides.atlasType || inferred.atlasType || (isDktAtlas ? resolveAtlasTypeForVolume(vol) : null);
 
   state.layerMeta.set(vol.id, {
     label: overrides.label || vol.name || "Volume",
-    modality: overrides.modality || inferred.modality,
+    modality: overrides.modality || (isDrawingLayer ? "Drawing VOI" : inferred.modality),
     visible,
     savedOpacity,
     origAffine,
     params: { tx: 0, ty: 0, tz: 0, rx: 0, ry: 0, rz: 0, sx: 1, sy: 1, sz: 1 },
     isChildOfMov: isChild,
-    isCheckedForChildApply: isChild || isMask,
-    isCheckedForExport: isChild || overrides.role === "moving" || isDktAtlas,
+    isCheckedForChildApply: !isDrawingLayer && (isChild || isMask),
+    isCheckedForExport: !isDrawingLayer && (isChild || overrides.role === "moving" || isDktAtlas),
     isMask,
     isDktAtlas,
+    isDrawingLayer,
+    drawingLayerId: overrides.drawingLayerId || null,
     atlasType,
     rawBytes: overrides.rawBytes || null,
     isSyntheticVerification: Boolean(overrides.isSyntheticVerification),
@@ -655,9 +683,16 @@ function registerVolumeMeta(vol, overrides = {}) {
     state.activeDktVolId = vol.id;
   }
 
-  if (!state.refVolId && !overrides.isSyntheticVerification && !isDktAtlas) {
+  if (!state.refVolId && !overrides.isSyntheticVerification && !isDktAtlas && !isDrawingLayer) {
     state.refVolId = vol.id;
-  } else if (!state.movVolId && vol.id !== state.refVolId && !isChild && !overrides.isSyntheticVerification && !isDktAtlas) {
+  } else if (
+    !state.movVolId &&
+    vol.id !== state.refVolId &&
+    !isChild &&
+    !overrides.isSyntheticVerification &&
+    !isDktAtlas &&
+    !isDrawingLayer
+  ) {
     state.movVolId = vol.id;
   }
 }
@@ -674,6 +709,14 @@ function toggleVolumeVisibility(volId, forceState = null) {
 
   const targetOpacity = nextVis ? (meta.savedOpacity > 0 ? meta.savedOpacity : 0.75) : 0.0;
   state.nv.setOpacity(idx, targetOpacity);
+
+  if (meta.isDrawingLayer && meta.drawingLayerId) {
+    const dLayer = state.drawing.layers.find((l) => l.id === meta.drawingLayerId);
+    if (dLayer) {
+      dLayer.visible = nextVis;
+      renderDrawingStudioUI();
+    }
+  }
 
   // If the user explicitly turns ON a DKT or Destrieux atlas layer in the Image Stack, make it the active atlas
   if (meta.isDktAtlas && nextVis) {
@@ -722,6 +765,10 @@ function renderLayerList() {
     const meta = state.layerMeta.get(vol.id);
     if (!meta) return;
 
+    const isDraw = Boolean(meta.isDrawingLayer);
+    const drawLayer = isDraw ? state.drawing.layers.find((l) => l.id === meta.drawingLayerId) : null;
+    const isActiveDraw = Boolean(drawLayer && state.drawing.activeLayerId === drawLayer.id);
+
     const isRef = vol.id === state.refVolId;
     const isMov = vol.id === state.movVolId;
     const isChild = Boolean(meta.isChildOfMov) && !isRef && !isMov;
@@ -730,53 +777,99 @@ function renderLayerList() {
     const isSolo = vol.id === state.soloVolId;
 
     const card = document.createElement("div");
-    card.className = `layer-card ${!meta.visible ? "is-hidden" : ""} ${isRef ? "role-ref" : ""} ${isMov ? "role-mov" : ""} ${isChild ? "role-child" : ""}`;
+    card.className = `layer-card ${!meta.visible ? "is-hidden" : ""} ${isDraw ? "is-drawing-layer" : ""} ${
+      isActiveDraw ? "is-active-drawing" : ""
+    } ${isRef ? "role-ref" : ""} ${isMov ? "role-mov" : ""} ${isChild ? "role-child" : ""}`;
     card.setAttribute("role", "listitem");
 
     const currentOpacityPct = Math.round((meta.visible ? vol.opacity : 0) * 100);
     const calMin = vol.cal_min !== undefined ? Number(vol.cal_min).toFixed(1) : "0";
     const calMax = vol.cal_max !== undefined ? Number(vol.cal_max).toFixed(1) : "100";
+    const dims = getVolDims(vol);
 
-    card.innerHTML = `
-      <div class="layer-top-row">
-        <label class="vis-switch-label" title="Toggle volume visibility ON / OFF">
-          <input type="checkbox" role="switch" class="vis-switch" data-action="toggle-vis" data-id="${vol.id}" ${meta.visible ? "checked" : ""} />
-          <span class="layer-title" title="${meta.label} (${vol.name})">${meta.label}</span>
-        </label>
-        <div class="layer-badges">
-          ${isBet ? `<span class="role-badge bet" title="Skull-Stripped Brain Extracted Volume (FSL BET)">BET</span>` : ""}
-          ${isDkt ? `<span class="role-badge dkt" title="Active DKT Anatomical Parcellation Atlas for Cursor Hover">DKT</span>` : ""}
-          <button class="role-badge ${isRef ? "ref" : "inactive"}" data-action="set-ref" data-id="${vol.id}" title="Set as Fixed Reference Volume">REF</button>
-          <button class="role-badge ${isMov ? "mov" : "inactive"}" data-action="set-mov" data-id="${vol.id}" title="Set as Moving Parent Volume">MOV</button>
-          <button class="role-badge ${isChild ? "child" : "inactive"}" data-action="toggle-child" data-id="${vol.id}" title="Link/Unlink as Child of Moving Volume (inherits Moving transforms automatically)">CHILD</button>
-          <button class="icon-btn ${isSolo ? "solo-active" : ""}" data-action="solo" data-id="${vol.id}" title="Solo this volume">S</button>
-          <button class="icon-btn" data-action="quick-export" data-id="${vol.id}" title="Export this volume as coregistered NIfTI">⬇</button>
-          <button class="icon-btn" data-action="remove" data-id="${vol.id}" title="Remove volume">✕</button>
+    if (isDraw) {
+      const swatchColor = drawLayer?.colorHex || "#f43f5e";
+      const volCc = (drawLayer?.volumeCc ?? 0).toFixed(2);
+      const voxCnt = drawLayer?.voxelCount ?? 0;
+      const modeTag = drawLayer?.mode === "multilabel" ? "1–6" : "0/1";
+      card.innerHTML = `
+        <div class="layer-top-row">
+          <label class="vis-switch-label" title="Toggle drawing layer visibility ON / OFF">
+            <input type="checkbox" role="switch" class="vis-switch" data-action="toggle-vis" data-id="${vol.id}" ${meta.visible ? "checked" : ""} />
+            <span class="draw-layer-card-swatch" style="background:${swatchColor};"></span>
+            <span class="layer-title" title="${meta.label} (${vol.name})">${meta.label}</span>
+          </label>
+          <div class="layer-badges">
+            <span class="role-badge draw" title="Editable Drawing / VOI Layer">DRAW</span>
+            <button class="role-badge draw-edit" data-action="edit-drawing" data-id="${vol.id}" title="Select and edit this layer in Drawing Studio">Edit</button>
+            <button class="icon-btn ${isSolo ? "solo-active" : ""}" data-action="solo" data-id="${vol.id}" title="Solo this layer">S</button>
+            <button class="icon-btn" data-action="export-drawing" data-id="${vol.id}" title="Save Drawing Layer as .voi / NIfTI">⬇</button>
+            <button class="icon-btn" data-action="remove" data-id="${vol.id}" title="Delete drawing layer">✕</button>
+          </div>
         </div>
-      </div>
 
-      <div class="layer-controls-grid">
-        <div class="control-pair">
-          <span>α</span>
-          <input type="range" min="0" max="100" value="${currentOpacityPct}" data-action="opacity" data-id="${vol.id}" title="Adjust Volume Opacity" />
-          <span class="opacity-pct">${currentOpacityPct}%</span>
+        <div class="layer-controls-grid">
+          <div class="control-pair">
+            <span>α</span>
+            <input type="range" min="0" max="100" value="${currentOpacityPct}" data-action="opacity" data-id="${vol.id}" title="Adjust Drawing Layer Opacity" />
+            <span class="opacity-pct">${currentOpacityPct}%</span>
+          </div>
+          <span class="draw-vol-pill" title="Painted volume (${modeTag} labels)">${volCc} cm³ • ${voxCnt} vox (${modeTag})</span>
         </div>
-        <select class="select-compact" data-action="colormap" data-id="${vol.id}" title="Volume Colormap">
-          ${COLORMAPS.map((cm) => `<option value="${cm}" ${vol.colormap === cm ? "selected" : ""}>${cm}</option>`).join("")}
-        </select>
-      </div>
 
-      <div class="layer-window-row">
-        <span>Window:</span>
-        <input type="number" class="window-input" step="any" value="${calMin}" data-action="cal-min" data-id="${vol.id}" title="Intensity Min (cal_min)" />
-        <span>–</span>
-        <input type="number" class="window-input" step="any" value="${calMax}" data-action="cal-max" data-id="${vol.id}" title="Intensity Max (cal_max)" />
-        <button class="btn-xs" data-action="auto-window" data-id="${vol.id}" title="Reset intensity window to robust min/max">Auto</button>
-        <span style="margin-left:auto;color:var(--text-muted);font-family:var(--font-mono);font-size:10px;">
-          ${(() => { const d = getVolDims(vol); return `${d[1]}×${d[2]}×${d[3]}`; })()}
-        </span>
-      </div>
-    `;
+        <div class="layer-window-row">
+          <span style="color:var(--text-muted);font-size:10px;">
+            ${isActiveDraw ? "● Active in Drawing Studio" : "Click Edit to paint on this layer"}
+          </span>
+          <span style="margin-left:auto;color:var(--text-muted);font-family:var(--font-mono);font-size:10px;">
+            ${dims[1]}×${dims[2]}×${dims[3]}
+          </span>
+        </div>
+      `;
+    } else {
+      const canConvert = !meta.isSyntheticVerification && !meta.isDktAtlas;
+      card.innerHTML = `
+        <div class="layer-top-row">
+          <label class="vis-switch-label" title="Toggle volume visibility ON / OFF">
+            <input type="checkbox" role="switch" class="vis-switch" data-action="toggle-vis" data-id="${vol.id}" ${meta.visible ? "checked" : ""} />
+            <span class="layer-title" title="${meta.label} (${vol.name})">${meta.label}</span>
+          </label>
+          <div class="layer-badges">
+            ${isBet ? `<span class="role-badge bet" title="Skull-Stripped Brain Extracted Volume (FSL BET)">BET</span>` : ""}
+            ${isDkt ? `<span class="role-badge dkt" title="Active DKT Anatomical Parcellation Atlas for Cursor Hover">DKT</span>` : ""}
+            <button class="role-badge ${isRef ? "ref" : "inactive"}" data-action="set-ref" data-id="${vol.id}" title="Set as Fixed Reference Volume">REF</button>
+            <button class="role-badge ${isMov ? "mov" : "inactive"}" data-action="set-mov" data-id="${vol.id}" title="Set as Moving Parent Volume">MOV</button>
+            <button class="role-badge ${isChild ? "child" : "inactive"}" data-action="toggle-child" data-id="${vol.id}" title="Link/Unlink as Child of Moving Volume (inherits Moving transforms automatically)">CHILD</button>
+            <button class="icon-btn ${isSolo ? "solo-active" : ""}" data-action="solo" data-id="${vol.id}" title="Solo this volume">S</button>
+            ${canConvert ? `<button class="icon-btn" data-action="convert-to-drawing" data-id="${vol.id}" title="Convert / duplicate this mask or volume into an editable Drawing Layer">✎</button>` : ""}
+            <button class="icon-btn" data-action="quick-export" data-id="${vol.id}" title="Export this volume as coregistered NIfTI">⬇</button>
+            <button class="icon-btn" data-action="remove" data-id="${vol.id}" title="Remove volume">✕</button>
+          </div>
+        </div>
+
+        <div class="layer-controls-grid">
+          <div class="control-pair">
+            <span>α</span>
+            <input type="range" min="0" max="100" value="${currentOpacityPct}" data-action="opacity" data-id="${vol.id}" title="Adjust Volume Opacity" />
+            <span class="opacity-pct">${currentOpacityPct}%</span>
+          </div>
+          <select class="select-compact" data-action="colormap" data-id="${vol.id}" title="Volume Colormap">
+            ${COLORMAPS.map((cm) => `<option value="${cm}" ${vol.colormap === cm ? "selected" : ""}>${cm}</option>`).join("")}
+          </select>
+        </div>
+
+        <div class="layer-window-row">
+          <span>Window:</span>
+          <input type="number" class="window-input" step="any" value="${calMin}" data-action="cal-min" data-id="${vol.id}" title="Intensity Min (cal_min)" />
+          <span>–</span>
+          <input type="number" class="window-input" step="any" value="${calMax}" data-action="cal-max" data-id="${vol.id}" title="Intensity Max (cal_max)" />
+          <button class="btn-xs" data-action="auto-window" data-id="${vol.id}" title="Reset intensity window to robust min/max">Auto</button>
+          <span style="margin-left:auto;color:var(--text-muted);font-family:var(--font-mono);font-size:10px;">
+            ${dims[1]}×${dims[2]}×${dims[3]}
+          </span>
+        </div>
+      `;
+    }
 
     listEl.appendChild(card);
   });
@@ -784,6 +877,9 @@ function renderLayerList() {
   syncCoregVolumeSelectors();
   renderChildAndExportLists();
   syncDktOverlayControlsUI();
+  if (typeof renderDrawingStudioUI === "function") {
+    renderDrawingStudioUI();
+  }
 }
 
 // Populate the Reference & Moving dropdowns in the right-hand Coregistration Studio
@@ -794,7 +890,7 @@ function syncCoregVolumeSelectors() {
 
   const realVolumes = state.nv.volumes.filter((v) => {
     const m = state.layerMeta.get(v.id);
-    return m && !m.isSyntheticVerification;
+    return m && !m.isSyntheticVerification && !m.isDrawingLayer;
   });
 
   if (realVolumes.length > 0 && !realVolumes.some((v) => v.id === state.refVolId)) {
@@ -840,7 +936,7 @@ function syncNeuroT1Selector() {
   const selectIds = ["selectBetT1Vol", "selectDktT1Vol", "selectNeuroT1Vol"];
   const candidateVols = state.nv.volumes.filter((v) => {
     const m = state.layerMeta.get(v.id);
-    return m && !m.isSyntheticVerification && !m.isDktAtlas && !m.isMask;
+    return m && !m.isSyntheticVerification && !m.isDktAtlas && !m.isMask && !m.isDrawingLayer;
   });
 
   const t1Match = candidateVols.find(
@@ -876,7 +972,7 @@ function renderChildAndExportLists() {
 
   const candidateChildren = state.nv.volumes.filter((v) => {
     const m = state.layerMeta.get(v.id);
-    return m && !m.isSyntheticVerification && v.id !== state.refVolId && v.id !== state.movVolId;
+    return m && !m.isSyntheticVerification && !m.isDrawingLayer && v.id !== state.refVolId && v.id !== state.movVolId;
   });
 
   if (childListEl) {
@@ -905,7 +1001,7 @@ function renderChildAndExportLists() {
   if (exportListEl) {
     const exportCandidates = state.nv.volumes.filter((v) => {
       const m = state.layerMeta.get(v.id);
-      return m && !m.isSyntheticVerification && v.id !== state.refVolId;
+      return m && !m.isSyntheticVerification && !m.isDrawingLayer && v.id !== state.refVolId;
     });
 
     if (exportCandidates.length === 0) {
@@ -2128,8 +2224,23 @@ async function loadLocalNiftiFiles(fileList) {
     return;
   }
 
-  for (const file of files) {
+  // Load anatomical volumes first so any accompanying .voi files snap onto the Reference grid
+  const orderedFiles = [
+    ...files.filter((f) => !f.name.toLowerCase().endsWith(".voi")),
+    ...files.filter((f) => f.name.toLowerCase().endsWith(".voi")),
+  ];
+
+  let importedVoiCount = 0;
+  for (const file of orderedFiles) {
     try {
+      if (file.name.toLowerCase().endsWith(".voi")) {
+        if (typeof importFileAsDrawingLayer === "function") {
+          const imported = await importFileAsDrawingLayer(file, { openStudio: true, quiet: true });
+          if (imported) importedVoiCount++;
+        }
+        continue;
+      }
+
       showToast(`Loading ${file.name}...`, 2000);
       const ab = await file.arrayBuffer();
       let rawBytes = new Uint8Array(ab);
@@ -2188,7 +2299,11 @@ async function loadLocalNiftiFiles(fileList) {
   state.nv.drawScene();
   renderLayerList();
   computeAndDisplayAlignmentMetrics(true);
-  showToast(`Loaded ${files.length} volume(s).`);
+  if (importedVoiCount > 0 && orderedFiles.length === importedVoiCount) {
+    showToast(`Imported ${importedVoiCount} .voi file(s) as editable Drawing Layer(s).`);
+  } else {
+    showToast(`Loaded ${orderedFiles.length} file(s).`);
+  }
 }
 
 async function loadSampleMultimodalSubject() {
@@ -2299,6 +2414,9 @@ function createNewPatientWorkspace(confirmIfLoaded = true, presetPatientId = nul
   state.baselineMetrics = null;
   state.savedTransforms = [];
   state.zoom2d.panCalib = null;
+  if (typeof resetDrawingWorkspace === "function") {
+    resetDrawingWorkspace();
+  }
 
   state.nv.updateGLVolume();
   state.nv.drawScene();
@@ -2353,7 +2471,7 @@ function buildProjectBundleData() {
 
   const realVolumes = state.nv.volumes.filter((v) => {
     const m = state.layerMeta.get(v.id);
-    return m && !m.isSyntheticVerification;
+    return m && !m.isSyntheticVerification && !m.isDrawingLayer;
   });
 
   const refIdx = getVolumeIndexById(state.refVolId);
@@ -2417,6 +2535,34 @@ function buildProjectBundleData() {
     };
   });
 
+  const usedDrawingNames = new Set();
+  const drawingEntries = (state.drawing?.layers || []).map((layer, idx) => {
+    const rawBase = (layer.name || `drawing_${idx + 1}`).replace(/[^a-zA-Z0-9._-]/g, "_");
+    let fileName = `${rawBase}.voi`;
+    let counter = 2;
+    while (usedDrawingNames.has(fileName)) {
+      fileName = `${rawBase}_${counter}.voi`;
+      counter++;
+    }
+    usedDrawingNames.add(fileName);
+    return {
+      layer,
+      entry: {
+        fileName,
+        id: layer.id,
+        name: layer.name,
+        mode: layer.mode,
+        colorHex: layer.colorHex,
+        opacity: layer.opacity,
+        visible: Boolean(layer.visible),
+        activeLabel: layer.activeLabel || 1,
+        labelPalette: Array.isArray(layer.labelPalette) ? layer.labelPalette.map((p) => ({ ...p })) : [],
+        dims: [...layer.dims],
+        affine: cloneMat4(layer.affine),
+      },
+    };
+  });
+
   const manifest = {
     schema: "neurocoreg-project-v1",
     savedAt: new Date().toISOString(),
@@ -2433,6 +2579,7 @@ function buildProjectBundleData() {
     activeMovingFlirtMatrix: flirtMat,
     savedTransforms: state.savedTransforms,
     volumes: volumeEntries.map((ve) => ve.entry),
+    drawingLayers: drawingEntries.map((de) => de.entry),
   };
 
   const transformFiles = [
@@ -2450,14 +2597,14 @@ function buildProjectBundleData() {
     })),
   ];
 
-  return { patientId, safePatient, manifest, volumeEntries, transformFiles };
+  return { patientId, safePatient, manifest, volumeEntries, drawingEntries, transformFiles };
 }
 
 // Save Project to a Folder of the User's Choice (returns true if saved, false if cancelled/failed)
 async function saveProjectToUserFolder() {
   if (!state.nv) return false;
-  const { patientId, safePatient, manifest, volumeEntries, transformFiles } = buildProjectBundleData();
-  if (volumeEntries.length === 0) {
+  const { patientId, safePatient, manifest, volumeEntries, drawingEntries, transformFiles } = buildProjectBundleData();
+  if (volumeEntries.length === 0 && drawingEntries.length === 0) {
     showToast("No volumes loaded in the workspace to save.");
     return false;
   }
@@ -2480,7 +2627,7 @@ async function saveProjectToUserFolder() {
 
       if (chosenDirHandle) {
         try {
-          showToast(`Saving workspace bundle (${volumeEntries.length} NIfTI volumes + transforms + project.json)...`, 0);
+          showToast(`Saving workspace bundle (${volumeEntries.length} NIfTI volumes, ${drawingEntries.length} VOI layers)...`, 0);
 
           // Create <patientId>_project subfolder unless the user already selected a folder named for this patient
           const dirName = chosenDirHandle.name || "";
@@ -2537,9 +2684,36 @@ async function saveProjectToUserFolder() {
             }
           }
 
+          // Write each drawing layer as MRIcroGL .voi under drawings/
+          if (drawingEntries.length > 0) {
+            const drawingsDirHandle = await projDirHandle.getDirectoryHandle("drawings", { create: true });
+            for (const { layer, entry } of drawingEntries) {
+              const resp = await fetch("/api/drawing-save", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  voxelsBase64: uint8ArrayToBase64(layer.voxels),
+                  dims: layer.dims,
+                  affine: layer.affine,
+                  format: "voi",
+                  fileName: entry.fileName,
+                  mode: "download",
+                }),
+              });
+              const data = await resp.json();
+              if (resp.ok && data.fileBase64) {
+                const voiBytes = base64ToUint8Array(data.fileBase64);
+                const voiHandle = await drawingsDirHandle.getFileHandle(entry.fileName, { create: true });
+                const voiWritable = await voiHandle.createWritable();
+                await voiWritable.write(voiBytes);
+                await voiWritable.close();
+              }
+            }
+          }
+
           setCoregStatus("Ready", false);
           showToast(
-            `Saved project "${projDirHandle.name}" (${volumeEntries.length} NIfTIs, ${transformFiles.length} .mat files, project.json)!`,
+            `Saved project "${projDirHandle.name}" (${volumeEntries.length} NIfTIs, ${drawingEntries.length} .voi layers, ${transformFiles.length} .mat files)!`,
             4500
           );
           return true;
@@ -2558,6 +2732,12 @@ async function saveProjectToUserFolder() {
       currentAffine: entry.currentAffine,
       rawBase64: meta?.rawBytes ? uint8ArrayToBase64(meta.rawBytes) : null,
     }));
+    const drawingsPayload = drawingEntries.map(({ layer, entry }) => ({
+      fileName: entry.fileName,
+      dims: layer.dims,
+      affine: layer.affine,
+      voxelsBase64: uint8ArrayToBase64(layer.voxels),
+    }));
 
     let resp = await fetch("/api/save-project", {
       method: "POST",
@@ -2566,6 +2746,7 @@ async function saveProjectToUserFolder() {
         patientId,
         manifest,
         volumes: volumesPayload,
+        drawingFiles: drawingsPayload,
         transformFiles,
       }),
     });
@@ -2593,6 +2774,7 @@ async function saveProjectToUserFolder() {
           patientId,
           manifest,
           volumes: volumesPayload,
+          drawingFiles: drawingsPayload,
           transformFiles,
         }),
       });
@@ -2667,7 +2849,7 @@ async function shutdownServerAndCloseTab() {
 }
 
 // Restore a saved project workspace given its parsed project.json manifest and a map of fileName -> Uint8Array
-async function restoreProjectWorkspace(manifest, niftiBytesByName) {
+async function restoreProjectWorkspace(manifest, niftiBytesByName, drawingBytesByName = new Map()) {
   setCoregStatus("Loading Project...", true);
   createNewPatientWorkspace(false, manifest.patientId || "sub-01");
 
@@ -2751,12 +2933,15 @@ async function restoreProjectWorkspace(manifest, niftiBytesByName) {
 
   state.nv.updateGLVolume();
   state.nv.drawScene();
+  if (typeof rehydrateRestoredDrawingLayers === "function" && Array.isArray(manifest.drawingLayers) && manifest.drawingLayers.length > 0) {
+    await rehydrateRestoredDrawingLayers(manifest.drawingLayers, drawingBytesByName);
+  }
   renderSavedTransformsDropdown();
   renderLayerList();
   computeAndDisplayAlignmentMetrics(true);
   setCoregStatus("Ready", false);
   showToast(
-    `Opened project for Patient "${manifest.patientId || "sub-01"}" (${state.nv.volumes.length} volumes restored)!`,
+    `Opened project for Patient "${manifest.patientId || "sub-01"}" (${state.nv.volumes.length} layers restored)!`,
     4200
   );
 }
@@ -2805,7 +2990,28 @@ async function openSavedProject() {
             }
           }
 
-          await restoreProjectWorkspace(manifest, niftiBytesByName);
+          const drawingBytesByName = new Map();
+          if (Array.isArray(manifest.drawingLayers) && manifest.drawingLayers.length > 0) {
+            let drawingsDirHandle = dirHandle;
+            try {
+              drawingsDirHandle = await dirHandle.getDirectoryHandle("drawings");
+            } catch (_) {
+              // Fallback to root dirHandle
+            }
+            for (const dEntry of manifest.drawingLayers) {
+              const dname = dEntry.fileName;
+              if (!dname) continue;
+              try {
+                const fh = await drawingsDirHandle.getFileHandle(dname);
+                const f = await fh.getFile();
+                drawingBytesByName.set(dname, new Uint8Array(await f.arrayBuffer()));
+              } catch (_) {
+                console.warn("Could not read drawing layer from project folder:", dname);
+              }
+            }
+          }
+
+          await restoreProjectWorkspace(manifest, niftiBytesByName, drawingBytesByName);
           return;
         } catch (fsReadErr) {
           console.warn("showDirectoryPicker read failed on selected folder, falling back to /api/open-project:", fsReadErr);
@@ -2851,7 +3057,13 @@ async function openSavedProject() {
           niftiBytesByName.set(v.fileName, base64ToUint8Array(v.niftiBase64));
         }
       }
-      await restoreProjectWorkspace(res.manifest, niftiBytesByName);
+      const drawingBytesByName = new Map();
+      for (const d of res.drawings || []) {
+        if (d.fileName && d.voiBase64) {
+          drawingBytesByName.set(d.fileName, base64ToUint8Array(d.voiBase64));
+        }
+      }
+      await restoreProjectWorkspace(res.manifest, niftiBytesByName, drawingBytesByName);
       return;
     }
 
@@ -2875,14 +3087,17 @@ async function loadProjectFromFileList(files) {
     }
     const manifest = JSON.parse(await projFile.text());
     const niftiBytesByName = new Map();
+    const drawingBytesByName = new Map();
 
     for (const f of files) {
-      if (f.name.endsWith(".nii.gz") || f.name.endsWith(".nii")) {
+      if (f.name.toLowerCase().endsWith(".voi")) {
+        drawingBytesByName.set(f.name, new Uint8Array(await f.arrayBuffer()));
+      } else if (f.name.endsWith(".nii.gz") || f.name.endsWith(".nii")) {
         niftiBytesByName.set(f.name, new Uint8Array(await f.arrayBuffer()));
       }
     }
 
-    await restoreProjectWorkspace(manifest, niftiBytesByName);
+    await restoreProjectWorkspace(manifest, niftiBytesByName, drawingBytesByName);
   } catch (err) {
     console.error("Failed to load project from folder:", err);
     setCoregStatus("Ready", false);
@@ -4045,8 +4260,8 @@ function handleCanvasMouseHover(e) {
   const dktVol = getDktVolume();
   if (!dktVol) return;
 
-  // Hide tooltip & suppress hover lookup while actively panning 2D slices
-  if (state.zoom2d.isDraggingPan) {
+  // Hide tooltip & suppress hover lookup while actively panning 2D slices or painting a stroke
+  if (state.zoom2d.isDraggingPan || state.drawing?.isStroking) {
     const tooltip = document.getElementById("dktHoverTooltip");
     if (tooltip) tooltip.hidden = true;
     return;
@@ -4127,6 +4342,29 @@ function updateCrosshairReadout(data) {
           </div>
         `;
       }
+      if (meta?.isDrawingLayer) {
+        const dLayer = state.drawing?.layers?.find((l) => l.id === meta.drawingLayerId);
+        const lid = Math.round(val);
+        let drawText = "0 (BG)";
+        let drawHex = "#94a3b8";
+        if (lid > 0 && dLayer) {
+          if (dLayer.mode === "multilabel") {
+            const p = dLayer.labelPalette?.[lid - 1];
+            drawText = p ? `#${lid} ${p.name}` : `Label #${lid}`;
+            drawHex = p?.hex || dLayer.colorHex;
+          } else {
+            drawText = `Inside (${lid})`;
+            drawHex = dLayer.colorHex;
+          }
+        }
+        return `
+          <div class="voxel-row">
+            <span class="voxel-name" title="${meta?.label || vol.name}">${meta?.label || vol.name}</span>
+            <span style="color:var(--text-muted);font-family:var(--font-mono);font-size:10px;">[${vox.join(",")}]</span>
+            <span class="voxel-val" style="color:${drawHex};">${drawText}</span>
+          </div>
+        `;
+      }
       return `
         <div class="voxel-row">
           <span class="voxel-name" title="${meta?.label || vol.name}">${meta?.label || vol.name}</span>
@@ -4193,7 +4431,12 @@ function getCanvasDevicePos(clientX, clientY) {
 function isPointInLtwh(x, y, ltwh) {
   if (!ltwh || ltwh.length < 4) return false;
   const [l, t, w, h] = ltwh;
-  return w > 0 && h > 0 && x >= l && x <= l + w && y >= t && y <= t + h;
+  if (!w || !h) return false;
+  const x0 = w < 0 ? l + w : l;
+  const y0 = h < 0 ? t + h : t;
+  const aw = Math.abs(w);
+  const ah = Math.abs(h);
+  return x >= x0 && x <= x0 + aw && y >= y0 && y <= y0 + ah;
 }
 
 function get2DSliceTileAtClientPos(clientX, clientY) {
@@ -4498,6 +4741,10 @@ function reset2DZoom() {
 
 function togglePan2dMode(forceState = null) {
   const nextActive = forceState !== null ? Boolean(forceState) : !state.zoom2d.panModeActive;
+  if (nextActive && state.drawing?.paintEnabled && typeof setDrawingPaintEnabled === "function") {
+    setDrawingPaintEnabled(false);
+    showToast("Paused Paint Mode while 2D Pan Mode is active.", 2200);
+  }
   state.zoom2d.panModeActive = nextActive;
 
   const panBtn = document.getElementById("btnTogglePan2dMode");
@@ -5105,6 +5352,2327 @@ function clampAllPopoutsToViewport() {
 }
 
 // ============================================================================
+// Phase 2: Drawing Layers, Assisted Segmentation & MRIcroGL .voi / NIfTI Export
+// ============================================================================
+const DRAW_COLOR_SWATCHES = [
+  "#f43f5e",
+  "#f59e0b",
+  "#10b981",
+  "#38bdf8",
+  "#a855f7",
+  "#ec4899",
+  "#eab308",
+  "#06b6d4",
+];
+
+const DEFAULT_MULTILABEL_PALETTE = [
+  { id: 1, name: "Lesion / SOZ", hex: "#f43f5e" },
+  { id: 2, name: "Resection Cavity", hex: "#10b981" },
+  { id: 3, name: "Eloquent Cortex", hex: "#38bdf8" },
+  { id: 4, name: "Perilesional Margin", hex: "#f59e0b" },
+  { id: 5, name: "Vascular Landmark", hex: "#a855f7" },
+  { id: 6, name: "Artifact / Exclude", hex: "#ec4899" },
+];
+
+const DRAW_TOOL_DEFS = [
+  { id: "pen", label: "Pen", key: "B", icon: "✏", title: "Freehand 2D/3D Brush (Shortcut: B)" },
+  { id: "filled_pen", label: "Filled", key: "F", icon: "⬟", title: "Closed-Contour Filled Pen (Shortcut: F)" },
+  { id: "eraser", label: "Eraser", key: "X", icon: "⌫", title: "Eraser (Shortcut: X, or Right-Click-Drag anytime)" },
+  { id: "flood_fill", label: "Bucket", key: "G", icon: "🪣", title: "2D Flood Fill inside closed contour/region (Shortcut: G)" },
+  { id: "region_grow", label: "Grow", key: "W", icon: "✦", title: "Intensity-Guided Region Grow click-to-segment (Shortcut: W)" },
+];
+
+function escapeDrawHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function hexToRgb(hex) {
+  const m = String(hex || "").trim().match(/^#?([0-9a-f]{6})$/i);
+  if (!m) return [244, 63, 94];
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function normalizeVolDims3(dims) {
+  if (!Array.isArray(dims)) return [1, 1, 1];
+  if (dims.length >= 4) return [Math.max(1, dims[1] | 0), Math.max(1, dims[2] | 0), Math.max(1, dims[3] | 0)];
+  if (dims.length >= 3) return [Math.max(1, dims[0] | 0), Math.max(1, dims[1] | 0), Math.max(1, dims[2] | 0)];
+  return [1, 1, 1];
+}
+
+function stripDrawingFilenameExt(name) {
+  return String(name || "drawing")
+    .replace(/\.(nii\.gz|nii|voi|mgz|mgh)$/i, "")
+    .trim() || "drawing";
+}
+
+function buildUint8Nifti1Bytes(nx, ny, nz, affine4x4, voxelsUint8 = null) {
+  const totalVoxels = Math.max(1, (nx | 0) * (ny | 0) * (nz | 0));
+  const buf = new ArrayBuffer(352 + totalVoxels);
+  const view = new DataView(buf);
+  const bytes = new Uint8Array(buf);
+  const aff = Array.isArray(affine4x4) && affine4x4.length >= 3 ? affine4x4 : identityMat4();
+
+  const vx = Math.hypot(aff[0][0] || 0, aff[1][0] || 0, aff[2][0] || 0) || 1;
+  const vy = Math.hypot(aff[0][1] || 0, aff[1][1] || 0, aff[2][1] || 0) || 1;
+  const vz = Math.hypot(aff[0][2] || 0, aff[1][2] || 0, aff[2][2] || 0) || 1;
+
+  view.setInt32(0, 348, true); // sizeof_hdr
+  view.setInt16(40, 3, true); // dim[0]
+  view.setInt16(42, nx | 0, true);
+  view.setInt16(44, ny | 0, true);
+  view.setInt16(46, nz | 0, true);
+  view.setInt16(48, 1, true);
+  view.setInt16(50, 1, true);
+  view.setInt16(52, 1, true);
+  view.setInt16(54, 1, true);
+
+  view.setInt16(70, 2, true); // DT_UINT8
+  view.setInt16(72, 8, true); // bitpix
+
+  view.setFloat32(76, 1.0, true); // pixdim[0]
+  view.setFloat32(80, vx, true);
+  view.setFloat32(84, vy, true);
+  view.setFloat32(88, vz, true);
+  view.setFloat32(92, 1.0, true);
+  view.setFloat32(96, 1.0, true);
+  view.setFloat32(100, 1.0, true);
+  view.setFloat32(104, 1.0, true);
+
+  view.setFloat32(108, 352.0, true); // vox_offset
+  view.setFloat32(112, 1.0, true); // scl_slope
+  view.setFloat32(116, 0.0, true); // scl_inter
+  bytes[123] = 2; // NIFTI_UNITS_MM
+
+  view.setInt16(252, 0, true); // qform_code
+  view.setInt16(254, 1, true); // sform_code
+  for (let c = 0; c < 4; c++) {
+    view.setFloat32(280 + c * 4, Number(aff[0][c]) || 0, true);
+    view.setFloat32(296 + c * 4, Number(aff[1][c]) || 0, true);
+    view.setFloat32(312 + c * 4, Number(aff[2][c]) || 0, true);
+  }
+  bytes[344] = 0x6e; // 'n'
+  bytes[345] = 0x2b; // '+'
+  bytes[346] = 0x31; // '1'
+  bytes[347] = 0x00; // '\0'
+
+  if (voxelsUint8 && voxelsUint8.length) {
+    const copyLen = Math.min(totalVoxels, voxelsUint8.length);
+    bytes.set(voxelsUint8.subarray(0, copyLen), 352);
+  }
+  return bytes;
+}
+
+function resolveSliceVoxelAxes(affine4x4, axCorSag) {
+  const aff = Array.isArray(affine4x4) && affine4x4.length >= 3 ? affine4x4 : identityMat4();
+  // Target world axis: Axial -> Z (2), Coronal -> Y (1), Sagittal -> X (0)
+  let targetWorldAxis = 2;
+  if (axCorSag === 1) targetWorldAxis = 1;
+  else if (axCorSag === 2) targetWorldAxis = 0;
+
+  let sliceAxis = 2;
+  let bestScore = -1;
+  for (let col = 0; col < 3; col++) {
+    const norm = Math.hypot(aff[0][col] || 0, aff[1][col] || 0, aff[2][col] || 0) || 1;
+    const score = Math.abs(aff[targetWorldAxis][col] || 0) / norm;
+    if (score > bestScore) {
+      bestScore = score;
+      sliceAxis = col;
+    }
+  }
+  const otherAxes = [0, 1, 2].filter((a) => a !== sliceAxis);
+  return { sliceAxis, uAxis: otherAxes[0], vAxis: otherAxes[1] };
+}
+
+function computeLayerStatsData(voxels, affine) {
+  const perLabelCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+  let voxelCount = 0;
+  if (voxels && voxels.length) {
+    for (let i = 0; i < voxels.length; i++) {
+      const v = voxels[i];
+      if (v > 0) {
+        voxelCount++;
+        if (v >= 1 && v <= 6) perLabelCounts[v]++;
+      }
+    }
+  }
+  const voxelMm3 = Math.abs(det3x3(affine || identityMat4())) || 1;
+  const volumeCc = (voxelCount * voxelMm3) / 1000.0;
+  return { voxelCount, volumeCc, voxelMm3, perLabelCounts };
+}
+
+function applySparseDiffToVoxels(voxels, changesInput, newVal = 1, overwrite = true) {
+  if (!voxels || !changesInput) return null;
+  const indices = [];
+  const prev = [];
+  const next = [];
+
+  const handleEntry = (idx, targetVal) => {
+    if (idx < 0 || idx >= voxels.length) return;
+    const oldVal = voxels[idx];
+    const clampedNext = Math.max(0, Math.min(255, targetVal | 0));
+    if (!overwrite && clampedNext !== 0 && oldVal !== 0) return;
+    if (oldVal === clampedNext) return;
+    indices.push(idx);
+    prev.push(oldVal);
+    next.push(clampedNext);
+    voxels[idx] = clampedNext;
+  };
+
+  if (changesInput instanceof Map) {
+    for (const [idx, val] of changesInput.entries()) {
+      handleEntry(idx | 0, val);
+    }
+  } else {
+    for (const idx of changesInput) {
+      handleEntry(idx | 0, newVal);
+    }
+  }
+
+  if (indices.length === 0) return null;
+  return {
+    indices: Uint32Array.from(indices),
+    prev: Uint8Array.from(prev),
+    next: Uint8Array.from(next),
+  };
+}
+
+function stampBrushSegmentVoxels(
+  voxels,
+  dims,
+  p0,
+  p1,
+  value,
+  brushSize,
+  brush3D,
+  sliceAxis,
+  overwrite,
+  diffMap
+) {
+  const [nx, ny, nz] = normalizeVolDims3(dims);
+  const val = Math.max(0, Math.min(255, value | 0));
+  const r = Math.max(0, Math.min(8, Math.round(brushSize || 1) - 1));
+  const r2 = r * r + 0.25;
+  const sliceStride = nx * ny;
+  const ax = sliceAxis === 0 || sliceAxis === 1 || sliceAxis === 2 ? sliceAxis : 2;
+
+  const dx = p1[0] - p0[0];
+  const dy = p1[1] - p0[1];
+  const dz = p1[2] - p0[2];
+  const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) * 2));
+
+  const ozMin = !brush3D && ax === 2 ? 0 : -r;
+  const ozMax = !brush3D && ax === 2 ? 0 : r;
+  const oyMin = !brush3D && ax === 1 ? 0 : -r;
+  const oyMax = !brush3D && ax === 1 ? 0 : r;
+  const oxMin = !brush3D && ax === 0 ? 0 : -r;
+  const oxMax = !brush3D && ax === 0 ? 0 : r;
+
+  for (let s = 0; s <= steps; s++) {
+    const t = s / steps;
+    const cx = Math.round(p0[0] + dx * t);
+    const cy = Math.round(p0[1] + dy * t);
+    const cz = Math.round(p0[2] + dz * t);
+
+    for (let oz = ozMin; oz <= ozMax; oz++) {
+      const z = cz + oz;
+      if (z < 0 || z >= nz) continue;
+      for (let oy = oyMin; oy <= oyMax; oy++) {
+        const y = cy + oy;
+        if (y < 0 || y >= ny) continue;
+        for (let ox = oxMin; ox <= oxMax; ox++) {
+          if (ox * ox + oy * oy + oz * oz > r2) continue;
+          const x = cx + ox;
+          if (x < 0 || x >= nx) continue;
+          const idx = z * sliceStride + y * nx + x;
+          if (!overwrite && val !== 0 && voxels[idx] !== 0) continue;
+          if (voxels[idx] !== val || diffMap.has(idx)) {
+            diffMap.set(idx, val);
+          }
+        }
+      }
+    }
+  }
+}
+
+function fillClosedPolygon2DOnSlice(
+  voxels,
+  dims,
+  contourVoxels,
+  sliceAxis,
+  sliceIdx,
+  uAxis,
+  vAxis,
+  value,
+  overwrite,
+  diffMap
+) {
+  if (!Array.isArray(contourVoxels) || contourVoxels.length === 0) return;
+  const dimArr = normalizeVolDims3(dims);
+  const [nx, ny, nz] = dimArr;
+  const sliceStride = nx * ny;
+  const strides = [1, nx, sliceStride];
+  const sIdx = Math.max(0, Math.min(dimArr[sliceAxis] - 1, Math.round(sliceIdx)));
+  const val = Math.max(0, Math.min(255, value | 0));
+  const nu = dimArr[uAxis];
+  const nv = dimArr[vAxis];
+
+  // Snap polygon vertices onto fixed sliceIdx and stamp closed perimeter
+  const snapped = contourVoxels.map((pt) => {
+    const copy = [Math.round(pt[0]), Math.round(pt[1]), Math.round(pt[2])];
+    copy[sliceAxis] = sIdx;
+    return copy;
+  });
+
+  for (let i = 0; i < snapped.length; i++) {
+    const pA = snapped[i];
+    const pB = snapped[(i + 1) % snapped.length];
+    stampBrushSegmentVoxels(voxels, [nx, ny, nz], pA, pB, val, 1, false, sliceAxis, overwrite, diffMap);
+  }
+  if (snapped.length < 3) return;
+
+  const poly = snapped.map((p) => [p[uAxis], p[vAxis]]);
+  let minV = nv;
+  let maxV = -1;
+  for (const [, py] of poly) {
+    if (py < minV) minV = py;
+    if (py > maxV) maxV = py;
+  }
+  minV = Math.max(0, Math.floor(minV));
+  maxV = Math.min(nv - 1, Math.ceil(maxV));
+
+  const baseOffset = sIdx * strides[sliceAxis];
+  const uStride = strides[uAxis];
+  const vStride = strides[vAxis];
+  const xs = [];
+
+  for (let v = minV; v <= maxV; v++) {
+    const scanY = v + 0.50013;
+    xs.length = 0;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i][0];
+      const yi = poly[i][1];
+      const xj = poly[j][0];
+      const yj = poly[j][1];
+      const intersects = (yi <= scanY && yj > scanY) || (yj <= scanY && yi > scanY);
+      if (intersects) {
+        const xHit = xi + ((scanY - yi) / (yj - yi)) * (xj - xi);
+        xs.push(xHit);
+      }
+    }
+    if (xs.length < 2) continue;
+    xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const uStart = Math.max(0, Math.ceil(xs[k] - 0.5));
+      const uEnd = Math.min(nu - 1, Math.floor(xs[k + 1] + 0.5));
+      for (let u = uStart; u <= uEnd; u++) {
+        const idx = baseOffset + u * uStride + v * vStride;
+        if (!overwrite && val !== 0 && voxels[idx] !== 0) continue;
+        if (voxels[idx] !== val) {
+          diffMap.set(idx, val);
+        }
+      }
+    }
+  }
+}
+
+function floodFill2DOnSlice(voxels, dims, seedVox, sliceAxis, uAxis, vAxis, fillValue, overwrite = true) {
+  const diffMap = new Map();
+  if (!voxels || !seedVox) return diffMap;
+  const dimArr = normalizeVolDims3(dims);
+  const [nx, ny] = dimArr;
+  const strides = [1, nx, nx * ny];
+
+  const sIdx = Math.max(0, Math.min(dimArr[sliceAxis] - 1, Math.round(seedVox[sliceAxis])));
+  const su = Math.round(seedVox[uAxis]);
+  const sv = Math.round(seedVox[vAxis]);
+  const nu = dimArr[uAxis];
+  const nv = dimArr[vAxis];
+  if (su < 0 || su >= nu || sv < 0 || sv >= nv) return diffMap;
+
+  const baseOffset = sIdx * strides[sliceAxis];
+  const uStride = strides[uAxis];
+  const vStride = strides[vAxis];
+  const val = Math.max(0, Math.min(255, fillValue | 0));
+
+  const startIdx = baseOffset + su * uStride + sv * vStride;
+  const targetVal = voxels[startIdx];
+  if (targetVal === val) return diffMap;
+  if (!overwrite && val !== 0 && targetVal !== 0) return diffMap;
+
+  const totalSlice = nu * nv;
+  const visited = new Uint8Array(totalSlice);
+  const queue = new Int32Array(totalSlice);
+  let qHead = 0;
+  let qTail = 0;
+
+  const startPos = sv * nu + su;
+  visited[startPos] = 1;
+  queue[qTail++] = startPos;
+
+  while (qHead < qTail) {
+    const pos = queue[qHead++];
+    const u = pos % nu;
+    const v = (pos - u) / nu;
+    const idx = baseOffset + u * uStride + v * vStride;
+    diffMap.set(idx, val);
+
+    if (u > 0) {
+      const nPos = pos - 1;
+      if (!visited[nPos] && voxels[idx - uStride] === targetVal) {
+        visited[nPos] = 1;
+        queue[qTail++] = nPos;
+      }
+    }
+    if (u + 1 < nu) {
+      const nPos = pos + 1;
+      if (!visited[nPos] && voxels[idx + uStride] === targetVal) {
+        visited[nPos] = 1;
+        queue[qTail++] = nPos;
+      }
+    }
+    if (v > 0) {
+      const nPos = pos - nu;
+      if (!visited[nPos] && voxels[idx - vStride] === targetVal) {
+        visited[nPos] = 1;
+        queue[qTail++] = nPos;
+      }
+    }
+    if (v + 1 < nv) {
+      const nPos = pos + nu;
+      if (!visited[nPos] && voxels[idx + vStride] === targetVal) {
+        visited[nPos] = 1;
+        queue[qTail++] = nPos;
+      }
+    }
+  }
+  return diffMap;
+}
+
+function clearSliceDiffOnVoxels(voxels, dims, sliceAxis, sliceIdx, targetLabel = 0) {
+  const diffMap = new Map();
+  if (!voxels) return diffMap;
+  const dimArr = normalizeVolDims3(dims);
+  const [nx] = dimArr;
+  const strides = [1, nx, nx * dimArr[1]];
+  const otherAxes = [0, 1, 2].filter((a) => a !== sliceAxis);
+  const uAxis = otherAxes[0];
+  const vAxis = otherAxes[1];
+  const sIdx = Math.max(0, Math.min(dimArr[sliceAxis] - 1, Math.round(sliceIdx)));
+  const nu = dimArr[uAxis];
+  const nv = dimArr[vAxis];
+  const baseOffset = sIdx * strides[sliceAxis];
+  const uStride = strides[uAxis];
+  const vStride = strides[vAxis];
+
+  for (let v = 0; v < nv; v++) {
+    const vBase = baseOffset + v * vStride;
+    for (let u = 0; u < nu; u++) {
+      const idx = vBase + u * uStride;
+      const cur = voxels[idx];
+      if (cur > 0 && (targetLabel === 0 || cur === targetLabel)) {
+        diffMap.set(idx, 0);
+      }
+    }
+  }
+  return diffMap;
+}
+
+function buildDrawingDiscreteColormap(layer) {
+  const R = new Array(256).fill(0);
+  const G = new Array(256).fill(0);
+  const B = new Array(256).fill(0);
+  const A = new Array(256).fill(0);
+  const I = new Array(256);
+
+  for (let i = 0; i < 256; i++) {
+    I[i] = i;
+  }
+
+  const baseRgb = hexToRgb(layer?.colorHex || "#f43f5e");
+  const palette = Array.isArray(layer?.labelPalette) && layer.labelPalette.length
+    ? layer.labelPalette
+    : DEFAULT_MULTILABEL_PALETTE;
+
+  // Bins 0..2 remain RGBA (0,0,0,0) as a transparent guard band for empty background voxels (f = 0).
+  if (layer?.mode === "multilabel") {
+    for (let k = 3; k < 256; k++) {
+      const fVal = 0.5 + 6.0 * (k / 255.0);
+      const lbl = Math.max(1, Math.min(6, Math.round(fVal)));
+      const entry = palette[(lbl - 1) % palette.length];
+      const [r, g, b] = hexToRgb(entry?.hex || layer.colorHex);
+      R[k] = r;
+      G[k] = g;
+      B[k] = b;
+      A[k] = 255;
+    }
+  } else {
+    for (let k = 3; k < 256; k++) {
+      R[k] = baseRgb[0];
+      G[k] = baseRgb[1];
+      B[k] = baseRgb[2];
+      A[k] = 255;
+    }
+  }
+  return { R, G, B, A, I, min: 0, max: 0 };
+}
+
+function applyDrawingLayerColormap(layer, vol) {
+  if (!layer || !vol) return;
+  const isMulti = layer.mode === "multilabel";
+  const calMin = 0.5;
+  const calMax = isMulti ? 6.5 : 1.5;
+  const globalMax = isMulti ? 6 : 1;
+
+  const cmapKey = `__draw_${layer.id}`;
+  const cmap = buildDrawingDiscreteColormap(layer);
+  if (state.nv && typeof state.nv.addColormap === "function") {
+    state.nv.addColormap(cmapKey, cmap);
+  }
+
+  vol.colormapLabel = null;
+  vol.colormapType = 0;
+  vol.colorbarVisible = false;
+  if (vol.hdr) {
+    vol.hdr.cal_min = calMin;
+    vol.hdr.cal_max = calMax;
+  }
+  vol.trustCalMinMax = true;
+  vol.colormap = cmapKey;
+
+  // Re-assert display window after setColormap()'s internal calMinMax() recalculation.
+  vol.cal_min = calMin;
+  vol.cal_max = calMax;
+  vol.robust_min = calMin;
+  vol.robust_max = calMax;
+  vol.global_min = 0;
+  vol.global_max = globalMax;
+}
+
+function getDrawingLayerById(layerId) {
+  return state.drawing.layers.find((l) => l.id === layerId) || null;
+}
+
+function getActiveDrawingLayer() {
+  return getDrawingLayerById(state.drawing.activeLayerId) || null;
+}
+
+function getBaseDrawingReferenceVolume() {
+  if (!state.nv || !state.nv.volumes?.length) return null;
+  const refIdx = getVolumeIndexById(state.refVolId);
+  if (refIdx >= 0) {
+    const rv = state.nv.volumes[refIdx];
+    const rm = state.layerMeta.get(rv.id);
+    if (rm && !rm.isDrawingLayer && !rm.isSyntheticVerification) return rv;
+  }
+  return (
+    state.nv.volumes.find((v) => {
+      const m = state.layerMeta.get(v.id);
+      return m && !m.isDrawingLayer && !m.isSyntheticVerification;
+    }) || null
+  );
+}
+
+function refreshDrawingStats(layer) {
+  if (!layer) return;
+  const stats = computeLayerStatsData(layer.voxels, layer.affine);
+  layer.voxelCount = stats.voxelCount;
+  layer.volumeCc = stats.volumeCc;
+  layer.perLabelCounts = stats.perLabelCounts;
+  layer.voxelMm3 = stats.voxelMm3;
+}
+
+function commitDrawingLayerToGL(layer, skipRenderList = false) {
+  if (!layer || !state.nv) return;
+  const volIdx = getVolumeIndexById(layer.volId);
+  if (volIdx >= 0) {
+    const vol = state.nv.volumes[volIdx];
+    if (vol.img && vol.img.length === layer.voxels.length) {
+      vol.img.set(layer.voxels);
+    }
+    applyDrawingLayerColormap(layer, vol);
+    if (typeof vol.calculateRAS === "function") {
+      vol.calculateRAS();
+    }
+  }
+  refreshDrawingStats(layer);
+  state.nv.updateGLVolume();
+  state.nv.drawScene();
+  syncDrawActiveBanner();
+  if (!skipRenderList) {
+    renderLayerList();
+  } else {
+    renderDrawingStudioUI();
+  }
+}
+
+function applyDiffDirectionToLayer(layer, entry, isUndo) {
+  if (!layer || !entry || !layer.voxels) return;
+  const srcArr = isUndo ? entry.prev : entry.next;
+  for (let i = 0; i < entry.indices.length; i++) {
+    layer.voxels[entry.indices[i]] = srcArr[i];
+  }
+}
+
+function undoDrawingLayer(layer = null) {
+  const target = layer || getActiveDrawingLayer();
+  if (!target || !target.undoStack?.length) {
+    showToast("Nothing to undo on active drawing layer.", 1800);
+    return false;
+  }
+  const entry = target.undoStack.pop();
+  applyDiffDirectionToLayer(target, entry, true);
+  target.redoStack.push(entry);
+  commitDrawingLayerToGL(target);
+  showToast(`Undid ${entry.indices.length} voxel change(s).`, 1500);
+  return true;
+}
+
+function redoDrawingLayer(layer = null) {
+  const target = layer || getActiveDrawingLayer();
+  if (!target || !target.redoStack?.length) {
+    showToast("Nothing to redo on active drawing layer.", 1800);
+    return false;
+  }
+  const entry = target.redoStack.pop();
+  applyDiffDirectionToLayer(target, entry, false);
+  target.undoStack.push(entry);
+  commitDrawingLayerToGL(target);
+  showToast(`Redid ${entry.indices.length} voxel change(s).`, 1500);
+  return true;
+}
+
+function getActivePenValueForLayer(layer) {
+  if (!layer) return 1;
+  if (state.drawing.tool === "eraser") return 0;
+  if (layer.mode === "multilabel") return Math.max(1, Math.min(6, layer.activeLabel || 1));
+  return 1;
+}
+
+async function createDrawingLayer(options = {}) {
+  if (!state.nv) return null;
+  const baseVol = getBaseDrawingReferenceVolume();
+  let nx, ny, nz, affine;
+
+  if (options.explicitDims && options.explicitAffine) {
+    [nx, ny, nz] = normalizeVolDims3(options.explicitDims);
+    affine = cloneMat4(options.explicitAffine);
+  } else if (baseVol) {
+    [nx, ny, nz] = normalizeVolDims3(getVolDims(baseVol));
+    affine = cloneMat4(baseVol.hdr.affine);
+  } else {
+    showToast("Load an anatomical NIfTI/DICOM volume first to create a drawing layer.", 3200);
+    return null;
+  }
+
+  const totalVox = nx * ny * nz;
+  const voxels =
+    options.voxels instanceof Uint8Array && options.voxels.length === totalVox
+      ? options.voxels
+      : new Uint8Array(totalVox);
+
+  const counter = state.drawing.nextLayerCounter++;
+  const colorHex =
+    options.colorHex || DRAW_COLOR_SWATCHES[(counter - 1) % DRAW_COLOR_SWATCHES.length];
+  const layerName = (options.name || `VOI_${counter}`).trim() || `VOI_${counter}`;
+  const mode = options.mode === "multilabel" ? "multilabel" : "binary";
+  const opacity = Number.isFinite(Number(options.opacity)) ? Math.max(0, Math.min(1, Number(options.opacity))) : 0.72;
+  const visible = options.visible !== undefined ? Boolean(options.visible) : true;
+  const labelPalette = Array.isArray(options.labelPalette) && options.labelPalette.length === 6
+    ? options.labelPalette.map((p, idx) => ({
+        id: idx + 1,
+        name: String(p?.name || `ROI ${idx + 1}`),
+        hex: p?.hex || DEFAULT_MULTILABEL_PALETTE[idx].hex,
+      }))
+    : DEFAULT_MULTILABEL_PALETTE.map((p) => ({ ...p }));
+
+  const safeFileStem = layerName.replace(/[^a-zA-Z0-9._-]/g, "_") || `VOI_${counter}`;
+  const niftiBytes = buildUint8Nifti1Bytes(nx, ny, nz, affine, voxels);
+  const vol = await loadNVImageFromBytes(niftiBytes, {
+    name: `${safeFileStem}.nii`,
+    opacity: visible ? opacity : 0.0,
+    cal_min: 0.5,
+    cal_max: mode === "multilabel" ? 6.5 : 1.5,
+    colorbarVisible: false,
+  });
+
+  if (vol.hdr) {
+    vol.hdr.affine = cloneMat4(affine);
+    vol.hdr.sform_code = 1;
+  }
+
+  const layer = {
+    id: options.id || `draw_${Date.now()}_${counter}`,
+    volId: vol.id,
+    name: layerName,
+    mode,
+    colorHex,
+    activeLabel: Math.max(1, Math.min(6, Number(options.activeLabel) || 1)),
+    labelPalette,
+    visible,
+    opacity,
+    dims: [nx, ny, nz],
+    affine,
+    voxels,
+    undoStack: [],
+    redoStack: [],
+    voxelCount: 0,
+    volumeCc: 0,
+    voxelMm3: 1,
+    perLabelCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+  };
+
+  applyDrawingLayerColormap(layer, vol);
+  state.nv.addVolume(vol);
+  registerVolumeMeta(vol, {
+    label: layerName,
+    modality: "Drawing VOI",
+    opacity: visible ? opacity : 0.0,
+    visible,
+    isMask: true,
+    isDktAtlas: false,
+    isDrawingLayer: true,
+    drawingLayerId: layer.id,
+  });
+  const volMeta = state.layerMeta.get(vol.id);
+  if (volMeta) {
+    volMeta.savedOpacity = opacity;
+    volMeta.visible = visible;
+  }
+
+  refreshDrawingStats(layer);
+  state.drawing.layers.push(layer);
+  state.drawing.activeLayerId = layer.id;
+
+  if (typeof vol.calculateRAS === "function") {
+    vol.calculateRAS();
+  }
+  state.nv.updateGLVolume();
+  state.nv.drawScene();
+  renderLayerList();
+  syncDrawHeaderButton();
+  syncDrawActiveBanner();
+  return layer;
+}
+
+function selectActiveDrawingLayer(layerId) {
+  const layer = getDrawingLayerById(layerId);
+  if (!layer) return;
+  state.drawing.activeLayerId = layer.id;
+  syncDrawActiveBanner();
+  renderLayerList();
+}
+
+function deleteDrawingLayer(layerId) {
+  const idxInDraw = state.drawing.layers.findIndex((l) => l.id === layerId);
+  if (idxInDraw < 0) return;
+  const layer = state.drawing.layers[idxInDraw];
+  state.drawing.layers.splice(idxInDraw, 1);
+
+  const volIdx = getVolumeIndexById(layer.volId);
+  if (volIdx >= 0) {
+    state.nv.removeVolumeByIndex(volIdx);
+    state.layerMeta.delete(layer.volId);
+  }
+
+  if (state.drawing.activeLayerId === layerId) {
+    const next = state.drawing.layers[Math.min(idxInDraw, state.drawing.layers.length - 1)] || null;
+    state.drawing.activeLayerId = next ? next.id : null;
+  }
+  if (state.drawing.layers.length === 0 && state.drawing.paintEnabled) {
+    setDrawingPaintEnabled(false);
+  }
+
+  state.nv.updateGLVolume();
+  state.nv.drawScene();
+  renderLayerList();
+  syncDrawHeaderButton();
+  syncDrawActiveBanner();
+}
+
+function setDrawingLayerVisibility(layerId, visible) {
+  const layer = getDrawingLayerById(layerId);
+  if (!layer) return;
+  layer.visible = Boolean(visible);
+  const volIdx = getVolumeIndexById(layer.volId);
+  if (volIdx >= 0) {
+    const meta = state.layerMeta.get(layer.volId);
+    if (meta) meta.visible = layer.visible;
+    state.nv.setOpacity(volIdx, layer.visible ? layer.opacity : 0.0);
+    state.nv.drawScene();
+  }
+  renderLayerList();
+}
+
+function setDrawingLayerOpacity(layerId, opacity) {
+  const layer = getDrawingLayerById(layerId);
+  if (!layer) return;
+  const clamped = Math.max(0, Math.min(1, Number(opacity)));
+  layer.opacity = clamped;
+  layer.visible = clamped > 0;
+  const volIdx = getVolumeIndexById(layer.volId);
+  if (volIdx >= 0) {
+    const meta = state.layerMeta.get(layer.volId);
+    if (meta) {
+      meta.visible = clamped > 0;
+      if (clamped > 0) meta.savedOpacity = clamped;
+    }
+    state.nv.setOpacity(volIdx, clamped);
+    state.nv.drawScene();
+  }
+  renderLayerList();
+}
+
+function renameDrawingLayer(layerId, newName) {
+  const layer = getDrawingLayerById(layerId);
+  if (!layer) return;
+  const clean = String(newName || "").trim() || layer.name;
+  layer.name = clean;
+  const volIdx = getVolumeIndexById(layer.volId);
+  if (volIdx >= 0) {
+    const vol = state.nv.volumes[volIdx];
+    const meta = state.layerMeta.get(layer.volId);
+    vol.name = `${clean.replace(/[^a-zA-Z0-9._-]/g, "_")}.nii`;
+    if (meta) meta.label = clean;
+  }
+  syncDrawActiveBanner();
+  renderLayerList();
+}
+
+function setDrawingLayerColor(layerId, hex) {
+  const layer = getDrawingLayerById(layerId);
+  if (!layer) return;
+  layer.colorHex = hex;
+  const volIdx = getVolumeIndexById(layer.volId);
+  if (volIdx >= 0) {
+    applyDrawingLayerColormap(layer, state.nv.volumes[volIdx]);
+    state.nv.updateGLVolume();
+    state.nv.drawScene();
+  }
+  syncDrawActiveBanner();
+  renderLayerList();
+}
+
+function setDrawingLayerMode(layerId, mode) {
+  const layer = getDrawingLayerById(layerId);
+  if (!layer) return;
+  layer.mode = mode === "multilabel" ? "multilabel" : "binary";
+  const volIdx = getVolumeIndexById(layer.volId);
+  if (volIdx >= 0) {
+    applyDrawingLayerColormap(layer, state.nv.volumes[volIdx]);
+    state.nv.updateGLVolume();
+    state.nv.drawScene();
+  }
+  syncDrawActiveBanner();
+  renderLayerList();
+}
+
+function clearSliceOnActiveDrawingLayer() {
+  const layer = getActiveDrawingLayer();
+  if (!layer) return;
+  const invAff = invertMat4(layer.affine);
+  const vox = applyMat4Pt(invAff, state.lastCrosshairRAS || [0, 0, 0]);
+  const ax = state.drawing.lastSliceAxis;
+  const sIdx = Math.max(0, Math.min(layer.dims[ax] - 1, Math.round(vox[ax])));
+  const diffMap = clearSliceDiffOnVoxels(layer.voxels, layer.dims, ax, sIdx, 0);
+  const entry = applySparseDiffToVoxels(layer.voxels, diffMap, 0, true);
+  if (!entry) {
+    showToast("Current slice is already empty.", 1800);
+    return;
+  }
+  layer.undoStack.push(entry);
+  if (layer.undoStack.length > 30) layer.undoStack.shift();
+  layer.redoStack = [];
+  commitDrawingLayerToGL(layer);
+  showToast(`Cleared ${entry.indices.length} voxel(s) on slice ${sIdx}.`, 1800);
+}
+
+function clearActiveDrawingLayer() {
+  const layer = getActiveDrawingLayer();
+  if (!layer) return;
+  const diffMap = new Map();
+  for (let i = 0; i < layer.voxels.length; i++) {
+    if (layer.voxels[i] > 0) diffMap.set(i, 0);
+  }
+  const entry = applySparseDiffToVoxels(layer.voxels, diffMap, 0, true);
+  if (!entry) {
+    showToast("Layer is already empty.", 1800);
+    return;
+  }
+  layer.undoStack.push(entry);
+  if (layer.undoStack.length > 30) layer.undoStack.shift();
+  layer.redoStack = [];
+  commitDrawingLayerToGL(layer);
+  showToast(`Cleared entire layer "${layer.name}" (${entry.indices.length} voxels).`, 2000);
+}
+
+function resetDrawingWorkspace() {
+  state.drawing.paintEnabled = false;
+  state.drawing.isStroking = false;
+  state.drawing.layers = [];
+  state.drawing.activeLayerId = null;
+  state.drawing.nextLayerCounter = 1;
+  state.drawing.regionGrow.sourceVolId = null;
+
+  const nvCanvas = document.getElementById("niivueCanvas");
+  nvCanvas?.classList.remove("draw-mode-active", "draw-brush-hover");
+  clearStrokeOverlayCanvas();
+  syncDrawHeaderButton();
+  syncDrawActiveBanner();
+  renderDrawingStudioUI();
+}
+
+function pushUpdatedVoxelsAsUndo(layer, nextVoxels) {
+  const diffMap = new Map();
+  for (let i = 0; i < layer.voxels.length; i++) {
+    if (layer.voxels[i] !== nextVoxels[i]) {
+      diffMap.set(i, nextVoxels[i]);
+    }
+  }
+  const entry = applySparseDiffToVoxels(layer.voxels, diffMap, 0, true);
+  if (!entry) return null;
+  layer.undoStack.push(entry);
+  if (layer.undoStack.length > 30) layer.undoStack.shift();
+  layer.redoStack = [];
+  commitDrawingLayerToGL(layer);
+  return entry;
+}
+
+async function runDrawingMorphOp(op, extraParams = {}) {
+  const layer = getActiveDrawingLayer();
+  if (!layer) {
+    showToast("Select or create a drawing layer first.", 2200);
+    return;
+  }
+  try {
+    setCoregStatus(`Running ${op.replace(/_/g, " ")}...`, true);
+    const targetLabel =
+      op === "interpolate_slices" || op === "fill_holes" || op === "largest_island" || op === "dilate" || op === "erode"
+        ? layer.mode === "multilabel"
+          ? 0
+          : 1
+        : Math.max(1, getActivePenValueForLayer(layer));
+
+    const resp = await fetch("/api/drawing-morph", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        op,
+        voxelsBase64: uint8ArrayToBase64(layer.voxels),
+        dims: layer.dims,
+        affine: layer.affine,
+        targetLabel,
+        overwrite: state.drawing.overwriteLabels,
+        axis: state.drawing.interpAxis,
+        ...extraParams,
+      }),
+    });
+    const res = await resp.json();
+    if (!resp.ok || !res.voxelsBase64) {
+      throw new Error(res.error || "Morphological operation failed");
+    }
+    const nextBytes = base64ToUint8Array(res.voxelsBase64);
+    pushUpdatedVoxelsAsUndo(layer, nextBytes);
+    setCoregStatus("Ready", false);
+    showToast(res.message || `Applied ${op} cleanly.`, 2600);
+  } catch (err) {
+    console.error("Drawing morph error:", err);
+    setCoregStatus("Ready", false);
+    showToast(`Drawing tool error: ${err.message}`, 3600);
+  }
+}
+
+async function runBackendRegionGrow(layer, seedVoxel, sliceAxis) {
+  if (!layer || !state.nv) return;
+  const candidateId = state.drawing.regionGrow.sourceVolId || state.refVolId;
+  let srcVol = candidateId && getVolumeIndexById(candidateId) >= 0 ? state.nv.volumes[getVolumeIndexById(candidateId)] : getBaseDrawingReferenceVolume();
+  if (!srcVol) {
+    showToast("No anatomical source volume available for Region Growing.", 2600);
+    return;
+  }
+  const srcMeta = state.layerMeta.get(srcVol.id);
+  let srcBytes = srcMeta?.rawBytes || null;
+  if (!srcBytes && srcVol.img) {
+    const sDims = normalizeVolDims3(getVolDims(srcVol));
+    srcBytes = buildUint8Nifti1Bytes(sDims[0], sDims[1], sDims[2], srcVol.hdr.affine, new Uint8Array(srcVol.img));
+  }
+  if (!srcBytes) {
+    showToast("Selected source volume cannot be read for Region Growing.", 2600);
+    return;
+  }
+  const penVal = getActivePenValueForLayer(layer) || 1;
+  await runDrawingMorphOp("region_grow", {
+    targetLabel: penVal,
+    seedVoxel: seedVoxel.map((v) => Math.round(v)),
+    sliceAxis,
+    scope: state.drawing.regionGrow.scope,
+    tolerancePct: state.drawing.regionGrow.tolerancePct,
+    maxRadiusMm: state.drawing.regionGrow.maxRadiusMm,
+    sourceName: srcVol.name || "source.nii.gz",
+    sourceBase64: uint8ArrayToBase64(srcBytes),
+    sourceAffine: srcVol.hdr?.affine || identityMat4(),
+  });
+}
+
+function buildDrawingLabelsExportMetadata(layer) {
+  if (!layer || layer.mode !== "multilabel") return null;
+  refreshDrawingStats(layer);
+  const labels = (layer.labelPalette || []).map((p, i) => {
+    const vox = layer.perLabelCounts?.[i + 1] || 0;
+    return {
+      id: i + 1,
+      name: p.name,
+      hex: p.hex,
+      voxelCount: vox,
+      volumeCc: Number(((vox * (layer.voxelMm3 || 1)) / 1000.0).toFixed(4)),
+    };
+  });
+  return {
+    layerName: layer.name,
+    mode: "multilabel",
+    dims: layer.dims,
+    labels,
+  };
+}
+
+function mergeVisibleDrawingLayersVoxels(layersList) {
+  const visibleLayers = (layersList || []).filter((l) => l && l.visible);
+  if (visibleLayers.length === 0) return null;
+  const first = visibleLayers[0];
+  const merged = new Uint8Array(first.voxels.length);
+  const labels = [];
+  let labelId = 1;
+  for (const layer of visibleLayers) {
+    if (layer.voxels.length !== merged.length) continue;
+    let count = 0;
+    for (let i = 0; i < merged.length; i++) {
+      if (layer.voxels[i] > 0) {
+        merged[i] = labelId;
+        count++;
+      }
+    }
+    labels.push({
+      id: labelId,
+      name: layer.name,
+      hex: layer.colorHex,
+      voxelCount: count,
+      volumeCc: Number(((count * (layer.voxelMm3 || 1)) / 1000.0).toFixed(4)),
+    });
+    labelId++;
+    if (labelId > 255) break;
+  }
+  return {
+    voxels: merged,
+    dims: [...first.dims],
+    affine: cloneMat4(first.affine),
+    labelsMetadata: {
+      layerName: "Merged_VOIs",
+      mode: "multilabel",
+      dims: [...first.dims],
+      labels,
+    },
+  };
+}
+
+async function performDrawingSaveRequest({
+  voxels,
+  dims,
+  affine,
+  format = "voi",
+  fileName = "drawing",
+  mode = "download",
+  labelsMetadata = null,
+}) {
+  const fmt = ["voi", "nii.gz", "nii"].includes(format) ? format : "voi";
+  const cleanStem = stripDrawingFilenameExt(fileName).replace(/[^a-zA-Z0-9._-]/g, "_") || "drawing_voi";
+  const suggestedName = `${cleanStem}.${fmt}`;
+
+  let fileHandle = null;
+  let pickerFailedNonAbort = false;
+  if (mode === "save_as" && typeof window.showSaveFilePicker === "function") {
+    try {
+      fileHandle = await window.showSaveFilePicker({ suggestedName });
+    } catch (err) {
+      if (err && err.name === "AbortError") {
+        showToast("Save cancelled.", 1800);
+        return false;
+      }
+      fileHandle = null;
+      pickerFailedNonAbort = true;
+    }
+  }
+
+  const effectiveMode = fileHandle ? "download" : mode;
+  const resp = await fetch("/api/drawing-save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      voxelsBase64: uint8ArrayToBase64(voxels),
+      dims,
+      affine,
+      format: fmt,
+      fileName: cleanStem,
+      mode: effectiveMode,
+      labelsMetadata,
+    }),
+  });
+  const res = await resp.json();
+  if (!resp.ok) {
+    throw new Error(res.error || "Failed to export drawing layer");
+  }
+
+  if (fileHandle) {
+    const outBytes = base64ToUint8Array(res.fileBase64);
+    const writable = await fileHandle.createWritable();
+    await writable.write(outBytes);
+    await writable.close();
+    if (labelsMetadata) {
+      downloadTextFile(
+        `${stripDrawingFilenameExt(fileHandle.name || res.fileName)}_labels.json`,
+        JSON.stringify(labelsMetadata, null, 2)
+      );
+    }
+    showToast(`Saved ${fileHandle.name || res.fileName}!`, 3500);
+    return true;
+  }
+
+  if (res.cancelled) {
+    showToast("Save cancelled.", 1800);
+    return false;
+  }
+  if (res.saved) {
+    showToast(`Saved ${res.fileName} to ${res.savedPath}`, 4200);
+    return true;
+  }
+
+  const outBytes = base64ToUint8Array(res.fileBase64);
+  if (mode === "save_as" && !pickerFailedNonAbort && res.needsFallback && typeof window.showSaveFilePicker === "function") {
+    try {
+      const fh = await window.showSaveFilePicker({ suggestedName: res.fileName });
+      const writable = await fh.createWritable();
+      await writable.write(outBytes);
+      await writable.close();
+      if (labelsMetadata) {
+        downloadTextFile(
+          `${stripDrawingFilenameExt(fh.name || res.fileName)}_labels.json`,
+          JSON.stringify(labelsMetadata, null, 2)
+        );
+      }
+      showToast(`Saved ${fh.name || res.fileName}!`, 3500);
+      return true;
+    } catch (err) {
+      if (err && err.name === "AbortError") {
+        showToast("Save cancelled.", 1800);
+        return false;
+      }
+    }
+  }
+
+  downloadBlobBytes(res.fileName, outBytes);
+  if (labelsMetadata) {
+    downloadTextFile(`${stripDrawingFilenameExt(res.fileName)}_labels.json`, JSON.stringify(labelsMetadata, null, 2));
+  }
+  showToast(`Downloaded ${res.fileName}`, 3200);
+  return true;
+}
+
+async function exportDrawingLayer(layerId = null, mode = "download", formatOverride = null, fileStemOverride = null) {
+  const layer = layerId ? getDrawingLayerById(layerId) : getActiveDrawingLayer();
+  if (!layer) {
+    showToast("No drawing layer selected to save.", 2200);
+    return false;
+  }
+  const patientId = (document.getElementById("patientIdInput")?.value?.trim() || "sub-01").replace(/[^a-zA-Z0-9._-]/g, "_");
+  const safeLayer = layer.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const stem = (fileStemOverride || `${patientId}_${safeLayer}`).trim() || `${patientId}_VOI`;
+  const fmt = formatOverride || state.drawing.exportFormat || "voi";
+  const labelsMetadata = buildDrawingLabelsExportMetadata(layer);
+  try {
+    setCoregStatus("Exporting VOI...", true);
+    return await performDrawingSaveRequest({
+      voxels: layer.voxels,
+      dims: layer.dims,
+      affine: layer.affine,
+      format: fmt,
+      fileName: stem,
+      mode,
+      labelsMetadata,
+    });
+  } catch (err) {
+    console.error("Export drawing error:", err);
+    showToast(`Export error: ${err.message}`, 3600);
+    return false;
+  } finally {
+    setCoregStatus("Ready", false);
+  }
+}
+
+async function mergeAndExportVisibleDrawingLayers(mode = "save_as", formatOverride = null) {
+  const merged = mergeVisibleDrawingLayersVoxels(state.drawing.layers);
+  if (!merged) {
+    showToast("Turn ON visibility for at least one drawing layer to merge.", 2400);
+    return false;
+  }
+  const patientId = (document.getElementById("patientIdInput")?.value?.trim() || "sub-01").replace(/[^a-zA-Z0-9._-]/g, "_");
+  const fmt = formatOverride || state.drawing.exportFormat || "voi";
+  try {
+    setCoregStatus("Merging VOIs...", true);
+    return await performDrawingSaveRequest({
+      voxels: merged.voxels,
+      dims: merged.dims,
+      affine: merged.affine,
+      format: fmt,
+      fileName: `${patientId}_merged_VOIs`,
+      mode,
+      labelsMetadata: merged.labelsMetadata,
+    });
+  } catch (err) {
+    console.error("Merge drawing export error:", err);
+    showToast(`Merge export error: ${err.message}`, 3600);
+    return false;
+  } finally {
+    setCoregStatus("Ready", false);
+  }
+}
+
+async function importBytesAsDrawingLayer(rawBytes, fileName, options = {}) {
+  const baseVol = getBaseDrawingReferenceVolume();
+  const payload = {
+    sourceName: fileName,
+    sourceBase64: uint8ArrayToBase64(rawBytes),
+  };
+  if (baseVol && !options.useNativeGrid) {
+    payload.refDims = normalizeVolDims3(getVolDims(baseVol));
+    payload.refAffine = baseVol.hdr.affine;
+  }
+  if (options.sourceAffine) {
+    payload.sourceAffine = options.sourceAffine;
+  }
+  if (options.thresholdMin !== undefined && options.thresholdMin !== null) {
+    payload.thresholdMin = options.thresholdMin;
+  }
+
+  const resp = await fetch("/api/drawing-import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const res = await resp.json();
+  if (!resp.ok || !res.voxelsBase64) {
+    throw new Error(res.error || `Failed to import ${fileName}`);
+  }
+
+  const voxels = base64ToUint8Array(res.voxelsBase64);
+  const layer = await createDrawingLayer({
+    id: options.id,
+    name: options.name || stripDrawingFilenameExt(fileName),
+    mode: options.mode || res.suggestedMode || "binary",
+    colorHex: options.colorHex,
+    opacity: options.opacity,
+    visible: options.visible,
+    activeLabel: options.activeLabel,
+    labelPalette: options.labelPalette,
+    voxels,
+    explicitDims: res.dims,
+    explicitAffine: res.affine,
+  });
+
+  if (options.openStudio) {
+    openDrawingStudioPopout();
+  }
+  if (!options.quiet && layer) {
+    showToast(
+      `Imported "${layer.name}" (${layer.volumeCc.toFixed(2)} cm³${res.resampled ? ", nearest-neighbor resampled to Ref grid" : ""}).`,
+      3400
+    );
+  }
+  return layer;
+}
+
+async function importFileAsDrawingLayer(file, options = {}) {
+  if (!file) return null;
+  const ab = await file.arrayBuffer();
+  return importBytesAsDrawingLayer(new Uint8Array(ab), file.name, options);
+}
+
+async function convertVolumeToDrawingLayer(volId) {
+  const volIdx = getVolumeIndexById(volId);
+  if (volIdx < 0) return null;
+  const vol = state.nv.volumes[volIdx];
+  const meta = state.layerMeta.get(volId);
+  if (!vol || !meta || meta.isDrawingLayer) return null;
+
+  let rawBytes = meta.rawBytes || null;
+  if (!rawBytes && vol.img) {
+    const dims = normalizeVolDims3(getVolDims(vol));
+    rawBytes = buildUint8Nifti1Bytes(dims[0], dims[1], dims[2], vol.hdr.affine, new Uint8Array(vol.img));
+  }
+  if (!rawBytes) {
+    showToast("Unable to extract volume bytes to convert into a drawing layer.", 3000);
+    return null;
+  }
+
+  const thresholdMin = !meta.isMask
+    ? Number.isFinite(vol.cal_min) && vol.cal_min > 0
+      ? vol.cal_min
+      : Math.max(0.5, (vol.global_max || vol.cal_max || 1) * 0.4)
+    : null;
+
+  const layer = await importBytesAsDrawingLayer(rawBytes, `${meta.label || vol.name}.nii.gz`, {
+    name: `${meta.label || stripDrawingFilenameExt(vol.name)}_ROI`,
+    sourceAffine: vol.hdr?.affine || identityMat4(),
+    thresholdMin,
+    openStudio: true,
+    quiet: true,
+  });
+  if (layer) {
+    showToast(
+      `Converted "${meta.label}" into editable Drawing Layer "${layer.name}" (${layer.volumeCc.toFixed(2)} cm³).`,
+      3400
+    );
+  }
+  return layer;
+}
+
+async function rehydrateRestoredDrawingLayers(manifestEntries, drawingBytesByName) {
+  if (!Array.isArray(manifestEntries) || manifestEntries.length === 0) return;
+  for (const dEntry of manifestEntries) {
+    const rawBytes = drawingBytesByName?.get(dEntry.fileName) || null;
+    if (!rawBytes) continue;
+    try {
+      await importBytesAsDrawingLayer(rawBytes, dEntry.fileName, {
+        id: dEntry.id,
+        name: dEntry.name || stripDrawingFilenameExt(dEntry.fileName),
+        mode: dEntry.mode || "binary",
+        colorHex: dEntry.colorHex,
+        opacity: dEntry.opacity,
+        visible: dEntry.visible,
+        activeLabel: dEntry.activeLabel,
+        labelPalette: dEntry.labelPalette,
+        quiet: true,
+      });
+    } catch (err) {
+      console.warn("Failed to restore drawing layer:", dEntry.fileName, err);
+    }
+  }
+}
+
+// ============================================================================
+// Drawing Studio Pop-Out UI, Banner, Keyboard Shortcuts & Brush Overlay Canvas
+// ============================================================================
+function syncDrawHeaderButton() {
+  const btn = document.getElementById("btnToggleDrawStudio");
+  if (!btn) return;
+  const popOpen = Boolean(state.drawing.popout && state.drawing.popout.isOpen());
+  btn.classList.toggle("active", popOpen);
+  btn.classList.toggle("paint-on", state.drawing.paintEnabled);
+  btn.setAttribute("aria-expanded", String(popOpen));
+}
+
+function syncDrawActiveBanner() {
+  const banner = document.getElementById("drawActiveBanner");
+  if (!banner) return;
+  const activeLayer = getActiveDrawingLayer();
+  if (!state.drawing.paintEnabled || !activeLayer) {
+    banner.hidden = true;
+    return;
+  }
+  banner.hidden = false;
+  const dot = document.getElementById("drawBannerDot");
+  const text = document.getElementById("drawBannerText");
+  let dotHex = activeLayer.colorHex || "#f43f5e";
+  if (activeLayer.mode === "multilabel") {
+    dotHex = activeLayer.labelPalette?.[activeLayer.activeLabel - 1]?.hex || dotHex;
+  }
+  if (dot) dot.style.background = dotHex;
+  const toolDef = DRAW_TOOL_DEFS.find((t) => t.id === state.drawing.tool) || DRAW_TOOL_DEFS[0];
+  if (text) {
+    text.textContent = `Paint: ${activeLayer.name} • ${toolDef.label} (${state.drawing.brushRadius}px ${
+      state.drawing.brush3D ? "3D" : "2D"
+    })`;
+  }
+}
+
+async function setDrawingPaintEnabled(forceState = null) {
+  const next = forceState !== null ? Boolean(forceState) : !state.drawing.paintEnabled;
+  if (next) {
+    if (state.drawing.layers.length === 0) {
+      const created = await createDrawingLayer();
+      if (!created) return false;
+    }
+    if (state.zoom2d.panModeActive) {
+      togglePan2dMode(false);
+    }
+    state.drawing.paintEnabled = true;
+  } else {
+    state.drawing.paintEnabled = false;
+    state.drawing.isStroking = false;
+    clearStrokeOverlayCanvas();
+  }
+
+  const nvCanvas = document.getElementById("niivueCanvas");
+  if (nvCanvas) {
+    nvCanvas.classList.toggle("draw-mode-active", state.drawing.paintEnabled);
+    if (!state.drawing.paintEnabled) nvCanvas.classList.remove("draw-brush-hover");
+  }
+  syncDrawHeaderButton();
+  syncDrawActiveBanner();
+  renderDrawingStudioUI();
+  return state.drawing.paintEnabled;
+}
+
+function renderDrawingStudioUI() {
+  const pop = state.drawing.popout;
+  if (!pop || !pop.bodyEl) return;
+  const container = pop.bodyEl;
+  const activeLayer = getActiveDrawingLayer();
+  const baseVol = getBaseDrawingReferenceVolume();
+  const baseDims = baseVol ? normalizeVolDims3(getVolDims(baseVol)) : null;
+  const baseLabel = baseVol ? state.layerMeta.get(baseVol.id)?.label || baseVol.name : "None loaded";
+
+  const patientId = (document.getElementById("patientIdInput")?.value?.trim() || "sub-01").replace(/[^a-zA-Z0-9._-]/g, "_");
+  const defaultStem = activeLayer
+    ? `${patientId}_${activeLayer.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`
+    : `${patientId}_VOI`;
+  const existingFilenameInput = container.querySelector("#drawExportFileInput");
+  const keepCustomStem =
+    existingFilenameInput &&
+    existingFilenameInput.dataset.forLayerId === (activeLayer?.id || "") &&
+    existingFilenameInput.value.trim()
+      ? existingFilenameInput.value.trim()
+      : defaultStem;
+
+  const nonDrawingVols = (state.nv?.volumes || []).filter((v) => {
+    const m = state.layerMeta.get(v.id);
+    return m && !m.isDrawingLayer && !m.isSyntheticVerification;
+  });
+  const rgSrcId = state.drawing.regionGrow.sourceVolId || state.refVolId || nonDrawingVols[0]?.id || "";
+  const isGrowTool = state.drawing.tool === "region_grow";
+
+  const layerRowsHtml =
+    state.drawing.layers.length === 0
+      ? `<div class="draw-empty-note">No drawing layers yet. Click <strong>+ New Layer</strong> or <strong>Import .voi</strong> to begin.</div>`
+      : state.drawing.layers
+          .map((l) => {
+            const isActive = activeLayer && l.id === activeLayer.id;
+            const swColor =
+              l.mode === "multilabel"
+                ? l.labelPalette?.[l.activeLabel - 1]?.hex || l.colorHex
+                : l.colorHex;
+            return `
+              <div class="draw-layer-item ${isActive ? "active" : ""}" data-draw-select-layer="${l.id}">
+                <input type="checkbox" data-draw-layer-vis="${l.id}" ${l.visible ? "checked" : ""} title="Show / Hide layer" />
+                <span class="draw-layer-swatch-dot" style="background:${swColor};"></span>
+                <input type="text" class="draw-layer-name-input" data-draw-layer-rename="${l.id}" value="${escapeDrawHtml(l.name)}" title="Rename layer" />
+                <span class="draw-vol-pill" title="${l.voxelCount} voxels">${l.volumeCc.toFixed(2)} cm³</span>
+                <button type="button" class="icon-btn" data-draw-layer-del="${l.id}" title="Delete drawing layer">✕</button>
+              </div>
+            `;
+          })
+          .join("");
+
+  let activeColorHtml = "";
+  if (activeLayer) {
+    if (activeLayer.mode === "binary") {
+      activeColorHtml = `
+        <div class="draw-color-swatches">
+          ${DRAW_COLOR_SWATCHES.map(
+            (hex) =>
+              `<button type="button" class="draw-color-swatch ${
+                activeLayer.colorHex.toLowerCase() === hex ? "active" : ""
+              }" data-draw-color="${hex}" style="background:${hex};" title="Set layer color ${hex}"></button>`
+          ).join("")}
+          <input type="color" class="draw-color-picker" id="drawCustomColorInput" value="${activeLayer.colorHex}" title="Pick custom layer color" />
+        </div>
+      `;
+    } else {
+      activeColorHtml = `
+        <div class="draw-multilabel-list">
+          ${activeLayer.labelPalette
+            .map((p, idx) => {
+              const lblId = idx + 1;
+              const isAct = activeLayer.activeLabel === lblId;
+              const vox = activeLayer.perLabelCounts?.[lblId] || 0;
+              const cc = ((vox * (activeLayer.voxelMm3 || 1)) / 1000).toFixed(2);
+              return `
+                <div class="draw-multilabel-row ${isAct ? "active" : ""}" data-draw-pick-label="${lblId}">
+                  <span class="draw-label-num" style="background:${p.hex};">${lblId}</span>
+                  <input type="text" class="draw-layer-name-input" data-draw-label-name="${lblId}" value="${escapeDrawHtml(p.name)}" />
+                  <span class="draw-vol-pill">${cc} cm³</span>
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
+      `;
+    }
+  }
+
+  container.innerHTML = `
+    <div class="draw-studio-body">
+      <div class="draw-studio-topstrip">
+        <button id="btnDrawPaintToggle" type="button" class="draw-paint-toggle-btn ${
+          state.drawing.paintEnabled ? "active" : ""
+        }" title="Toggle interactive 2D slice painting ON / OFF (Shortcut: E)">
+          <span class="draw-paint-dot"></span>
+          <span>Paint Mode: ${state.drawing.paintEnabled ? "ON" : "OFF"} (<kbd>E</kbd>)</span>
+        </button>
+        <button id="btnDrawNewLayer" type="button" class="btn btn-primary btn-sm" title="Create a new drawing / VOI layer aligned to Reference">${"+"} New Layer</button>
+        <button id="btnDrawImportVoi" type="button" class="btn btn-secondary btn-sm" title="Import .voi / .nii / .nii.gz mask as editable drawing layer">Import .voi</button>
+      </div>
+
+      <div class="draw-grid-badge">
+        <span>Grid: ${escapeDrawHtml(baseLabel)}</span>
+        <span>${baseDims ? `${baseDims[0]}×${baseDims[1]}×${baseDims[2]}` : "No Ref Grid"}</span>
+      </div>
+
+      <div class="draw-section-card">
+        <div class="draw-section-header">
+          <span>Drawing Layers (${state.drawing.layers.length})</span>
+          ${
+            activeLayer
+              ? `<span style="color:#bae6fd;font-weight:600;text-transform:none;">${activeLayer.voxelCount} vox (${activeLayer.volumeCc.toFixed(2)} cm³)</span>`
+              : ""
+          }
+        </div>
+        <div class="draw-layer-list">${layerRowsHtml}</div>
+        ${
+          activeLayer
+            ? `
+          <div class="draw-inline-row" style="justify-content:space-between;margin-top:2px;">
+            <span style="color:var(--text-muted);">Label Mode:</span>
+            <div class="draw-segmented">
+              <button type="button" class="draw-seg-btn ${activeLayer.mode === "binary" ? "active" : ""}" data-draw-mode="binary">Binary (0/1)</button>
+              <button type="button" class="draw-seg-btn ${activeLayer.mode === "multilabel" ? "active" : ""}" data-draw-mode="multilabel">Multi-Label (1–6)</button>
+            </div>
+          </div>
+          ${activeColorHtml}
+        `
+            : ""
+        }
+      </div>
+
+      <div class="draw-section-card">
+        <div class="draw-section-header">
+          <span>Brush &amp; Segmentation Tools</span>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-weight:500;text-transform:none;cursor:pointer;">
+            <input type="checkbox" id="chkDrawOverwrite" ${state.drawing.overwriteLabels ? "checked" : ""} />
+            <span>Overwrite</span>
+          </label>
+        </div>
+
+        <div class="draw-tool-grid">
+          ${DRAW_TOOL_DEFS.map(
+            (t) => `
+              <button type="button" class="draw-tool-btn ${state.drawing.tool === t.id ? "active" : ""}"
+                data-draw-tool="${t.id}" title="${t.title}">
+                <span style="font-size:13px;line-height:1;">${t.icon}</span>
+                <span>${t.label}</span>
+              </button>
+            `
+          ).join("")}
+        </div>
+
+        <div class="draw-brush-row">
+          <div class="draw-size-pills" title="Brush Radius (Shortcuts: [ / ])">
+            <span style="color:var(--text-muted);align-self:center;margin-right:2px;">Size:</span>
+            ${[1, 2, 3, 4, 5]
+              .map(
+                (sz) =>
+                  `<button type="button" class="draw-size-pill ${
+                    state.drawing.brushRadius === sz ? "active" : ""
+                  }" data-draw-size="${sz}">${sz}</button>`
+              )
+              .join("")}
+          </div>
+          <div class="draw-segmented">
+            <button type="button" class="draw-seg-btn ${!state.drawing.brush3D ? "active" : ""}" data-draw-3d="0" title="Paint on active 2D slice only">2D Disk</button>
+            <button type="button" class="draw-seg-btn ${state.drawing.brush3D ? "active" : ""}" data-draw-3d="1" title="Paint as a 3D spherical brush across neighboring slices">3D Sphere</button>
+          </div>
+        </div>
+
+        ${
+          activeLayer
+            ? `
+          <div class="draw-inline-row" style="justify-content:space-between;">
+            <span style="color:var(--text-muted);">Layer α:</span>
+            <input type="range" id="sliderDrawLayerOpacity" min="0" max="100" value="${Math.round(
+              activeLayer.opacity * 100
+            )}" style="flex:1;" />
+            <span id="valDrawLayerOpacity" class="opacity-pct">${Math.round(activeLayer.opacity * 100)}%</span>
+          </div>
+        `
+            : ""
+        }
+
+        <div class="draw-region-grow-card" ${isGrowTool ? "" : "hidden"}>
+          <div class="draw-section-header" style="color:#7dd3fc;">
+            <span>Region Grow Settings</span>
+            <div class="draw-segmented">
+              <button type="button" class="draw-seg-btn ${state.drawing.regionGrow.scope === "3d" ? "active" : ""}" data-draw-rg-scope="3d">3D Vol</button>
+              <button type="button" class="draw-seg-btn ${state.drawing.regionGrow.scope === "2d" ? "active" : ""}" data-draw-rg-scope="2d">2D Slice</button>
+            </div>
+          </div>
+          <div class="draw-inline-row">
+            <span style="color:var(--text-muted);">Source:</span>
+            <select id="selectDrawRgSource" class="select-compact" style="flex:1;">
+              ${
+                nonDrawingVols.length === 0
+                  ? `<option value="">No source volume</option>`
+                  : nonDrawingVols
+                      .map((v) => {
+                        const m = state.layerMeta.get(v.id);
+                        return `<option value="${v.id}" ${v.id === rgSrcId ? "selected" : ""}>${escapeDrawHtml(
+                          m?.label || v.name
+                        )}</option>`;
+                      })
+                      .join("")
+              }
+            </select>
+          </div>
+          <div class="draw-inline-row">
+            <span style="color:var(--text-muted);width:64px;">Tol: <strong id="valDrawRgTol">${state.drawing.regionGrow.tolerancePct}%</strong></span>
+            <input type="range" id="sliderDrawRgTol" min="2" max="55" step="1" value="${state.drawing.regionGrow.tolerancePct}" style="flex:1;" />
+          </div>
+          <div class="draw-inline-row">
+            <span style="color:var(--text-muted);width:64px;">Max: <strong id="valDrawRgRad">${state.drawing.regionGrow.maxRadiusMm}mm</strong></span>
+            <input type="range" id="sliderDrawRgRad" min="5" max="80" step="1" value="${state.drawing.regionGrow.maxRadiusMm}" style="flex:1;" />
+          </div>
+          <div style="font-size:10px;color:#bae6fd;">Turn Paint Mode ON &amp; click inside structure on any 2D slice.</div>
+        </div>
+
+        <div class="draw-actions-grid" style="grid-template-columns:repeat(4,minmax(0,1fr));">
+          <button id="btnDrawUndo" type="button" class="btn-xs" ${
+            activeLayer?.undoStack?.length ? "" : "disabled"
+          } title="Undo last stroke (Cmd/Ctrl+Z)">↺ Undo</button>
+          <button id="btnDrawRedo" type="button" class="btn-xs" ${
+            activeLayer?.redoStack?.length ? "" : "disabled"
+          } title="Redo (Cmd/Ctrl+Shift+Z)">↻ Redo</button>
+          <button id="btnDrawClearSlice" type="button" class="btn-xs" ${
+            activeLayer ? "" : "disabled"
+          } title="Clear active slice on this layer">Clear Slice</button>
+          <button id="btnDrawClearLayer" type="button" class="btn-xs btn-danger-outline" ${
+            activeLayer ? "" : "disabled"
+          } title="Clear all voxels on this layer">Clear All</button>
+        </div>
+      </div>
+
+      <div class="draw-section-card">
+        <div class="draw-section-header">
+          <span>3D Cleanup &amp; Interpolation</span>
+          <select id="selectDrawInterpAxis" class="select-compact" title="Interpolation slice axis">
+            <option value="auto" ${state.drawing.interpAxis === "auto" ? "selected" : ""}>Axis: Auto</option>
+            <option value="2" ${state.drawing.interpAxis === "2" ? "selected" : ""}>Axial (Z)</option>
+            <option value="1" ${state.drawing.interpAxis === "1" ? "selected" : ""}>Coronal (Y)</option>
+            <option value="0" ${state.drawing.interpAxis === "0" ? "selected" : ""}>Sagittal (X)</option>
+          </select>
+        </div>
+        <div class="draw-actions-grid">
+          <button id="btnDrawInterpSlices" type="button" class="btn btn-secondary btn-sm" ${
+            activeLayer ? "" : "disabled"
+          } title="Smoothly interpolate between painted key slices using signed distance">Interpolate Slices</button>
+          <button id="btnDrawFillHoles" type="button" class="btn btn-secondary btn-sm" ${
+            activeLayer ? "" : "disabled"
+          } title="Fill enclosed 3D interior holes">Fill 3D Holes</button>
+          <button id="btnDrawLargestIsland" type="button" class="btn btn-secondary btn-sm" ${
+            activeLayer ? "" : "disabled"
+          } title="Keep only the largest 3D connected component">Largest Island</button>
+          <div style="display:flex;gap:4px;">
+            <button id="btnDrawDilate" type="button" class="btn btn-secondary btn-sm" style="flex:1;" ${
+              activeLayer ? "" : "disabled"
+            } title="Expand ROI boundary by 1 voxel">Dilate +1</button>
+            <button id="btnDrawErode" type="button" class="btn btn-secondary btn-sm" style="flex:1;" ${
+              activeLayer ? "" : "disabled"
+            } title="Shrink ROI boundary by 1 voxel">Erode -1</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="draw-section-card">
+        <div class="draw-section-header"><span>Save / Export VOI &amp; NIfTI</span></div>
+        <div class="draw-export-row">
+          <input id="drawExportFileInput" type="text" class="draw-export-name-input"
+            data-for-layer-id="${escapeDrawHtml(activeLayer?.id || "")}"
+            value="${escapeDrawHtml(keepCustomStem)}" placeholder="patient_VOI" />
+          <select id="selectDrawExportFormat" class="select-compact" title="Export File Format">
+            <option value="voi" ${state.drawing.exportFormat === "voi" ? "selected" : ""}>.voi (MRIcroGL)</option>
+            <option value="nii.gz" ${state.drawing.exportFormat === "nii.gz" ? "selected" : ""}>.nii.gz</option>
+            <option value="nii" ${state.drawing.exportFormat === "nii" ? "selected" : ""}>.nii</option>
+          </select>
+        </div>
+        <div class="draw-export-row">
+          <button id="btnDrawSaveAs" type="button" class="btn btn-primary btn-sm" style="flex:1;" ${
+            activeLayer ? "" : "disabled"
+          } title="Choose destination folder & filename (local or mounted network share)">Save As...</button>
+          <button id="btnDrawDownload" type="button" class="btn btn-secondary btn-sm" ${
+            activeLayer ? "" : "disabled"
+          } title="Download file immediately">Download</button>
+          <button id="btnDrawMergeExport" type="button" class="btn btn-outline btn-sm" ${
+            state.drawing.layers.some((l) => l.visible) ? "" : "disabled"
+          } title="Merge all visible drawing layers into one multi-label file + labels JSON">Merge Visible</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  bindDrawingStudioEvents(container);
+}
+
+function bindDrawingStudioEvents(container) {
+  if (!container || container._drawDelegated) return;
+  container._drawDelegated = true;
+
+  container.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (btn) {
+      if (btn.id === "btnDrawPaintToggle") {
+        setDrawingPaintEnabled();
+        return;
+      }
+      if (btn.id === "btnDrawNewLayer") {
+        createDrawingLayer();
+        return;
+      }
+      if (btn.id === "btnDrawImportVoi") {
+        document.getElementById("voiImportFileInput")?.click();
+        return;
+      }
+      if (btn.id === "btnDrawUndo") {
+        undoDrawingLayer();
+        return;
+      }
+      if (btn.id === "btnDrawRedo") {
+        redoDrawingLayer();
+        return;
+      }
+      if (btn.id === "btnDrawClearSlice") {
+        clearSliceOnActiveDrawingLayer();
+        return;
+      }
+      if (btn.id === "btnDrawClearLayer") {
+        clearActiveDrawingLayer();
+        return;
+      }
+      if (btn.id === "btnDrawInterpSlices") {
+        runDrawingMorphOp("interpolate_slices");
+        return;
+      }
+      if (btn.id === "btnDrawFillHoles") {
+        runDrawingMorphOp("fill_holes");
+        return;
+      }
+      if (btn.id === "btnDrawLargestIsland") {
+        runDrawingMorphOp("largest_island");
+        return;
+      }
+      if (btn.id === "btnDrawDilate") {
+        runDrawingMorphOp("dilate");
+        return;
+      }
+      if (btn.id === "btnDrawErode") {
+        runDrawingMorphOp("erode");
+        return;
+      }
+      if (btn.id === "btnDrawSaveAs" || btn.id === "btnDrawDownload") {
+        const stem = container.querySelector("#drawExportFileInput")?.value?.trim() || null;
+        const fmt = container.querySelector("#selectDrawExportFormat")?.value || state.drawing.exportFormat;
+        exportDrawingLayer(state.drawing.activeLayerId, btn.id === "btnDrawSaveAs" ? "save_as" : "download", fmt, stem);
+        return;
+      }
+      if (btn.id === "btnDrawMergeExport") {
+        const fmt = container.querySelector("#selectDrawExportFormat")?.value || state.drawing.exportFormat;
+        mergeAndExportVisibleDrawingLayers("save_as", fmt);
+        return;
+      }
+
+      const delId = btn.getAttribute("data-draw-layer-del");
+      if (delId) {
+        deleteDrawingLayer(delId);
+        return;
+      }
+      const modeVal = btn.getAttribute("data-draw-mode");
+      if (modeVal && state.drawing.activeLayerId) {
+        setDrawingLayerMode(state.drawing.activeLayerId, modeVal);
+        return;
+      }
+      const swatchHex = btn.getAttribute("data-draw-color");
+      if (swatchHex && state.drawing.activeLayerId) {
+        setDrawingLayerColor(state.drawing.activeLayerId, swatchHex);
+        return;
+      }
+      const toolVal = btn.getAttribute("data-draw-tool");
+      if (toolVal) {
+        state.drawing.tool = toolVal;
+        syncDrawActiveBanner();
+        renderDrawingStudioUI();
+        return;
+      }
+      const sizeVal = btn.getAttribute("data-draw-size");
+      if (sizeVal) {
+        state.drawing.brushRadius = Math.max(1, Math.min(5, parseInt(sizeVal, 10) || 1));
+        syncDrawActiveBanner();
+        renderDrawingStudioUI();
+        return;
+      }
+      const d3Val = btn.getAttribute("data-draw-3d");
+      if (d3Val !== null) {
+        state.drawing.brush3D = d3Val === "1";
+        syncDrawActiveBanner();
+        renderDrawingStudioUI();
+        return;
+      }
+      const rgScope = btn.getAttribute("data-draw-rg-scope");
+      if (rgScope) {
+        state.drawing.regionGrow.scope = rgScope === "2d" ? "2d" : "3d";
+        renderDrawingStudioUI();
+        return;
+      }
+    }
+
+    const pickLblRow = e.target.closest("[data-draw-pick-label]");
+    if (pickLblRow && !e.target.matches("input")) {
+      const lblId = parseInt(pickLblRow.getAttribute("data-draw-pick-label"), 10);
+      const act = getActiveDrawingLayer();
+      if (act && Number.isFinite(lblId)) {
+        act.activeLabel = lblId;
+        syncDrawActiveBanner();
+        renderDrawingStudioUI();
+      }
+      return;
+    }
+
+    const layerItem = e.target.closest("[data-draw-select-layer]");
+    if (layerItem && !e.target.matches("input,button")) {
+      selectActiveDrawingLayer(layerItem.getAttribute("data-draw-select-layer"));
+    }
+  });
+
+  container.addEventListener("change", (e) => {
+    const t = e.target;
+    const visId = t.getAttribute("data-draw-layer-vis");
+    if (visId) {
+      setDrawingLayerVisibility(visId, t.checked);
+      return;
+    }
+    const renId = t.getAttribute("data-draw-layer-rename");
+    if (renId) {
+      renameDrawingLayer(renId, t.value);
+      return;
+    }
+    const lblNameId = t.getAttribute("data-draw-label-name");
+    if (lblNameId) {
+      const act = getActiveDrawingLayer();
+      const idx = parseInt(lblNameId, 10) - 1;
+      if (act && act.labelPalette?.[idx]) {
+        act.labelPalette[idx].name = t.value.trim() || `ROI ${idx + 1}`;
+        const volIdx = getVolumeIndexById(act.volId);
+        if (volIdx >= 0) applyDrawingLayerColormap(act, state.nv.volumes[volIdx]);
+      }
+      return;
+    }
+    if (t.id === "drawCustomColorInput" && state.drawing.activeLayerId) {
+      setDrawingLayerColor(state.drawing.activeLayerId, t.value);
+      return;
+    }
+    if (t.id === "chkDrawOverwrite") {
+      state.drawing.overwriteLabels = Boolean(t.checked);
+      return;
+    }
+    if (t.id === "selectDrawRgSource") {
+      state.drawing.regionGrow.sourceVolId = t.value || null;
+      return;
+    }
+    if (t.id === "selectDrawInterpAxis") {
+      state.drawing.interpAxis = t.value || "auto";
+      return;
+    }
+    if (t.id === "selectDrawExportFormat") {
+      state.drawing.exportFormat = t.value || "voi";
+      return;
+    }
+  });
+
+  container.addEventListener("input", (e) => {
+    const t = e.target;
+    if (t.id === "sliderDrawLayerOpacity" && state.drawing.activeLayerId) {
+      const val = parseFloat(t.value) / 100;
+      const pctEl = container.querySelector("#valDrawLayerOpacity");
+      if (pctEl) pctEl.textContent = `${Math.round(val * 100)}%`;
+      setDrawingLayerOpacity(state.drawing.activeLayerId, val);
+      return;
+    }
+    if (t.id === "sliderDrawRgTol") {
+      state.drawing.regionGrow.tolerancePct = parseInt(t.value, 10) || 15;
+      const vEl = container.querySelector("#valDrawRgTol");
+      if (vEl) vEl.textContent = `${state.drawing.regionGrow.tolerancePct}%`;
+      return;
+    }
+    if (t.id === "sliderDrawRgRad") {
+      state.drawing.regionGrow.maxRadiusMm = parseInt(t.value, 10) || 35;
+      const vEl = container.querySelector("#valDrawRgRad");
+      if (vEl) vEl.textContent = `${state.drawing.regionGrow.maxRadiusMm}mm`;
+    }
+  });
+}
+
+function openDrawingStudioPopout() {
+  if (!state.drawing.popout) {
+    const wrapperRect = document.getElementById("canvasWrapper")?.getBoundingClientRect();
+    const initX = wrapperRect ? Math.max(16, Math.round(wrapperRect.right - 368)) : 820;
+    const initY = wrapperRect ? Math.max(64, Math.round(wrapperRect.top + 12)) : 74;
+    state.drawing.popout = createPopoutWindow({
+      id: "drawing-studio",
+      title: "Drawing & VOI Studio",
+      width: 356,
+      height: 615,
+      x: initX,
+      y: initY,
+      minWidth: 316,
+      minHeight: 400,
+      autoOpen: true,
+      onClose: () => {
+        if (state.drawing.paintEnabled) {
+          setDrawingPaintEnabled(false);
+        }
+        syncDrawHeaderButton();
+      },
+      onMinimize: () => {
+        syncDrawHeaderButton();
+      },
+    });
+  } else {
+    state.drawing.popout.open();
+  }
+  renderDrawingStudioUI();
+  syncDrawHeaderButton();
+  return state.drawing.popout;
+}
+
+function toggleDrawingStudioPopout(forceOpen = null) {
+  const existing = state.drawing.popout;
+  const currentlyOpen = Boolean(existing && existing.isOpen() && !existing.isMinimized());
+  const nextOpen = forceOpen !== null ? Boolean(forceOpen) : !currentlyOpen;
+  if (nextOpen) {
+    openDrawingStudioPopout();
+  } else if (existing) {
+    existing.close();
+  }
+}
+
+function syncStrokeOverlayCanvasSize() {
+  const overlay = document.getElementById("drawStrokeOverlay");
+  const nvCanvas = document.getElementById("niivueCanvas");
+  if (!overlay || !nvCanvas) return null;
+  const cssW = nvCanvas.clientWidth || overlay.clientWidth || 0;
+  const cssH = nvCanvas.clientHeight || overlay.clientHeight || 0;
+  if (cssW <= 0 || cssH <= 0) return null;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const targetW = Math.round(cssW * dpr);
+  const targetH = Math.round(cssH * dpr);
+  if (overlay.width !== targetW || overlay.height !== targetH) {
+    overlay.width = targetW;
+    overlay.height = targetH;
+  }
+  return { overlay, cssW, cssH, dpr };
+}
+
+function clearStrokeOverlayCanvas() {
+  const info = syncStrokeOverlayCanvasSize();
+  if (!info) return;
+  const ctx = info.overlay.getContext("2d");
+  if (ctx) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, info.overlay.width, info.overlay.height);
+  }
+}
+
+function computeBrushRingCssRadius(tileInfo, layer) {
+  const brushSize = state.drawing.brushRadius || 1;
+  if (!tileInfo?.tile || !layer) return Math.max(4, brushSize * 3);
+  const xPt = tileInfo.useDevice ? tileInfo.pos.devX : tileInfo.pos.cssX;
+  const yPt = tileInfo.useDevice ? tileInfo.pos.devY : tileInfo.pos.cssY;
+  const lin = measureLinearRASInTile(tileInfo.tile, xPt, yPt);
+  if (!lin?.jacX) return Math.max(4, brushSize * 3);
+  const mmPerCssPx = Math.hypot(lin.jacX[0], lin.jacX[1], lin.jacX[2]) * (tileInfo.useDevice ? tileInfo.pos.scaleX : 1);
+  if (!(mmPerCssPx > 1e-4)) return Math.max(4, brushSize * 3);
+  const aff = layer.affine || identityMat4();
+  const voxSize = Math.min(
+    Math.hypot(aff[0][0], aff[1][0], aff[2][0]) || 1,
+    Math.hypot(aff[0][1], aff[1][1], aff[2][1]) || 1,
+    Math.hypot(aff[0][2], aff[1][2], aff[2][2]) || 1
+  );
+  const voxRad = Math.max(0.5, brushSize - 0.5);
+  return Math.max(3, Math.min(180, (voxRad * voxSize) / mmPerCssPx));
+}
+
+function renderStrokeOverlay(hoverState = null, activeStroke = null) {
+  const info = syncStrokeOverlayCanvasSize();
+  if (!info) return;
+  const ctx = info.overlay.getContext("2d");
+  if (!ctx) return;
+  ctx.setTransform(info.dpr, 0, 0, info.dpr, 0, 0);
+  ctx.clearRect(0, 0, info.cssW, info.cssH);
+
+  if (activeStroke && activeStroke.screenPts?.length) {
+    const pts = activeStroke.screenPts;
+    const isEraser = activeStroke.effectiveTool === "eraser";
+    const isFilled = activeStroke.effectiveTool === "filled_pen";
+    const strokeHex = isEraser ? "#f8fafc" : activeStroke.colorHex || "#f43f5e";
+
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = strokeHex;
+    ctx.lineWidth = isFilled ? 2 : Math.max(2, activeStroke.pxRadius * 2);
+    if (isEraser) ctx.setLineDash([4, 3]);
+
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) {
+      ctx.lineTo(pts[i].x, pts[i].y);
+    }
+    if (isFilled && pts.length > 2) {
+      ctx.closePath();
+      const [r, g, b] = hexToRgb(strokeHex);
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.28)`;
+      ctx.fill();
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  if (hoverState && state.drawing.paintEnabled && !state.zoom2d.isDraggingPan) {
+    const { cssX, cssY, pxRadius, colorHex, isEraser } = hoverState;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cssX, cssY, Math.max(3, pxRadius), 0, Math.PI * 2);
+    ctx.strokeStyle = isEraser ? "#f8fafc" : colorHex || "#f43f5e";
+    ctx.lineWidth = 1.5;
+    if (isEraser) ctx.setLineDash([3, 3]);
+    ctx.stroke();
+
+    // Crisp dark outer halo so cursor ring stays legible on bright T1/CT intensities
+    ctx.beginPath();
+    ctx.arc(cssX, cssY, Math.max(3, pxRadius) + 1.2, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(15, 23, 42, 0.72)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cssX, cssY, 1.3, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function wireDrawingCanvasListeners() {
+  const nvCanvas = document.getElementById("niivueCanvas");
+  if (!nvCanvas) return;
+
+  nvCanvas.addEventListener("contextmenu", (e) => {
+    if (state.drawing.paintEnabled) {
+      e.preventDefault();
+    }
+  });
+
+  let activeStroke = null;
+
+  const clientPosToLayerVoxel = (clientX, clientY, tileInfo, layer, lockSlice = null) => {
+    const rect = nvCanvas.getBoundingClientRect();
+    let cssX = clientX - rect.left;
+    let cssY = clientY - rect.top;
+
+    // Clamp inside tile rectangle while dragging a stroke
+    if (lockSlice && tileInfo?.tile?.leftTopWidthHeight) {
+      const [l, t, w, h] = tileInfo.tile.leftTopWidthHeight;
+      const x0 = w < 0 ? l + w : l;
+      const y0 = h < 0 ? t + h : t;
+      const aw = Math.abs(w);
+      const ah = Math.abs(h);
+      const sx = tileInfo.useDevice ? tileInfo.pos.scaleX : 1;
+      const sy = tileInfo.useDevice ? tileInfo.pos.scaleY : 1;
+      const minCssX = x0 / sx + 1;
+      const maxCssX = (x0 + aw) / sx - 1;
+      const minCssY = y0 / sy + 1;
+      const maxCssY = (y0 + ah) / sy - 1;
+      cssX = Math.max(minCssX, Math.min(maxCssX, cssX));
+      cssY = Math.max(minCssY, Math.min(maxCssY, cssY));
+    }
+
+    const scaleX = (nvCanvas.width || rect.width) / rect.width;
+    const scaleY = (nvCanvas.height || rect.height) / rect.height;
+    const devX = cssX * scaleX;
+    const devY = cssY * scaleY;
+    const xPt = tileInfo.useDevice ? devX : cssX;
+    const yPt = tileInfo.useDevice ? devY : cssY;
+
+    const ras =
+      sampleCanvasPtRAS(devX, devY, cssX, cssY) ||
+      (tileInfo.tile ? measureLinearRASInTile(tileInfo.tile, xPt, yPt)?.mm : null);
+    if (!ras) return null;
+
+    const invAff = invertMat4(layer.affine);
+    const vox = applyMat4Pt(invAff, ras);
+    if (!vox.every(Number.isFinite)) return null;
+
+    const { sliceAxis, uAxis, vAxis } = lockSlice || resolveSliceVoxelAxes(layer.affine, tileInfo.axCorSag);
+    const sIdx = lockSlice ? lockSlice.sliceIdx : Math.max(0, Math.min(layer.dims[sliceAxis] - 1, Math.round(vox[sliceAxis])));
+    const nu = layer.dims[uAxis];
+    const nv = layer.dims[vAxis];
+    const inPlane = vox[uAxis] >= -0.75 && vox[uAxis] <= nu - 0.25 && vox[vAxis] >= -0.75 && vox[vAxis] <= nv - 0.25;
+    if (!inPlane) return null;
+
+    const clampedVox = [
+      Math.max(0, Math.min(layer.dims[0] - 1, Math.round(vox[0]))),
+      Math.max(0, Math.min(layer.dims[1] - 1, Math.round(vox[1]))),
+      Math.max(0, Math.min(layer.dims[2] - 1, Math.round(vox[2]))),
+    ];
+    clampedVox[sliceAxis] = sIdx;
+    return { cssX, cssY, vox: clampedVox, sliceAxis, sliceIdx: sIdx, uAxis, vAxis };
+  };
+
+  nvCanvas.addEventListener(
+    "mousedown",
+    (e) => {
+      if (!state.drawing.paintEnabled) return;
+      // Respect Phase 1 2D Pan gestures & Alt+Click crosshair jump
+      if (e.button === 1 || e.shiftKey || state.zoom2d.panModeActive) return;
+      if (e.altKey && e.button === 0) return;
+      if (e.button !== 0 && e.button !== 2) return;
+
+      const tileInfo = get2DSliceTileAtClientPos(e.clientX, e.clientY);
+      if (!tileInfo) return; // Allow normal 3D camera rotation on 3D render tile
+
+      const layer = getActiveDrawingLayer();
+      if (!layer) return;
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      const hit = clientPosToLayerVoxel(e.clientX, e.clientY, tileInfo, layer, null);
+      if (!hit) return;
+
+      state.drawing.lastSliceAxis = hit.sliceAxis;
+      state.drawing.lastAxCorSag = tileInfo.axCorSag;
+
+      const effectiveTool = e.button === 2 ? "eraser" : state.drawing.tool;
+      const penVal = effectiveTool === "eraser" ? 0 : getActivePenValueForLayer(layer);
+      const colorHex =
+        layer.mode === "multilabel"
+          ? layer.labelPalette?.[Math.max(0, (penVal || 1) - 1)]?.hex || layer.colorHex
+          : layer.colorHex;
+
+      if (effectiveTool === "flood_fill") {
+        const diffMap = floodFill2DOnSlice(
+          layer.voxels,
+          layer.dims,
+          hit.vox,
+          hit.sliceAxis,
+          hit.uAxis,
+          hit.vAxis,
+          penVal,
+          state.drawing.overwriteLabels
+        );
+        const entry = applySparseDiffToVoxels(layer.voxels, diffMap, penVal, state.drawing.overwriteLabels);
+        if (entry) {
+          layer.undoStack.push(entry);
+          if (layer.undoStack.length > 30) layer.undoStack.shift();
+          layer.redoStack = [];
+          commitDrawingLayerToGL(layer);
+          showToast(`Flood filled ${entry.indices.length} pixel(s).`, 1800);
+        } else {
+          showToast("Flood fill made no change at this seed.", 1600);
+        }
+        return;
+      }
+
+      if (effectiveTool === "region_grow") {
+        runBackendRegionGrow(layer, hit.vox, hit.sliceAxis);
+        return;
+      }
+
+      const pxRadius = computeBrushRingCssRadius(tileInfo, layer);
+      state.drawing.isStroking = true;
+      const tooltip = document.getElementById("dktHoverTooltip");
+      if (tooltip) tooltip.hidden = true;
+
+      activeStroke = {
+        layer,
+        tileInfo,
+        effectiveTool,
+        penVal,
+        colorHex,
+        pxRadius,
+        lockSlice: {
+          sliceAxis: hit.sliceAxis,
+          sliceIdx: hit.sliceIdx,
+          uAxis: hit.uAxis,
+          vAxis: hit.vAxis,
+        },
+        screenPts: [{ x: hit.cssX, y: hit.cssY }],
+        voxPts: [hit.vox],
+      };
+
+      renderStrokeOverlay(
+        {
+          cssX: hit.cssX,
+          cssY: hit.cssY,
+          pxRadius,
+          colorHex,
+          isEraser: effectiveTool === "eraser",
+        },
+        activeStroke
+      );
+    },
+    { capture: true }
+  );
+
+  window.addEventListener("mousemove", (e) => {
+    if (activeStroke) {
+      const hit = clientPosToLayerVoxel(
+        e.clientX,
+        e.clientY,
+        activeStroke.tileInfo,
+        activeStroke.layer,
+        activeStroke.lockSlice
+      );
+      if (hit) {
+        const lastScr = activeStroke.screenPts[activeStroke.screenPts.length - 1];
+        if (!lastScr || Math.hypot(hit.cssX - lastScr.x, hit.cssY - lastScr.y) >= 1.5) {
+          activeStroke.screenPts.push({ x: hit.cssX, y: hit.cssY });
+          activeStroke.voxPts.push(hit.vox);
+        }
+        renderStrokeOverlay(
+          {
+            cssX: hit.cssX,
+            cssY: hit.cssY,
+            pxRadius: activeStroke.pxRadius,
+            colorHex: activeStroke.colorHex,
+            isEraser: activeStroke.effectiveTool === "eraser",
+          },
+          activeStroke
+        );
+      }
+      return;
+    }
+
+    if (!state.drawing.paintEnabled || state.zoom2d.isDraggingPan) {
+      nvCanvas.classList.remove("draw-brush-hover");
+      clearStrokeOverlayCanvas();
+      return;
+    }
+
+    const tileInfo = get2DSliceTileAtClientPos(e.clientX, e.clientY);
+    const layer = getActiveDrawingLayer();
+    if (!tileInfo || !layer || e.shiftKey || state.zoom2d.panModeActive) {
+      nvCanvas.classList.remove("draw-brush-hover");
+      clearStrokeOverlayCanvas();
+      return;
+    }
+
+    const axInfo = resolveSliceVoxelAxes(layer.affine, tileInfo.axCorSag);
+    state.drawing.lastSliceAxis = axInfo.sliceAxis;
+    state.drawing.lastAxCorSag = tileInfo.axCorSag;
+
+    const pxRadius = computeBrushRingCssRadius(tileInfo, layer);
+    const penVal = getActivePenValueForLayer(layer);
+    const colorHex =
+      layer.mode === "multilabel"
+        ? layer.labelPalette?.[Math.max(0, (penVal || 1) - 1)]?.hex || layer.colorHex
+        : layer.colorHex;
+    const isPointTool = state.drawing.tool === "flood_fill" || state.drawing.tool === "region_grow";
+    nvCanvas.classList.toggle("draw-brush-hover", !isPointTool);
+    if (isPointTool) {
+      clearStrokeOverlayCanvas();
+      return;
+    }
+
+    renderStrokeOverlay(
+      {
+        cssX: tileInfo.pos.cssX,
+        cssY: tileInfo.pos.cssY,
+        pxRadius,
+        colorHex,
+        isEraser: state.drawing.tool === "eraser",
+      },
+      null
+    );
+  });
+
+  nvCanvas.addEventListener("mouseleave", () => {
+    if (!activeStroke) {
+      nvCanvas.classList.remove("draw-brush-hover");
+      clearStrokeOverlayCanvas();
+    }
+  });
+
+  const finishStroke = () => {
+    if (!activeStroke) return;
+    const finished = activeStroke;
+    activeStroke = null;
+    state.drawing.isStroking = false;
+    clearStrokeOverlayCanvas();
+
+    const { layer, effectiveTool, penVal, lockSlice, voxPts } = finished;
+    if (!layer || !voxPts.length) return;
+
+    const diffMap = new Map();
+    if (effectiveTool === "filled_pen") {
+      fillClosedPolygon2DOnSlice(
+        layer.voxels,
+        layer.dims,
+        voxPts,
+        lockSlice.sliceAxis,
+        lockSlice.sliceIdx,
+        lockSlice.uAxis,
+        lockSlice.vAxis,
+        penVal,
+        state.drawing.overwriteLabels,
+        diffMap
+      );
+    } else {
+      const brushSz = state.drawing.brushRadius || 1;
+      const is3D = Boolean(state.drawing.brush3D);
+      const segCount = Math.max(1, voxPts.length - 1);
+      for (let i = 0; i < segCount; i++) {
+        const pA = voxPts[i];
+        const pB = i + 1 < voxPts.length ? voxPts[i + 1] : pA;
+        stampBrushSegmentVoxels(
+          layer.voxels,
+          layer.dims,
+          pA,
+          pB,
+          penVal,
+          brushSz,
+          is3D,
+          lockSlice.sliceAxis,
+          state.drawing.overwriteLabels,
+          diffMap
+        );
+      }
+    }
+
+    const entry = applySparseDiffToVoxels(layer.voxels, diffMap, penVal, state.drawing.overwriteLabels);
+    if (entry) {
+      layer.undoStack.push(entry);
+      if (layer.undoStack.length > 30) layer.undoStack.shift();
+      layer.redoStack = [];
+      commitDrawingLayerToGL(layer);
+    }
+  };
+
+  window.addEventListener("mouseup", finishStroke, { capture: true });
+  window.addEventListener("blur", finishStroke);
+}
+
+// ============================================================================
 // Wire Up All UI Event Listeners
 // ============================================================================
 function setupEventListeners() {
@@ -5114,6 +7682,24 @@ function setupEventListeners() {
   });
   document.getElementById("btnCloseLayersPanel")?.addEventListener("click", () => {
     toggleLayersPanel(false);
+  });
+  document.getElementById("btnToggleDrawStudio")?.addEventListener("click", () => {
+    toggleDrawingStudioPopout();
+  });
+  document.getElementById("btnPausePaintFromBanner")?.addEventListener("click", () => {
+    setDrawingPaintEnabled(false);
+  });
+  document.getElementById("voiImportFileInput")?.addEventListener("change", async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    for (const f of files) {
+      try {
+        await importFileAsDrawingLayer(f, { openStudio: true });
+      } catch (err) {
+        console.error("Failed to import VOI:", err);
+        showToast(`Import failed for ${f.name}: ${err.message}`, 3600);
+      }
+    }
   });
   document.getElementById("btnToggleCoregPanel")?.addEventListener("click", () => {
     toggleCoregPanel();
@@ -5287,6 +7873,9 @@ function setupEventListeners() {
 
   wire2DZoomAndPanListeners();
   syncZoom2dUI();
+  wireDrawingCanvasListeners();
+  syncDrawHeaderButton();
+  syncStrokeOverlayCanvasSize();
 
   const nvCanvas = document.getElementById("niivueCanvas");
   nvCanvas?.addEventListener("mousemove", (e) => {
@@ -5532,6 +8121,20 @@ function setupEventListeners() {
       if (meta?.isDktAtlas) {
         syncDktOverlayControlsUI();
       }
+      if (meta?.isDrawingLayer && meta.drawingLayerId) {
+        const dLayer = getDrawingLayerById(meta.drawingLayerId);
+        if (dLayer) {
+          dLayer.opacity = val;
+          dLayer.visible = val > 0;
+          if (state.drawing.activeLayerId === dLayer.id && state.drawing.popout?.bodyEl) {
+            const pctVal = Math.round(val * 100);
+            const sEl = state.drawing.popout.bodyEl.querySelector("#sliderDrawLayerOpacity");
+            const vEl = state.drawing.popout.bodyEl.querySelector("#valDrawLayerOpacity");
+            if (sEl) sEl.value = String(pctVal);
+            if (vEl) vEl.textContent = `${pctVal}%`;
+          }
+        }
+      }
     }
   });
 
@@ -5581,6 +8184,17 @@ function setupEventListeners() {
         }
         renderLayerList();
       }
+    } else if (action === "edit-drawing") {
+      if (meta?.drawingLayerId) {
+        selectActiveDrawingLayer(meta.drawingLayerId);
+        openDrawingStudioPopout();
+      }
+    } else if (action === "export-drawing") {
+      if (meta?.drawingLayerId) {
+        exportDrawingLayer(meta.drawingLayerId, "save_as");
+      }
+    } else if (action === "convert-to-drawing") {
+      convertVolumeToDrawingLayer(volId);
     } else if (action === "quick-export") {
       exportSingleVolumeAsNifti(volId).then((fname) => {
         if (fname) showToast(`Exported ${fname}`);
@@ -5624,6 +8238,10 @@ function setupEventListeners() {
         renderLayerList();
       }
     } else if (action === "remove") {
+      if (meta?.isDrawingLayer && meta.drawingLayerId) {
+        deleteDrawingLayer(meta.drawingLayerId);
+        return;
+      }
       state.nv.removeVolumeByIndex(idx);
       state.layerMeta.delete(volId);
       if (state.refVolId === volId) state.refVolId = null;
@@ -5665,25 +8283,86 @@ function setupEventListeners() {
     renderLayerList();
   });
 
-  // 6. Verification Bar & Keyboard Shortcuts (Space = Blink, C = Coreg, L = Layers, +/-/0 = 2D Zoom, H = Pan)
+  // 6. Verification Bar & Keyboard Shortcuts
   document.getElementById("btnBlinkToggle")?.addEventListener("click", toggleBlinkMode);
   window.addEventListener("keydown", (e) => {
     const activeEl = document.activeElement;
     const tag = activeEl?.tagName;
     if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || activeEl?.isContentEditable) return;
+
+    const lowerKey = e.key.toLowerCase();
+    const drawStudioOpen = Boolean(state.drawing.popout && state.drawing.popout.isOpen() && !state.drawing.popout.isMinimized());
+    const drawCtxActive = state.drawing.paintEnabled || drawStudioOpen;
+
+    if ((e.metaKey || e.ctrlKey) && lowerKey === "z" && !e.altKey) {
+      if (drawCtxActive || state.drawing.layers.length > 0) {
+        e.preventDefault();
+        if (e.shiftKey) redoDrawingLayer();
+        else undoDrawingLayer();
+      }
+      return;
+    }
+    if ((e.metaKey || e.ctrlKey) && lowerKey === "y" && !e.altKey) {
+      if (drawCtxActive || state.drawing.layers.length > 0) {
+        e.preventDefault();
+        redoDrawingLayer();
+      }
+      return;
+    }
+
     if (e.code === "Space") {
       e.preventDefault();
       stepBlinkComparator();
-    } else if (e.key === "c" || e.key === "C") {
-      if (!e.metaKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        toggleCoregPanel();
+    } else if (lowerKey === "c" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      toggleCoregPanel();
+    } else if (lowerKey === "l" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      toggleLayersPanel();
+    } else if (lowerKey === "d" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      toggleDrawingStudioPopout();
+    } else if (lowerKey === "e" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      if (!state.drawing.paintEnabled) {
+        openDrawingStudioPopout();
       }
-    } else if (e.key === "l" || e.key === "L") {
-      if (!e.metaKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        toggleLayersPanel();
-      }
+      setDrawingPaintEnabled();
+    } else if (drawCtxActive && !e.metaKey && !e.ctrlKey && !e.altKey && lowerKey === "b") {
+      e.preventDefault();
+      state.drawing.tool = "pen";
+      syncDrawActiveBanner();
+      renderDrawingStudioUI();
+    } else if (drawCtxActive && !e.metaKey && !e.ctrlKey && !e.altKey && lowerKey === "f") {
+      e.preventDefault();
+      state.drawing.tool = "filled_pen";
+      syncDrawActiveBanner();
+      renderDrawingStudioUI();
+    } else if (drawCtxActive && !e.metaKey && !e.ctrlKey && !e.altKey && lowerKey === "x") {
+      e.preventDefault();
+      state.drawing.tool = "eraser";
+      syncDrawActiveBanner();
+      renderDrawingStudioUI();
+    } else if (drawCtxActive && !e.metaKey && !e.ctrlKey && !e.altKey && lowerKey === "g") {
+      e.preventDefault();
+      state.drawing.tool = "flood_fill";
+      syncDrawActiveBanner();
+      renderDrawingStudioUI();
+    } else if (drawCtxActive && !e.metaKey && !e.ctrlKey && !e.altKey && lowerKey === "w") {
+      e.preventDefault();
+      state.drawing.tool = "region_grow";
+      syncDrawActiveBanner();
+      renderDrawingStudioUI();
+    } else if (drawCtxActive && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "[") {
+      e.preventDefault();
+      state.drawing.brushRadius = Math.max(1, (state.drawing.brushRadius || 1) - 1);
+      syncDrawActiveBanner();
+      renderDrawingStudioUI();
+    } else if (drawCtxActive && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "]") {
+      e.preventDefault();
+      state.drawing.brushRadius = Math.min(5, (state.drawing.brushRadius || 1) + 1);
+      syncDrawActiveBanner();
+      renderDrawingStudioUI();
     } else if ((e.key === "+" || e.key === "=") && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       step2DZoom(1.25);
@@ -5693,7 +8372,7 @@ function setupEventListeners() {
     } else if (e.key === "0" && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       reset2DZoom();
-    } else if ((e.key === "h" || e.key === "H") && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    } else if (lowerKey === "h" && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       togglePan2dMode();
     }
@@ -5967,6 +8646,18 @@ window.NeuroCoregZoom = {
   reset2DZoom,
   togglePan2dMode,
   getCurrentPan2D,
+};
+
+window.NeuroCoregDrawing = {
+  createDrawingLayer,
+  openDrawingStudioPopout,
+  toggleDrawingStudioPopout,
+  setDrawingPaintEnabled,
+  exportDrawingLayer,
+  mergeAndExportVisibleDrawingLayers,
+  importFileAsDrawingLayer,
+  undoDrawingLayer,
+  redoDrawingLayer,
 };
 
 initApp().catch((err) => {

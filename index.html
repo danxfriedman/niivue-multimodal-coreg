@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NeuroCoreg — Single-Subject Multimodal Brain Viewer (niivue/mono)</title>
-  <link rel="stylesheet" href="./styles.css?v=11" />
+  <link rel="stylesheet" href="./styles.css?v=12" />
   <script type="importmap">
     {
       "imports": {
@@ -85,9 +85,9 @@
         </button>
 
         <label class="btn btn-secondary" for="niftiFileInput"
-          title="Load one or more NIfTI (.nii, .nii.gz) files from disk">
+          title="Load one or more NIfTI (.nii, .nii.gz) or MRIcroGL VOI (.voi) files from disk">
           + NIfTI
-          <input id="niftiFileInput" type="file" multiple accept=".nii,.nii.gz,.hdr,.img,.nrrd,.mgz" hidden />
+          <input id="niftiFileInput" type="file" multiple accept=".nii,.nii.gz,.voi,.hdr,.img,.nrrd,.mgz" hidden />
         </label>
 
         <label class="btn btn-secondary" for="dicomFolderInput"
@@ -120,6 +120,12 @@
           aria-controls="layersPanel" title="Toggle Left Layer Stack &amp; Neuro Tools Panel ON / OFF (Shortcut: L)">
           <span class="dot-indicator"></span>
           Layers (<kbd>L</kbd>)
+        </button>
+
+        <button id="btnToggleDrawStudio" class="btn btn-coreg-toggle" aria-expanded="false"
+          title="Open Floating Drawing &amp; VOI Segmentation Studio (Shortcut: D; toggle Paint Mode: E)">
+          <span class="dot-indicator"></span>
+          Draw (<kbd>D</kbd>)
         </button>
 
         <button id="btnToggleCoregPanel" class="btn btn-coreg-toggle" aria-expanded="false" aria-controls="coregPanel"
@@ -158,7 +164,7 @@
         </div>
 
         <div class="drop-hint">
-          Drop <strong>.nii / .nii.gz</strong> or a <strong>DICOM folder</strong>. Assign <strong>REF</strong>,
+          Drop <strong>.nii / .nii.gz / .voi</strong> or a <strong>DICOM folder</strong>. Assign <strong>REF</strong>,
           <strong>MOV</strong>, or <strong>CHILD</strong> (linked to Moving).
         </div>
 
@@ -386,6 +392,14 @@
         <!-- NiiVue WebGL2 / WebGPU Canvas Container -->
         <div id="canvasWrapper" class="canvas-wrapper">
           <canvas id="niivueCanvas"></canvas>
+          <canvas id="drawStrokeOverlay" class="draw-stroke-overlay" aria-hidden="true"></canvas>
+          <div id="drawActiveBanner" class="draw-active-banner" hidden>
+            <span id="drawBannerDot" class="draw-banner-dot"></span>
+            <span id="drawBannerText" class="draw-banner-text">Paint ON</span>
+            <span class="draw-banner-hint">Right-Drag: Erase • Shift-Drag: Pan • Alt-Click: Crosshair</span>
+            <button id="btnPausePaintFromBanner" type="button" class="btn-xs draw-banner-pause"
+              title="Pause Paint Mode (Shortcut: E)">Pause (<kbd>E</kbd>)</button>
+          </div>
           <div id="dktHudPill" class="dkt-hud-pill" hidden></div>
           <div id="dktHoverTooltip" class="dkt-hover-tooltip" hidden></div>
           <div id="statusToast" class="status-toast" hidden></div>
@@ -793,8 +807,9 @@
       </aside>
     </main>
 
-    <!-- Non-Blocking Floating Pop-Out Windows Layer (SEEG Attributes, SISCOM, etc.) -->
+    <!-- Non-Blocking Floating Pop-Out Windows Layer (Drawing Studio, SEEG Attributes, SISCOM, etc.) -->
     <div id="popoutLayer" class="popout-layer" aria-live="polite"></div>
+    <input id="voiImportFileInput" type="file" multiple accept=".voi,.nii,.nii.gz,.mgz" hidden />
 
     <!-- 3-Choice Close Application & Server Shutdown Confirmation Modal -->
     <div id="closeAppModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="closeAppModalTitle"
@@ -832,7 +847,7 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=16"></script>
+  <script type="module" src="./app.js?v=19"></script>
 </body>
 
 </html>

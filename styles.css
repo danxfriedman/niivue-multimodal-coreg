@@ -2049,3 +2049,489 @@ html, body {
   background: #38bdf8;
 }
 
+/* ============================================================================
+   Phase 2: Drawing Layers, Canvas Stroke Overlay & Drawing Studio Pop-Out
+   ============================================================================ */
+.draw-stroke-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 6;
+}
+
+#niivueCanvas.draw-mode-active {
+  cursor: crosshair;
+}
+
+#niivueCanvas.draw-mode-active.draw-brush-hover {
+  cursor: none;
+}
+
+#niivueCanvas.pan-mode-active.draw-mode-active,
+#niivueCanvas.is-panning.draw-mode-active {
+  cursor: grab;
+}
+
+#btnToggleDrawStudio.paint-on {
+  border-color: rgba(245, 158, 11, 0.72);
+  background: rgba(245, 158, 11, 0.16);
+  color: #fde68a;
+}
+
+#btnToggleDrawStudio.paint-on .dot-indicator {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.85);
+}
+
+.draw-active-banner {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 16;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(5px);
+  font-size: 11px;
+  color: #f8fafc;
+  pointer-events: auto;
+  max-width: calc(100% - 20px);
+  flex-wrap: wrap;
+}
+
+.draw-active-banner[hidden] {
+  display: none;
+}
+
+.draw-banner-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #f43f5e;
+  box-shadow: 0 0 6px rgba(244, 63, 94, 0.7);
+  flex-shrink: 0;
+}
+
+.draw-banner-text {
+  font-weight: 700;
+  color: #fde68a;
+}
+
+.draw-banner-hint {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.draw-banner-pause {
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #fde68a;
+}
+
+.layer-card.is-drawing-layer {
+  border-left: 3px solid rgba(244, 63, 94, 0.65);
+}
+
+.layer-card.is-drawing-layer.is-active-drawing {
+  border-color: rgba(245, 158, 11, 0.65);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.draw-layer-card-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 4px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.role-badge.draw {
+  background: rgba(244, 63, 94, 0.2);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.45);
+}
+
+.role-badge.draw-edit {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fde68a;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  cursor: pointer;
+}
+
+.role-badge.draw-edit:hover {
+  background: rgba(245, 158, 11, 0.3);
+}
+
+/* Drawing Studio Floating Pop-Out Body */
+.draw-studio-body {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 11px;
+}
+
+.draw-studio-topstrip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.draw-paint-toggle-btn {
+  flex: 1;
+  min-width: 140px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(30, 41, 59, 0.9);
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.draw-paint-toggle-btn:hover {
+  border-color: rgba(245, 158, 11, 0.65);
+}
+
+.draw-paint-toggle-btn.active {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.28), rgba(244, 63, 94, 0.22));
+  border-color: #f59e0b;
+  color: #fef3c7;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+}
+
+.draw-paint-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64748b;
+}
+
+.draw-paint-toggle-btn.active .draw-paint-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
+.draw-grid-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+
+.draw-section-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid var(--border-subtle);
+}
+
+.draw-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.draw-layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 132px;
+  overflow-y: auto;
+}
+
+.draw-layer-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.draw-layer-item:hover {
+  background: rgba(30, 41, 59, 0.85);
+}
+
+.draw-layer-item.active {
+  border-color: rgba(56, 189, 248, 0.6);
+  background: rgba(14, 116, 144, 0.22);
+}
+
+.draw-layer-swatch-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.draw-layer-name-input {
+  flex: 1;
+  min-width: 70px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 4px;
+}
+
+.draw-layer-name-input:focus {
+  outline: none;
+  background: rgba(15, 23, 42, 0.85);
+  border-color: #38bdf8;
+}
+
+.draw-vol-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: #bae6fd;
+  background: rgba(14, 116, 144, 0.25);
+  padding: 1px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.draw-segmented {
+  display: inline-flex;
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.draw-seg-btn {
+  flex: 1;
+  padding: 3px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.draw-seg-btn.active {
+  background: rgba(56, 189, 248, 0.22);
+  color: #e0f2fe;
+}
+
+.draw-color-swatches {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.draw-color-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.draw-color-swatch.active {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 1px #0f172a;
+}
+
+.draw-color-picker {
+  width: 24px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.draw-multilabel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.draw-multilabel-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.draw-multilabel-row.active {
+  background: rgba(56, 189, 248, 0.14);
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+.draw-label-num {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #0f172a;
+  flex-shrink: 0;
+}
+
+.draw-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.draw-tool-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 5px 2px;
+  border-radius: 5px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(30, 41, 59, 0.65);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.draw-tool-btn:hover {
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #fff;
+}
+
+.draw-tool-btn.active {
+  background: rgba(56, 189, 248, 0.24);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.draw-brush-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.draw-size-pills {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.draw-size-pill {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(30, 41, 59, 0.65);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.draw-size-pill.active {
+  background: rgba(56, 189, 248, 0.26);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.draw-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.draw-region-grow-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 7px;
+  border-radius: 5px;
+  background: rgba(14, 116, 144, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.draw-region-grow-card[hidden] {
+  display: none;
+}
+
+.draw-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.draw-export-row {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.draw-export-name-input {
+  flex: 1;
+  min-width: 90px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(15, 23, 42, 0.85);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.draw-empty-note {
+  padding: 8px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  border: 1px dashed var(--border-subtle);
+  border-radius: 5px;
+}
+
+
