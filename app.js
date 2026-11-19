@@ -10,6 +10,14 @@ const SLICE_TYPE = NiivueModule.SLICE_TYPE || {
   MULTIPLANAR: 3,
   RENDER: 4,
 };
+const DRAG_MODE = NiivueModule.DRAG_MODE || {
+  none: 0,
+  contrast: 1,
+  measurement: 2,
+  pan: 3,
+  slicer3D: 4,
+  callbackOnly: 5,
+};
 
 const COLORMAPS = [
   "gray",
@@ -48,6 +56,16 @@ const state = {
   dktLut: {}, // labelId string -> { id, name, title, rgb, hex }
   neuroToolsStatus: null,
   activeDktVolId: null,
+  zoom2d: {
+    zoom: 1.0,
+    panMM: [0, 0, 0],
+    panModeActive: false,
+    isDraggingPan: false,
+    panCalib: null,
+  },
+  popouts: new Map(),
+  popoutTopZ: 1210,
+  focusedPopoutId: null,
 };
 
 // Utility: Show temporary toast notification
@@ -2218,6 +2236,7 @@ async function loadSampleMultimodalSubject() {
 
     state.baselineMetrics = null;
     computeAndDisplayAlignmentMetrics(true);
+    reset2DZoom();
     setCoregStatus("Ready", false);
     showToast("Loaded Subject sub-01: T1w (Ref) + Misaligned CT (Mov) + Linked Child SEEG Contacts Mask!");
   } catch (err) {
@@ -2279,9 +2298,11 @@ function createNewPatientWorkspace(confirmIfLoaded = true, presetPatientId = nul
   state.activeDktVolId = null;
   state.baselineMetrics = null;
   state.savedTransforms = [];
+  state.zoom2d.panCalib = null;
 
   state.nv.updateGLVolume();
   state.nv.drawScene();
+  reset2DZoom();
 
   renderSavedTransformsDropdown();
   renderLayerList();
@@ -2404,6 +2425,7 @@ function buildProjectBundleData() {
       coregPanelOpen: state.coregPanelOpen,
       hudPinned: state.hudPinned,
       crosshairWidth: state.nv?.opts?.crosshairWidth ?? 1,
+      pan2Dxyzmm: getCurrentPan2D(),
     },
     baselineMetrics: state.baselineMetrics,
     currentMetrics,
@@ -2718,6 +2740,13 @@ async function restoreProjectWorkspace(manifest, niftiBytesByName) {
     if (manifest.viewState.coregPanelOpen !== undefined) {
       toggleCoregPanel(Boolean(manifest.viewState.coregPanelOpen));
     }
+    if (Array.isArray(manifest.viewState.pan2Dxyzmm) && manifest.viewState.pan2Dxyzmm.length === 4) {
+      applyPan2Dxyzmm(manifest.viewState.pan2Dxyzmm);
+    } else {
+      reset2DZoom();
+    }
+  } else {
+    reset2DZoom();
   }
 
   state.nv.updateGLVolume();
@@ -4016,6 +4045,13 @@ function handleCanvasMouseHover(e) {
   const dktVol = getDktVolume();
   if (!dktVol) return;
 
+  // Hide tooltip & suppress hover lookup while actively panning 2D slices
+  if (state.zoom2d.isDraggingPan) {
+    const tooltip = document.getElementById("dktHoverTooltip");
+    if (tooltip) tooltip.hidden = true;
+    return;
+  }
+
   const canvas = document.getElementById("niivueCanvas");
   if (!canvas) return;
   const rect = canvas.getBoundingClientRect();
@@ -4100,6 +4136,972 @@ function updateCrosshairReadout(data) {
       `;
     })
     .join("");
+}
+
+// ============================================================================
+// 2D Slice Zoom & Pan Subsystem (Ctrl/Cmd+Wheel, Pinch, Shift/Middle/Pan Drag)
+// ============================================================================
+const IN_PLANE_WORLD_AXES = {
+  0: [0, 1], // Axial -> X, Y
+  1: [0, 2], // Coronal -> X, Z
+  2: [1, 2], // Sagittal -> Y, Z
+};
+
+function getCurrentPan2D() {
+  const raw = state.nv?.scene?.pan2Dxyzmm;
+  if (raw && raw.length >= 4) {
+    const z = Number(raw[3]);
+    return [
+      Number(raw[0]) || 0,
+      Number(raw[1]) || 0,
+      Number(raw[2]) || 0,
+      Number.isFinite(z) && z >= 1 ? z : 1.0,
+    ];
+  }
+  return [
+    state.zoom2d.panMM[0] || 0,
+    state.zoom2d.panMM[1] || 0,
+    state.zoom2d.panMM[2] || 0,
+    state.zoom2d.zoom || 1.0,
+  ];
+}
+
+function getCanvasDevicePos(clientX, clientY) {
+  const canvas = document.getElementById("niivueCanvas");
+  if (!canvas) return null;
+  const rect = canvas.getBoundingClientRect();
+  if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+  if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+    return null;
+  }
+  const cssX = clientX - rect.left;
+  const cssY = clientY - rect.top;
+  const scaleX = (canvas.width || rect.width) / rect.width;
+  const scaleY = (canvas.height || rect.height) / rect.height;
+  return {
+    canvas,
+    rect,
+    cssX,
+    cssY,
+    devX: cssX * scaleX,
+    devY: cssY * scaleY,
+    scaleX,
+    scaleY,
+  };
+}
+
+function isPointInLtwh(x, y, ltwh) {
+  if (!ltwh || ltwh.length < 4) return false;
+  const [l, t, w, h] = ltwh;
+  return w > 0 && h > 0 && x >= l && x <= l + w && y >= t && y <= t + h;
+}
+
+function get2DSliceTileAtClientPos(clientX, clientY) {
+  if (!state.nv) return null;
+  const activeSliceType = state.nv.opts?.sliceType ?? state.nv.sliceType;
+  if (activeSliceType === SLICE_TYPE.RENDER) return null;
+  const pos = getCanvasDevicePos(clientX, clientY);
+  if (!pos) return null;
+
+  const tiles = state.nv.screenSlices;
+  if (Array.isArray(tiles) && tiles.length > 0) {
+    for (const tile of tiles) {
+      if (isPointInLtwh(pos.devX, pos.devY, tile.leftTopWidthHeight)) {
+        if (tile.axCorSag === 3) return null; // Never hijack 3D Render tile
+        return { tile, axCorSag: tile.axCorSag, pos, useDevice: true };
+      }
+    }
+    if (Math.abs(pos.scaleX - 1) > 0.05) {
+      for (const tile of tiles) {
+        if (isPointInLtwh(pos.cssX, pos.cssY, tile.leftTopWidthHeight)) {
+          if (tile.axCorSag === 3) return null;
+          return { tile, axCorSag: tile.axCorSag, pos, useDevice: false };
+        }
+      }
+    }
+    return null;
+  }
+
+  // Fallback for single-slice / mock contexts without populated screenSlices
+  return { tile: null, axCorSag: -1, pos, useDevice: true };
+}
+
+function sampleCanvasPtRAS(ptX, ptY, altCssX = null, altCssY = null) {
+  if (!state.nv || typeof state.nv.canvasPos2frac !== "function" || typeof state.nv.frac2mm !== "function") {
+    return null;
+  }
+  let frac = state.nv.canvasPos2frac([ptX, ptY]);
+  if ((!frac || frac[0] < 0) && altCssX !== null && altCssY !== null) {
+    frac = state.nv.canvasPos2frac([altCssX, altCssY]);
+  }
+  if (!frac || frac[0] < 0 || frac[1] < 0 || frac[2] < 0) return null;
+  const mm = state.nv.frac2mm(frac);
+  if (!mm || mm.length < 3) return null;
+  const out = [Number(mm[0]), Number(mm[1]), Number(mm[2])];
+  return out.every(Number.isFinite) ? out : null;
+}
+
+// Sample a valid point inside a tile and linearly extrapolate RAS to any target point in that tile
+function measureLinearRASInTile(tile, targetX, targetY) {
+  const ltwh = tile?.leftTopWidthHeight;
+  if (!ltwh || ltwh.length < 4) return null;
+  const [l, t, w, h] = ltwh;
+  if (w < 8 || h < 8) return null;
+
+  const anchorCandidates = [
+    [targetX, targetY],
+    [l + w * 0.5, t + h * 0.5],
+    [l + w * 0.38, t + h * 0.5],
+    [l + w * 0.62, t + h * 0.5],
+    [l + w * 0.5, t + h * 0.38],
+    [l + w * 0.5, t + h * 0.62],
+  ];
+
+  let basePt = null;
+  let baseMM = null;
+  for (const [ax, ay] of anchorCandidates) {
+    const mm = sampleCanvasPtRAS(ax, ay);
+    if (mm) {
+      basePt = [ax, ay];
+      baseMM = mm;
+      break;
+    }
+  }
+  if (!baseMM) return null;
+  if (Math.hypot(targetX - basePt[0], targetY - basePt[1]) < 0.5) {
+    return { mm: baseMM, jacX: null, jacY: null };
+  }
+
+  const step = Math.min(20, Math.max(6, Math.min(w, h) * 0.12));
+  const dxSign = basePt[0] + step <= l + w - 2 ? 1 : -1;
+  const dySign = basePt[1] + step <= t + h - 2 ? 1 : -1;
+  const mmX = sampleCanvasPtRAS(basePt[0] + dxSign * step, basePt[1]);
+  const mmY = sampleCanvasPtRAS(basePt[0], basePt[1] + dySign * step);
+
+  if (!mmX || !mmY) return null;
+  const jacX = [
+    (mmX[0] - baseMM[0]) / (dxSign * step),
+    (mmX[1] - baseMM[1]) / (dxSign * step),
+    (mmX[2] - baseMM[2]) / (dxSign * step),
+  ];
+  const jacY = [
+    (mmY[0] - baseMM[0]) / (dySign * step),
+    (mmY[1] - baseMM[1]) / (dySign * step),
+    (mmY[2] - baseMM[2]) / (dySign * step),
+  ];
+  const dx = targetX - basePt[0];
+  const dy = targetY - basePt[1];
+  return {
+    mm: [
+      baseMM[0] + jacX[0] * dx + jacY[0] * dy,
+      baseMM[1] + jacX[1] * dx + jacY[1] * dy,
+      baseMM[2] + jacX[2] * dx + jacY[2] * dy,
+    ],
+    jacX,
+    jacY,
+  };
+}
+
+// Measure constrained world RAS coordinates at either a specific tile cursor point or across all 2D tile centers
+function measureConstrainedWorldRAS(cursorTileInfo = null) {
+  if (!state.nv) return null;
+  const sums = [0, 0, 0];
+  const counts = [0, 0, 0];
+
+  if (cursorTileInfo?.tile) {
+    const t = cursorTileInfo.tile;
+    const x = cursorTileInfo.useDevice ? cursorTileInfo.pos.devX : cursorTileInfo.pos.cssX;
+    const y = cursorTileInfo.useDevice ? cursorTileInfo.pos.devY : cursorTileInfo.pos.cssY;
+    const res = measureLinearRASInTile(t, x, y);
+    if (res) {
+      const axes = IN_PLANE_WORLD_AXES[t.axCorSag] || [0, 1, 2];
+      axes.forEach((ax) => {
+        sums[ax] += res.mm[ax];
+        counts[ax] += 1;
+      });
+    }
+  } else {
+    const tiles = state.nv.screenSlices || [];
+    for (const t of tiles) {
+      if (!t || t.axCorSag < 0 || t.axCorSag > 2 || !t.leftTopWidthHeight) continue;
+      const [l, top, w, h] = t.leftTopWidthHeight;
+      const res = measureLinearRASInTile(t, l + w * 0.5, top + h * 0.5);
+      if (!res) continue;
+      const axes = IN_PLANE_WORLD_AXES[t.axCorSag] || [0, 1];
+      axes.forEach((ax) => {
+        sums[ax] += res.mm[ax];
+        counts[ax] += 1;
+      });
+    }
+  }
+
+  return {
+    mm: counts.map((c, idx) => (c > 0 ? sums[idx] / c : null)),
+    counts,
+  };
+}
+
+function setNvPanRaw(panVec4) {
+  if (!state.nv) return;
+  if (typeof state.nv.setPan2Dxyzmm === "function") {
+    state.nv.setPan2Dxyzmm([...panVec4]);
+  } else if (state.nv.scene) {
+    state.nv.scene.pan2Dxyzmm = [...panVec4];
+    state.nv.drawScene?.();
+  }
+}
+
+// Calibrate d(sampledWorldMM_i)/d(pan2Dxyzmm_i) once using NiiVue's live slice transform
+function getOrCalibratePanSlope(zoom, cursorTileInfo = null) {
+  const z = Math.max(1.0, zoom || 1.0);
+  if (state.zoom2d.panCalib) {
+    const { baseSlope, scalesByInvZoom } = state.zoom2d.panCalib;
+    return scalesByInvZoom ? baseSlope.map((s) => s / z) : [...baseSlope];
+  }
+
+  const fallback = [-1 / z, -1 / z, -1 / z];
+  if (!state.nv || !state.nv.volumes?.length || !Array.isArray(state.nv.screenSlices) || state.nv.screenSlices.length === 0) {
+    return fallback;
+  }
+
+  const saved = getCurrentPan2D();
+  const z1 = Math.max(1.25, z);
+  setNvPanRaw([0, 0, 0, z1]);
+  const mA = measureConstrainedWorldRAS(null);
+  setNvPanRaw([2, 2, 2, z1]);
+  const mB = measureConstrainedWorldRAS(null);
+
+  if (!mA || !mB) {
+    setNvPanRaw(saved);
+    return fallback;
+  }
+
+  const slope1 = [0, 1, 2].map((ax) => {
+    if (mA.mm[ax] !== null && mB.mm[ax] !== null) {
+      const s = (mB.mm[ax] - mA.mm[ax]) / 2.0;
+      if (Math.abs(s) > 1e-4) return s;
+    }
+    return null;
+  });
+
+  // Check whether sensitivity scales inversely with zoom (1/z) or stays constant
+  let scalesByInvZoom = true;
+  let validPairIdx = slope1.findIndex((s) => s !== null);
+  if (validPairIdx >= 0) {
+    const z2 = z1 * 2.0;
+    setNvPanRaw([0, 0, 0, z2]);
+    const mA2 = measureConstrainedWorldRAS(null);
+    setNvPanRaw([2, 2, 2, z2]);
+    const mB2 = measureConstrainedWorldRAS(null);
+    if (mA2?.mm[validPairIdx] !== null && mB2?.mm[validPairIdx] !== null) {
+      const s2 = (mB2.mm[validPairIdx] - mA2.mm[validPairIdx]) / 2.0;
+      if (Math.abs(s2) > 1e-4) {
+        const ratio = Math.abs(slope1[validPairIdx] / s2);
+        scalesByInvZoom = ratio > 1.35;
+      }
+    }
+  }
+
+  // Restore original pan before returning
+  setNvPanRaw(saved);
+
+  const observedSign = validPairIdx >= 0 ? Math.sign(slope1[validPairIdx]) || -1 : -1;
+  const baseSlope = [0, 1, 2].map((ax) => {
+    const measured = slope1[ax];
+    if (measured !== null) {
+      return scalesByInvZoom ? measured * z1 : measured;
+    }
+    return scalesByInvZoom ? observedSign : observedSign / z1;
+  });
+
+  if (slope1.every((s) => s !== null)) {
+    state.zoom2d.panCalib = { baseSlope, scalesByInvZoom };
+  }
+  return scalesByInvZoom ? baseSlope.map((s) => s / z) : [...baseSlope];
+}
+
+function applyPan2Dxyzmm(panVec4) {
+  const zRaw = Number(panVec4?.[3]);
+  const zoom = Math.max(1.0, Math.min(10.0, Number.isFinite(zRaw) ? zRaw : 1.0));
+  const px = Math.max(-400, Math.min(400, Number(panVec4?.[0]) || 0));
+  const py = Math.max(-400, Math.min(400, Number(panVec4?.[1]) || 0));
+  const pz = Math.max(-400, Math.min(400, Number(panVec4?.[2]) || 0));
+  const nextVec = [px, py, pz, Number(zoom.toFixed(4))];
+
+  state.zoom2d.panMM = [nextVec[0], nextVec[1], nextVec[2]];
+  state.zoom2d.zoom = nextVec[3];
+
+  setNvPanRaw(nextVec);
+  syncZoom2dUI();
+}
+
+function set2DZoom(targetZoom, focusRAS = null, cursorClientPos = null) {
+  const newZoom = Math.max(1.0, Math.min(10.0, Number(targetZoom) || 1.0));
+  if (newZoom <= 1.001) {
+    applyPan2Dxyzmm([0, 0, 0, 1.0]);
+    return;
+  }
+
+  const curPan = getCurrentPan2D();
+  if (!state.nv || !state.nv.volumes?.length) {
+    applyPan2Dxyzmm([0, 0, 0, newZoom]);
+    return;
+  }
+
+  const cursorTileInfo = cursorClientPos
+    ? get2DSliceTileAtClientPos(cursorClientPos.x, cursorClientPos.y)
+    : null;
+  const targetFocus =
+    Array.isArray(focusRAS) && focusRAS.length >= 3 && focusRAS.every(Number.isFinite)
+      ? focusRAS
+      : state.lastCrosshairRAS;
+
+  // Set provisional pan, then apply closed-form world-RAS anchor correction
+  const oldSlope = getOrCalibratePanSlope(curPan[3] || 1.0, cursorTileInfo);
+  const slope = getOrCalibratePanSlope(newZoom, cursorTileInfo);
+  setNvPanRaw([curPan[0], curPan[1], curPan[2], newZoom]);
+
+  const measured = measureConstrainedWorldRAS(cursorTileInfo);
+  if (measured && targetFocus) {
+    const nextPan = [curPan[0], curPan[1], curPan[2]];
+    for (let ax = 0; ax < 3; ax++) {
+      if (measured.mm[ax] !== null && Math.abs(slope[ax]) > 1e-5) {
+        const errMM = targetFocus[ax] - measured.mm[ax];
+        nextPan[ax] = curPan[ax] + errMM / slope[ax];
+      } else if (Math.abs(slope[ax]) > 1e-5) {
+        // Keep unconstrained axis (e.g. orthogonal axis during wheel zoom on one MPR tile) anchored without jump
+        nextPan[ax] = curPan[ax] * (oldSlope[ax] / slope[ax]);
+      }
+    }
+    applyPan2Dxyzmm([nextPan[0], nextPan[1], nextPan[2], newZoom]);
+    return;
+  }
+
+  applyPan2Dxyzmm([curPan[0], curPan[1], curPan[2], newZoom]);
+}
+
+function step2DZoom(multiplier) {
+  const curZoom = getCurrentPan2D()[3] || 1.0;
+  let nextZoom = curZoom * multiplier;
+  if (nextZoom < 1.03 && multiplier < 1) {
+    nextZoom = 1.0;
+  }
+  set2DZoom(nextZoom, state.lastCrosshairRAS, null);
+}
+
+function reset2DZoom() {
+  state.zoom2d.panMM = [0, 0, 0];
+  state.zoom2d.zoom = 1.0;
+  setNvPanRaw([0, 0, 0, 1.0]);
+  syncZoom2dUI();
+}
+
+function togglePan2dMode(forceState = null) {
+  const nextActive = forceState !== null ? Boolean(forceState) : !state.zoom2d.panModeActive;
+  state.zoom2d.panModeActive = nextActive;
+
+  const panBtn = document.getElementById("btnTogglePan2dMode");
+  if (panBtn) {
+    panBtn.classList.toggle("active", nextActive);
+    panBtn.setAttribute("aria-pressed", String(nextActive));
+  }
+
+  const canvas = document.getElementById("niivueCanvas");
+  if (canvas) {
+    canvas.classList.toggle("pan-mode-active", nextActive);
+    if (!nextActive) canvas.classList.remove("is-panning");
+  }
+
+  if (state.nv?.opts) {
+    state.nv.opts.dragMode = nextActive ? DRAG_MODE.pan : DRAG_MODE.contrast;
+  }
+  syncZoom2dUI();
+}
+
+function syncZoom2dUI() {
+  const hud = document.getElementById("zoom2dHud");
+  const select = document.getElementById("selectZoom2dLevel");
+  const zoomInBtn = document.getElementById("btnZoom2dIn");
+  const zoomOutBtn = document.getElementById("btnZoom2dOut");
+  const resetBtn = document.getElementById("btnZoom2dReset");
+  const panBtn = document.getElementById("btnTogglePan2dMode");
+
+  const [px, py, pz, zoom] = getCurrentPan2D();
+  const isAtDefault = zoom <= 1.001 && Math.hypot(px, py, pz) < 0.25;
+  const activeSliceType = state.nv?.opts?.sliceType ?? state.nv?.sliceType;
+  const isRenderOnly = activeSliceType === SLICE_TYPE.RENDER;
+
+  if (hud) {
+    hud.classList.toggle("is-3d-only", Boolean(isRenderOnly));
+  }
+  if (panBtn) {
+    panBtn.classList.toggle("active", state.zoom2d.panModeActive);
+    panBtn.setAttribute("aria-pressed", String(state.zoom2d.panModeActive));
+  }
+  if (zoomOutBtn) {
+    zoomOutBtn.disabled = zoom <= 1.001;
+  }
+  if (zoomInBtn) {
+    zoomInBtn.disabled = zoom >= 9.99;
+  }
+  if (resetBtn) {
+    resetBtn.disabled = isAtDefault && !state.zoom2d.panModeActive;
+  }
+
+  if (select) {
+    // Match an existing preset option (within 1%) or maintain a single dynamic custom option
+    let customOpt = select.querySelector('option[data-custom-zoom="true"]');
+    const presetOpts = Array.from(select.options).filter((o) => !o.hasAttribute("data-custom-zoom"));
+    const matched = presetOpts.find((o) => Math.abs(parseFloat(o.value) - zoom) < 0.015);
+    if (matched) {
+      if (customOpt) customOpt.remove();
+      select.value = matched.value;
+    } else {
+      const pctLabel = `${Math.round(zoom * 100)}%`;
+      if (!customOpt) {
+        customOpt = document.createElement("option");
+        customOpt.setAttribute("data-custom-zoom", "true");
+        select.appendChild(customOpt);
+      }
+      customOpt.value = String(zoom);
+      customOpt.textContent = pctLabel;
+      select.value = String(zoom);
+    }
+  }
+}
+
+function wire2DZoomAndPanListeners() {
+  const nvCanvas = document.getElementById("niivueCanvas");
+
+  document.getElementById("btnTogglePan2dMode")?.addEventListener("click", () => {
+    togglePan2dMode();
+  });
+  document.getElementById("btnZoom2dIn")?.addEventListener("click", () => {
+    step2DZoom(1.25);
+  });
+  document.getElementById("btnZoom2dOut")?.addEventListener("click", () => {
+    step2DZoom(0.8);
+  });
+  document.getElementById("btnZoom2dReset")?.addEventListener("click", () => {
+    reset2DZoom();
+    if (state.zoom2d.panModeActive) {
+      togglePan2dMode(false);
+    }
+  });
+  document.getElementById("selectZoom2dLevel")?.addEventListener("change", (e) => {
+    const val = parseFloat(e.target.value);
+    if (Number.isFinite(val)) {
+      set2DZoom(val, state.lastCrosshairRAS, null);
+    }
+  });
+
+  if (!nvCanvas) return;
+
+  // Ctrl/Cmd+Scroll (and browser trackpad pinch, which emits ctrlKey + wheel) -> 2D Zoom
+  // Plain Scroll passes through untouched to NiiVue slice stepping
+  nvCanvas.addEventListener(
+    "wheel",
+    (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (!state.nv || !state.nv.volumes?.length) return;
+      const tileInfo = get2DSliceTileAtClientPos(e.clientX, e.clientY);
+      if (!tileInfo) return; // Over 3D render tile or in 3D-only mode -> keep native 3D zoom
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      const curZoom = getCurrentPan2D()[3] || 1.0;
+      const clampedDelta = Math.max(-120, Math.min(120, e.deltaY));
+      const factor = Math.exp(-clampedDelta * 0.0045);
+      const nextZoom = Math.max(1.0, Math.min(10.0, curZoom * factor));
+
+      const xPt = tileInfo.useDevice ? tileInfo.pos.devX : tileInfo.pos.cssX;
+      const yPt = tileInfo.useDevice ? tileInfo.pos.devY : tileInfo.pos.cssY;
+      const cursorRAS =
+        sampleCanvasPtRAS(tileInfo.pos.devX, tileInfo.pos.devY, tileInfo.pos.cssX, tileInfo.pos.cssY) ||
+        measureLinearRASInTile(tileInfo.tile, xPt, yPt)?.mm ||
+        state.lastCrosshairRAS;
+
+      set2DZoom(nextZoom, cursorRAS, { x: e.clientX, y: e.clientY });
+    },
+    { capture: true, passive: false }
+  );
+
+  // 1:1 World-mm 2D Pan Drag (Pan Mode + Left Drag, Shift + Left Drag, or Middle-Click Drag) over 2D tiles
+  let activePanDrag = null;
+
+  nvCanvas.addEventListener(
+    "mousedown",
+    (e) => {
+      if (!state.nv || !state.nv.volumes?.length) return;
+      const wantsPan = e.button === 1 || (e.button === 0 && (e.shiftKey || state.zoom2d.panModeActive));
+      if (!wantsPan) return;
+
+      const tileInfo = get2DSliceTileAtClientPos(e.clientX, e.clientY);
+      if (!tileInfo) return; // Over 3D tile -> allow NiiVue 3D camera rotation
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      const startPan = getCurrentPan2D();
+      const slope = getOrCalibratePanSlope(startPan[3], tileInfo);
+      let jacX = null;
+      let jacY = null;
+      if (tileInfo.tile) {
+        const ptX = tileInfo.useDevice ? tileInfo.pos.devX : tileInfo.pos.cssX;
+        const ptY = tileInfo.useDevice ? tileInfo.pos.devY : tileInfo.pos.cssY;
+        const lin = measureLinearRASInTile(tileInfo.tile, ptX, ptY);
+        if (lin?.jacX && lin?.jacY) {
+          // Convert Jacobian from tile coordinate units to CSS px
+          const coordScaleX = tileInfo.useDevice ? tileInfo.pos.scaleX : 1;
+          const coordScaleY = tileInfo.useDevice ? tileInfo.pos.scaleY : 1;
+          jacX = lin.jacX.map((v) => v * coordScaleX);
+          jacY = lin.jacY.map((v) => v * coordScaleY);
+        }
+      }
+
+      activePanDrag = {
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startPan,
+        slope,
+        axes: tileInfo.tile ? IN_PLANE_WORLD_AXES[tileInfo.axCorSag] || [0, 1] : [0, 1],
+        jacX,
+        jacY,
+      };
+      state.zoom2d.isDraggingPan = true;
+      nvCanvas.classList.add("is-panning");
+      const tooltip = document.getElementById("dktHoverTooltip");
+      if (tooltip) tooltip.hidden = true;
+    },
+    { capture: true }
+  );
+
+  window.addEventListener("mousemove", (e) => {
+    if (!activePanDrag) return;
+    const dx = e.clientX - activePanDrag.startClientX;
+    const dy = e.clientY - activePanDrag.startClientY;
+    const nextPan = [...activePanDrag.startPan];
+
+    if (activePanDrag.jacX && activePanDrag.jacY) {
+      for (const ax of activePanDrag.axes) {
+        const s = activePanDrag.slope[ax];
+        if (Math.abs(s) > 1e-5) {
+          const dWorldMM = activePanDrag.jacX[ax] * dx + activePanDrag.jacY[ax] * dy;
+          nextPan[ax] = activePanDrag.startPan[ax] - dWorldMM / s;
+        }
+      }
+    } else {
+      const mmPerPx = 0.5 / Math.max(1, activePanDrag.startPan[3] || 1);
+      const ax0 = activePanDrag.axes[0] ?? 0;
+      const ax1 = activePanDrag.axes[1] ?? 1;
+      nextPan[ax0] = activePanDrag.startPan[ax0] - (dx * mmPerPx) / (activePanDrag.slope[ax0] || -1);
+      nextPan[ax1] = activePanDrag.startPan[ax1] + (dy * mmPerPx) / (activePanDrag.slope[ax1] || -1);
+    }
+
+    applyPan2Dxyzmm(nextPan);
+  });
+
+  const endPanDrag = () => {
+    if (!activePanDrag) return;
+    activePanDrag = null;
+    state.zoom2d.isDraggingPan = false;
+    nvCanvas.classList.remove("is-panning");
+  };
+  window.addEventListener("mouseup", endPanDrag);
+  window.addEventListener("blur", endPanDrag);
+}
+
+// ============================================================================
+// Shared Non-Blocking Floating Pop-Out Window Framework
+// ============================================================================
+function normalizePopoutZIndices() {
+  const ordered = Array.from(state.popouts.values()).sort(
+    (a, b) => (parseInt(a.el.style.zIndex || "1205", 10)) - (parseInt(b.el.style.zIndex || "1205", 10))
+  );
+  let z = 1205;
+  ordered.forEach((p) => {
+    z += 2;
+    p.el.style.zIndex = String(z);
+  });
+  state.popoutTopZ = z;
+}
+
+function getTopVisiblePopoutId() {
+  let topId = null;
+  let topZ = -1;
+  state.popouts.forEach((p, id) => {
+    if (!p.el.hidden && !p.isMinimized) {
+      const z = parseInt(p.el.style.zIndex || "1205", 10);
+      if (z >= topZ) {
+        topZ = z;
+        topId = id;
+      }
+    }
+  });
+  return topId;
+}
+
+function setPopoutDomContent(container, content) {
+  if (!container || content === undefined || content === null) return;
+  if (typeof content === "string") {
+    container.innerHTML = content;
+  } else if (typeof Node !== "undefined" && content instanceof Node) {
+    container.innerHTML = "";
+    container.appendChild(content);
+  }
+}
+
+function createPopoutWindow(options = {}) {
+  const id = String(options.id || `popout_${state.popouts.size + 1}`);
+  const existing = state.popouts.get(id);
+  if (existing) {
+    if (options.title !== undefined) existing.setTitle(options.title);
+    if (options.badge !== undefined) existing.setBadge(options.badge);
+    if (options.content !== undefined) existing.setContent(options.content);
+    if (options.footer !== undefined) existing.setFooter(options.footer);
+    if (options.autoOpen) existing.open();
+    return existing;
+  }
+
+  const layer = document.getElementById("popoutLayer") || document.body;
+  const dock = document.getElementById("popoutDock");
+
+  const minWidth = Math.max(240, Number(options.minWidth) || 320);
+  const minHeight = Math.max(160, Number(options.minHeight) || 220);
+  const vw = typeof window !== "undefined" && window.innerWidth ? window.innerWidth : 1280;
+  const vh = typeof window !== "undefined" && window.innerHeight ? window.innerHeight : 800;
+
+  let curWidth = Math.min(vw - 16, Math.max(minWidth, Number(options.width) || 500));
+  let curHeight = Math.min(vh - 16, Math.max(minHeight, Number(options.height) || 440));
+  const cascade = (state.popouts.size % 5) * 28;
+  let curLeft =
+    options.x !== undefined
+      ? Number(options.x)
+      : Math.max(12, Math.round((vw - curWidth) * 0.5 + cascade));
+  let curTop =
+    options.y !== undefined
+      ? Number(options.y)
+      : Math.max(64, Math.round((vh - curHeight) * 0.42 + cascade));
+
+  const el = document.createElement("section");
+  el.className = "popout-window";
+  el.id = `popout_${id}`;
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-modal", "false");
+  el.setAttribute("aria-label", options.title || "Tool Window");
+  el.hidden = true;
+
+  const headerEl = document.createElement("header");
+  headerEl.className = "popout-header";
+
+  const titleWrap = document.createElement("div");
+  titleWrap.className = "popout-title-wrap";
+
+  const iconEl = document.createElement("span");
+  iconEl.className = "popout-title-icon";
+  iconEl.setAttribute("aria-hidden", "true");
+  iconEl.textContent = options.icon || "◆";
+
+  const titleEl = document.createElement("h4");
+  titleEl.className = "popout-title";
+  titleEl.textContent = options.title || "Floating Module";
+
+  const badgeEl = document.createElement("span");
+  badgeEl.className = "popout-badge";
+  if (options.badge) {
+    badgeEl.textContent = options.badge;
+  } else {
+    badgeEl.hidden = true;
+  }
+
+  titleWrap.appendChild(iconEl);
+  titleWrap.appendChild(titleEl);
+  titleWrap.appendChild(badgeEl);
+
+  const actionsEl = document.createElement("div");
+  actionsEl.className = "popout-header-actions";
+
+  const minBtn = document.createElement("button");
+  minBtn.type = "button";
+  minBtn.className = "popout-ctrl-btn min-btn";
+  minBtn.title = "Minimize to bottom-left dock";
+  minBtn.setAttribute("aria-label", "Minimize window");
+  minBtn.textContent = "−";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "popout-ctrl-btn close-btn";
+  closeBtn.title = "Close window (Esc)";
+  closeBtn.setAttribute("aria-label", "Close window");
+  closeBtn.textContent = "✕";
+
+  actionsEl.appendChild(minBtn);
+  actionsEl.appendChild(closeBtn);
+  headerEl.appendChild(titleWrap);
+  headerEl.appendChild(actionsEl);
+
+  const bodyEl = document.createElement("div");
+  bodyEl.className = "popout-body";
+  setPopoutDomContent(bodyEl, options.content);
+
+  const footerEl = document.createElement("footer");
+  footerEl.className = "popout-footer";
+  if (options.footer) {
+    setPopoutDomContent(footerEl, options.footer);
+  } else {
+    footerEl.hidden = true;
+  }
+
+  const resizeHandle = document.createElement("div");
+  resizeHandle.className = "popout-resize-handle";
+  resizeHandle.title = "Drag to resize";
+
+  el.appendChild(headerEl);
+  el.appendChild(bodyEl);
+  el.appendChild(footerEl);
+  el.appendChild(resizeHandle);
+  layer.appendChild(el);
+
+  const applyGeom = () => {
+    el.style.width = `${Math.round(curWidth)}px`;
+    el.style.height = `${Math.round(curHeight)}px`;
+    el.style.left = `${Math.round(curLeft)}px`;
+    el.style.top = `${Math.round(curTop)}px`;
+  };
+
+  const handle = {
+    id,
+    el,
+    headerEl,
+    bodyEl,
+    footerEl,
+    titleEl,
+    badgeEl,
+    dockPillEl: null,
+    isMinimized: false,
+    isOpen() {
+      return !el.hidden && !handle.isMinimized;
+    },
+    clampToViewport() {
+      const curVW = typeof window !== "undefined" && window.innerWidth ? window.innerWidth : 1280;
+      const curVH = typeof window !== "undefined" && window.innerHeight ? window.innerHeight : 800;
+      curWidth = Math.max(Math.min(minWidth, curVW - 16), Math.min(curWidth, curVW - 16));
+      curHeight = Math.max(Math.min(minHeight, curVH - 16), Math.min(curHeight, curVH - 16));
+      curLeft = Math.max(8, Math.min(curLeft, Math.max(8, curVW - curWidth - 8)));
+      curTop = Math.max(8, Math.min(curTop, Math.max(8, curVH - curHeight - 8)));
+      applyGeom();
+    },
+    bringToFront() {
+      if (state.popoutTopZ >= 8000) {
+        normalizePopoutZIndices();
+      }
+      state.popoutTopZ += 2;
+      el.style.zIndex = String(state.popoutTopZ);
+      state.focusedPopoutId = id;
+      state.popouts.forEach((p, pid) => {
+        p.el.classList.toggle("is-focused", pid === id);
+      });
+      options.onFocus?.(handle);
+    },
+    setTitle(newTitle) {
+      titleEl.textContent = newTitle || "Floating Module";
+      el.setAttribute("aria-label", titleEl.textContent);
+      if (handle.dockPillEl) {
+        const lbl = handle.dockPillEl.querySelector(".popout-dock-label");
+        if (lbl) lbl.textContent = titleEl.textContent;
+      }
+    },
+    setBadge(text) {
+      if (text) {
+        badgeEl.textContent = text;
+        badgeEl.hidden = false;
+      } else {
+        badgeEl.textContent = "";
+        badgeEl.hidden = true;
+      }
+    },
+    setContent(content) {
+      setPopoutDomContent(bodyEl, content);
+    },
+    setFooter(footer) {
+      if (footer) {
+        setPopoutDomContent(footerEl, footer);
+        footerEl.hidden = false;
+      } else {
+        footerEl.innerHTML = "";
+        footerEl.hidden = true;
+      }
+    },
+    open() {
+      handle.isMinimized = false;
+      if (handle.dockPillEl) {
+        handle.dockPillEl.remove();
+        handle.dockPillEl = null;
+      }
+      el.hidden = false;
+      handle.clampToViewport();
+      handle.bringToFront();
+      options.onOpen?.(handle);
+    },
+    minimize() {
+      handle.isMinimized = true;
+      el.hidden = true;
+      el.classList.remove("is-focused");
+      if (state.focusedPopoutId === id) {
+        state.focusedPopoutId = getTopVisiblePopoutId();
+        if (state.focusedPopoutId) {
+          state.popouts.get(state.focusedPopoutId)?.el.classList.add("is-focused");
+        }
+      }
+      if (dock && !handle.dockPillEl) {
+        const pill = document.createElement("button");
+        pill.type = "button";
+        pill.className = "popout-dock-pill";
+        pill.title = `Restore ${titleEl.textContent}`;
+        const dot = document.createElement("span");
+        dot.className = "popout-dock-dot";
+        const lbl = document.createElement("span");
+        lbl.className = "popout-dock-label";
+        lbl.textContent = titleEl.textContent;
+        pill.appendChild(dot);
+        pill.appendChild(lbl);
+        pill.addEventListener("click", () => handle.restore());
+        dock.appendChild(pill);
+        handle.dockPillEl = pill;
+      }
+      options.onMinimize?.(handle);
+    },
+    restore() {
+      handle.open();
+      options.onRestore?.(handle);
+    },
+    close() {
+      handle.isMinimized = false;
+      el.hidden = true;
+      el.classList.remove("is-focused");
+      if (handle.dockPillEl) {
+        handle.dockPillEl.remove();
+        handle.dockPillEl = null;
+      }
+      if (state.focusedPopoutId === id) {
+        state.focusedPopoutId = getTopVisiblePopoutId();
+        if (state.focusedPopoutId) {
+          state.popouts.get(state.focusedPopoutId)?.el.classList.add("is-focused");
+        }
+      }
+      options.onClose?.(handle);
+    },
+    toggle() {
+      if (handle.isOpen()) {
+        handle.close();
+      } else {
+        handle.open();
+      }
+    },
+    destroy() {
+      handle.close();
+      el.remove();
+      state.popouts.delete(id);
+    },
+  };
+
+  // Bring to front on any interaction inside the window
+  el.addEventListener("pointerdown", () => handle.bringToFront(), { capture: true });
+  minBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handle.minimize();
+  });
+  closeBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handle.close();
+  });
+
+  // Header pointer drag
+  headerEl.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || e.target.closest(".popout-header-actions")) return;
+    e.preventDefault();
+    handle.bringToFront();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initLeft = curLeft;
+    const initTop = curTop;
+    el.classList.add("is-dragging");
+    if (typeof headerEl.setPointerCapture === "function") {
+      try {
+        headerEl.setPointerCapture(e.pointerId);
+      } catch (_) {}
+    }
+
+    const onMove = (mv) => {
+      curLeft = initLeft + (mv.clientX - startX);
+      curTop = initTop + (mv.clientY - startY);
+      handle.clampToViewport();
+    };
+    const onUp = () => {
+      el.classList.remove("is-dragging");
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  });
+
+  // Corner resize drag
+  resizeHandle.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handle.bringToFront();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initW = curWidth;
+    const initH = curHeight;
+    el.classList.add("is-resizing");
+    if (typeof resizeHandle.setPointerCapture === "function") {
+      try {
+        resizeHandle.setPointerCapture(e.pointerId);
+      } catch (_) {}
+    }
+
+    const onMove = (mv) => {
+      const curVW = window.innerWidth || 1280;
+      const curVH = window.innerHeight || 800;
+      curWidth = Math.max(minWidth, Math.min(curVW - curLeft - 8, initW + (mv.clientX - startX)));
+      curHeight = Math.max(minHeight, Math.min(curVH - curTop - 8, initH + (mv.clientY - startY)));
+      applyGeom();
+    };
+    const onUp = () => {
+      el.classList.remove("is-resizing");
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  });
+
+  handle.clampToViewport();
+  state.popouts.set(id, handle);
+  if (options.autoOpen) handle.open();
+  return handle;
+}
+
+function getPopoutWindow(id) {
+  return state.popouts.get(String(id)) || null;
+}
+
+function closeAllPopouts() {
+  state.popouts.forEach((p) => p.close());
+}
+
+function clampAllPopoutsToViewport() {
+  state.popouts.forEach((p) => {
+    if (!p.el.hidden) p.clampToViewport();
+  });
 }
 
 // ============================================================================
@@ -4278,7 +5280,13 @@ function setupEventListeners() {
     });
     ro.observe(canvasWrapper);
   }
-  window.addEventListener("resize", resizeWorkspaceCanvas);
+  window.addEventListener("resize", () => {
+    resizeWorkspaceCanvas();
+    clampAllPopoutsToViewport();
+  });
+
+  wire2DZoomAndPanListeners();
+  syncZoom2dUI();
 
   const nvCanvas = document.getElementById("niivueCanvas");
   nvCanvas?.addEventListener("mousemove", (e) => {
@@ -4332,8 +5340,21 @@ function setupEventListeners() {
   });
 
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && closeAppModal && !closeAppModal.hidden && !closeAppModal.classList.contains("hidden")) {
+    if (e.key !== "Escape") return;
+    if (closeAppModal && !closeAppModal.hidden && !closeAppModal.classList.contains("hidden")) {
       closeCloseAppModal();
+      return;
+    }
+    const topPopId = state.focusedPopoutId || getTopVisiblePopoutId();
+    if (topPopId) {
+      const pop = state.popouts.get(topPopId);
+      if (pop && pop.isOpen()) {
+        pop.close();
+        return;
+      }
+    }
+    if (state.zoom2d.panModeActive) {
+      togglePan2dMode(false);
     }
   });
 
@@ -4399,6 +5420,7 @@ function setupEventListeners() {
         render: SLICE_TYPE.RENDER,
       };
       state.nv.setSliceType(map[mode] ?? SLICE_TYPE.MULTIPLANAR);
+      syncZoom2dUI();
     });
   });
 
@@ -4643,11 +5665,12 @@ function setupEventListeners() {
     renderLayerList();
   });
 
-  // 6. Verification Bar & Keyboard Shortcuts (Space = Blink, C = Toggle Coreg Panel, L = Toggle Layers Panel)
+  // 6. Verification Bar & Keyboard Shortcuts (Space = Blink, C = Coreg, L = Layers, +/-/0 = 2D Zoom, H = Pan)
   document.getElementById("btnBlinkToggle")?.addEventListener("click", toggleBlinkMode);
   window.addEventListener("keydown", (e) => {
-    const tag = document.activeElement?.tagName;
-    if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+    const activeEl = document.activeElement;
+    const tag = activeEl?.tagName;
+    if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || activeEl?.isContentEditable) return;
     if (e.code === "Space") {
       e.preventDefault();
       stepBlinkComparator();
@@ -4661,6 +5684,18 @@ function setupEventListeners() {
         e.preventDefault();
         toggleLayersPanel();
       }
+    } else if ((e.key === "+" || e.key === "=") && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      step2DZoom(1.25);
+    } else if ((e.key === "-" || e.key === "_") && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      step2DZoom(0.8);
+    } else if (e.key === "0" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      reset2DZoom();
+    } else if ((e.key === "h" || e.key === "H") && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      togglePan2dMode();
     }
   });
 
@@ -4903,6 +5938,7 @@ async function initApp() {
     isRadiologicalConvention: false,
     isCornerOrientationText: true,
     multiplanarForceRender: true,
+    yoke3Dto2DZoom: false,
   });
 
   state.nv = nv;
@@ -4918,6 +5954,20 @@ async function initApp() {
   await checkNeuroToolsStatus(false);
   await loadSampleMultimodalSubject();
 }
+
+window.NeuroCoregPopouts = {
+  createPopoutWindow,
+  getPopoutWindow,
+  closeAllPopouts,
+};
+
+window.NeuroCoregZoom = {
+  set2DZoom,
+  step2DZoom,
+  reset2DZoom,
+  togglePan2dMode,
+  getCurrentPan2D,
+};
 
 initApp().catch((err) => {
   console.error("Failed to initialize NeuroCoreg Studio:", err);

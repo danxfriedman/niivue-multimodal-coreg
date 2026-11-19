@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NeuroCoreg — Single-Subject Multimodal Brain Viewer (niivue/mono)</title>
-  <link rel="stylesheet" href="./styles.css?v=10" />
+  <link rel="stylesheet" href="./styles.css?v=11" />
   <script type="importmap">
     {
       "imports": {
@@ -389,6 +389,37 @@
           <div id="dktHudPill" class="dkt-hud-pill" hidden></div>
           <div id="dktHoverTooltip" class="dkt-hover-tooltip" hidden></div>
           <div id="statusToast" class="status-toast" hidden></div>
+
+          <!-- Bottom-Left Dock for Minimized Floating Pop-Out Modules -->
+          <div id="popoutDock" class="popout-dock" aria-label="Minimized Tool Windows"></div>
+
+          <!-- Bottom-Right Compact 2D Zoom & Pan HUD -->
+          <div id="zoom2dHud" class="zoom2d-hud" role="toolbar" aria-label="2D Slice Zoom and Pan Controls">
+            <button id="btnTogglePan2dMode" type="button" class="zoom2d-btn zoom2d-pan-btn"
+              aria-pressed="false"
+              title="Toggle 2D Pan Mode (Shortcut: H). You can also pan anytime with Shift+Drag or Middle-Click Drag.">
+              <svg viewBox="0 0 20 20" width="13" height="13" fill="currentColor" aria-hidden="true">
+                <path d="M9 2a1 1 0 012 0v6h1V3a1 1 0 112 0v5h1V5a1 1 0 112 0v6.5a5.5 5.5 0 01-5.5 5.5H10a5 5 0 01-4.16-2.226L3.293 11.22a1.15 1.15 0 011.68-1.56L7 11.5V4a1 1 0 112 0v4V2z"/>
+              </svg>
+              <span>Pan</span>
+            </button>
+            <span class="zoom2d-sep" aria-hidden="true"></span>
+            <button id="btnZoom2dOut" type="button" class="zoom2d-btn" title="Zoom Out 2D Views (Shortcut: - or Ctrl/Cmd+Scroll)">−</button>
+            <select id="selectZoom2dLevel" class="zoom2d-select" aria-label="2D Zoom Level"
+              title="Select 2D Zoom Magnification (or use Ctrl/Cmd+Scroll / trackpad pinch)">
+              <option value="1" selected>100%</option>
+              <option value="1.25">125%</option>
+              <option value="1.5">150%</option>
+              <option value="2">200%</option>
+              <option value="3">300%</option>
+              <option value="4">400%</option>
+              <option value="6">600%</option>
+              <option value="8">800%</option>
+            </select>
+            <button id="btnZoom2dIn" type="button" class="zoom2d-btn" title="Zoom In 2D Views (Shortcut: + or Ctrl/Cmd+Scroll)">+</button>
+            <button id="btnZoom2dReset" type="button" class="zoom2d-btn zoom2d-reset-btn" disabled
+              title="Reset 2D Zoom &amp; Pan to 100% (Shortcut: 0)">1:1</button>
+          </div>
         </div>
 
         <!-- Quantitative Alignment Metrics Footer Bar -->
@@ -762,6 +793,9 @@
       </aside>
     </main>
 
+    <!-- Non-Blocking Floating Pop-Out Windows Layer (SEEG Attributes, SISCOM, etc.) -->
+    <div id="popoutLayer" class="popout-layer" aria-live="polite"></div>
+
     <!-- 3-Choice Close Application & Server Shutdown Confirmation Modal -->
     <div id="closeAppModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="closeAppModalTitle"
       hidden>
@@ -798,7 +832,7 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=15"></script>
+  <script type="module" src="./app.js?v=16"></script>
 </body>
 
 </html>
