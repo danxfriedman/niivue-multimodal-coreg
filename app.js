@@ -4603,12 +4603,12 @@ function buildAtlasDiscreteColormap(vol, meta) {
   let maxVox = 1;
   for (let i = 0; i < rawArr.length; i++) {
     const v = Math.round(rawArr[i]);
-    if (v > maxVox && v <= 16384) maxVox = v;
+    if (v > maxVox && v <= 65535) maxVox = v;
   }
   let maxLutId = 1;
   for (const k of Object.keys(lutObj)) {
     const n = parseInt(k, 10);
-    if (Number.isFinite(n) && n > maxLutId && n <= 16384) maxLutId = n;
+    if (Number.isFinite(n) && n > maxLutId && n <= 65535) maxLutId = n;
   }
 
   if (isFS) {
@@ -4621,7 +4621,7 @@ function buildAtlasDiscreteColormap(vol, meta) {
     return { ...cmap, maxLabelId: cmap.I.length - 1 };
   }
 
-  const maxLabelId = Math.min(16384, Math.max(1, maxVox, maxLutId));
+  const maxLabelId = Math.min(65535, Math.max(1, maxVox, maxLutId));
   const R = new Array(maxLabelId + 1).fill(0);
   const G = new Array(maxLabelId + 1).fill(0);
   const B = new Array(maxLabelId + 1).fill(0);
@@ -4710,7 +4710,7 @@ async function applyAtlasColormapToVolume(vol) {
 
     if (vol.img && vol.img.length) {
       if (meta && !meta.rawAtlasVoxels) {
-        const snap = new Int16Array(vol.img.length);
+        const snap = new Int32Array(vol.img.length);
         for (let i = 0; i < vol.img.length; i++) {
           snap[i] = Math.round(vol.img[i]);
         }
@@ -5634,9 +5634,9 @@ function updateDktReadoutUI(dktInfo, cursorEvent = null) {
         .slice(0, 3)
         .map(
           (h, idx) => `
-            <span class="dkt-swatch" style="background:${h.hex || "#38bdf8"};"></span>
-            <span style="${idx === 0 ? "font-weight:700;" : "color:var(--text-secondary);"}">${hits.length > 1 ? `${h.atlasBadge}: ` : ""}${h.shortName || h.title}</span>
-            <span style="color:var(--text-muted);font-family:var(--font-mono);font-size:10px;">#${h.labelId}</span>
+            <span class="dkt-swatch" style="background:${sanitizeCssHex(h.hex)};"></span>
+            <span style="${idx === 0 ? "font-weight:700;" : "color:var(--text-secondary);"}">${hits.length > 1 ? `${escapeDrawHtml(h.atlasBadge)}: ` : ""}${escapeDrawHtml(h.shortName || h.title)}</span>
+            <span style="color:var(--text-muted);font-family:var(--font-mono);font-size:10px;">#${Number(h.labelId)}</span>
           `
         )
         .join(`<span style="color:var(--text-muted);margin:0 2px;">|</span>`);
@@ -5658,15 +5658,15 @@ function updateDktReadoutUI(dktInfo, cursorEvent = null) {
             .map(
               (h) => `
                 <div style="display:flex;align-items:center;gap:6px;min-width:0;">
-                  <span class="dkt-swatch" style="background:${h.hex || "#38bdf8"};width:10px;height:10px;"></span>
-                  <span class="atlas-stacked-badge">${h.atlasBadge}</span>
-                  <span class="dkt-region-title" style="flex:1;">${h.shortName || h.title}</span>
-                  <span style="color:var(--text-muted);font-family:var(--font-mono);font-size:10px;">#${h.labelId}</span>
+                  <span class="dkt-swatch" style="background:${sanitizeCssHex(h.hex)};width:10px;height:10px;"></span>
+                  <span class="atlas-stacked-badge">${escapeDrawHtml(h.atlasBadge)}</span>
+                  <span class="dkt-region-title" style="flex:1;">${escapeDrawHtml(h.shortName || h.title)}</span>
+                  <span style="color:var(--text-muted);font-family:var(--font-mono);font-size:10px;">#${Number(h.labelId)}</span>
                 </div>
               `
             )
             .join("")}
-          <div class="dkt-region-sub">${rasStr}</div>
+          <div class="dkt-region-sub">${escapeDrawHtml(rasStr)}</div>
         </div>
       `;
       tooltip.style.transform = `translate3d(${Math.round(tx)}px, ${Math.round(ty)}px, 0)`;
@@ -5682,7 +5682,7 @@ function updateDktReadoutUI(dktInfo, cursorEvent = null) {
       const loadedCnt = getLoadedAtlasVolumes().length;
       hudPill.innerHTML = `
         <span class="dkt-swatch" style="background:#475569;"></span>
-        <span style="color:var(--text-secondary);">${loadedCnt > 1 ? `${loadedCnt} Atlases Loaded` : `${activeAtlasTitle} Active`} — Hover over brain</span>
+        <span style="color:var(--text-secondary);">${loadedCnt > 1 ? `${loadedCnt} Atlases Loaded` : `${escapeDrawHtml(activeAtlasTitle)} Active`} — Hover over brain</span>
       `;
     }
   }
@@ -6821,6 +6821,11 @@ function escapeDrawHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function sanitizeCssHex(hex, fallback = "#38bdf8") {
+  const s = String(hex || "").trim();
+  return /^#[0-9a-f]{6}$/i.test(s) ? s : fallback;
 }
 
 function hexToRgb(hex) {
@@ -8728,11 +8733,11 @@ function renderAtlasStudioCrosshairFooter() {
   listEl.innerHTML = hits
     .map(
       (h) => `
-        <div class="atlas-stacked-row" title="${h.name} (#${h.labelId})">
-          <span class="atlas-region-swatch" style="background:${h.hex};"></span>
-          <span class="atlas-stacked-badge">${h.atlasBadge}</span>
-          <span style="flex:1;min-width:0;color:#f8fafc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h.shortName || h.name}</span>
-          <span style="color:var(--text-muted);font-family:var(--font-mono);font-size:10px;">#${h.labelId}</span>
+        <div class="atlas-stacked-row" title="${escapeDrawHtml(h.name)} (#${Number(h.labelId)})">
+          <span class="atlas-region-swatch" style="background:${sanitizeCssHex(h.hex)};"></span>
+          <span class="atlas-stacked-badge">${escapeDrawHtml(h.atlasBadge)}</span>
+          <span style="flex:1;min-width:0;color:#f8fafc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeDrawHtml(h.shortName || h.name)}</span>
+          <span style="color:var(--text-muted);font-family:var(--font-mono);font-size:10px;">#${Number(h.labelId)}</span>
         </div>
       `
     )
@@ -9036,8 +9041,8 @@ function syncAtlasStudioUI() {
         card.innerHTML = `
           <div class="atlas-loaded-top">
             <input type="checkbox" role="switch" class="vis-switch" ${isActive ? "checked" : ""} title="Show this atlas overlay on slices (others stay loaded for stacked hover)" />
-            <span class="role-badge dkt ${badge.cls}">${badge.text}</span>
-            <span class="atlas-loaded-title" title="${meta?.atlasName || vol.name}">${meta?.atlasShortName || vol.name}</span>
+            <span class="role-badge dkt ${escapeDrawHtml(badge.cls)}">${escapeDrawHtml(badge.text)}</span>
+            <span class="atlas-loaded-title" title="${escapeDrawHtml(meta?.atlasName || vol.name)}">${escapeDrawHtml(meta?.atlasShortName || vol.name)}</span>
             <button type="button" class="icon-btn" title="Remove atlas layer">✕</button>
           </div>
           <div class="atlas-loaded-controls">
@@ -9199,7 +9204,7 @@ function syncAtlasStudioUI() {
         return true;
       });
       if (!filtered.length) {
-        regList.innerHTML = `<div class="draw-empty-note">No matching regions (${q || hemiFilter}).</div>`;
+        regList.innerHTML = `<div class="draw-empty-note">No matching regions (${escapeDrawHtml(q || hemiFilter)}).</div>`;
       } else {
         regList.innerHTML = "";
         for (const r of filtered.slice(0, 250)) {
@@ -9208,10 +9213,10 @@ function syncAtlasStudioUI() {
           row.className = "atlas-region-row";
           row.title = `Click to jump crosshair to ${r.name} (#${r.id}, ${r.volumeMm3} mm³)`;
           row.innerHTML = `
-            <input type="checkbox" ${isChecked ? "checked" : ""} title="Show/isolate ${r.shortName || r.name}" />
-            <span class="atlas-region-swatch" style="background:${r.hex || "#38bdf8"};"></span>
-            <span class="atlas-region-name">${r.name}</span>
-            <span class="atlas-region-meta">#${r.id} · ${Math.round(r.volumeMm3)}mm³</span>
+            <input type="checkbox" ${isChecked ? "checked" : ""} title="Show/isolate ${escapeDrawHtml(r.shortName || r.name)}" />
+            <span class="atlas-region-swatch" style="background:${sanitizeCssHex(r.hex)};"></span>
+            <span class="atlas-region-name">${escapeDrawHtml(r.name)}</span>
+            <span class="atlas-region-meta">#${Number(r.id)} · ${Math.round(r.volumeMm3)}mm³</span>
           `;
           const cb = row.querySelector('input[type="checkbox"]');
           cb?.addEventListener("click", (ev) => ev.stopPropagation());

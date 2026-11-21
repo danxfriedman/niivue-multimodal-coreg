@@ -12,6 +12,7 @@ import io
 import sys
 import glob
 import json
+import math
 import time
 import uuid
 import shlex
@@ -27,7 +28,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 from collections import deque
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, unquote
 
 import numpy as np
 import nibabel as nib
@@ -170,6 +171,7 @@ HIPS_THOMAS_CACHE_DIR = _get_hips_thomas_cache_dir()
 
 ATLAS_JOBS_LOCK = threading.Lock()
 ATLAS_JOBS = {}
+MAX_CONCURRENT_ATLAS_JOBS = 2
 
 THOMAS_THALAMIC_NUCLEI_IDS = frozenset({
     2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18,
@@ -232,17 +234,27 @@ def _parse_hips_stage_from_log(line: str, current_stage: str) -> str:
     return current_stage
 
 
-def _prune_atlas_jobs(max_age_sec: float = 900.0):
+def _prune_atlas_jobs(max_age_sec: float = 300.0, max_completed: int = 8):
     now = time.time()
     with ATLAS_JOBS_LOCK:
-        stale = [
-            jid
-            for jid, j in ATLAS_JOBS.items()
-            if j.get("status") in ("done", "error", "cancelled")
-            and (now - float(j.get("finishedAt") or now)) > max_age_sec
-        ]
+        stale = []
+        completed = []
+        for jid, j in ATLAS_JOBS.items():
+            if j.get("status") in ("done", "error", "cancelled"):
+                fin_t = float(j.get("finishedAt") or now)
+                if (now - fin_t) > max_age_sec:
+                    stale.append(jid)
+                else:
+                    fetched_t = j.get("resultFetchedAt")
+                    if fetched_t is not None and (now - float(fetched_t)) > 60.0:
+                        j["result"] = None
+                    completed.append((fin_t, jid))
         for jid in stale:
             ATLAS_JOBS.pop(jid, None)
+        if len(completed) > max_completed:
+            completed.sort()
+            for _, jid in completed[:-max_completed]:
+                ATLAS_JOBS.pop(jid, None)
 
 
 def normalize_user_path(raw_path: str) -> str:
@@ -767,6 +779,17 @@ NON_BRAIN_FREESURFER_IDS = np.array(
 )
 
 
+def _to_safe_label_int_array(data_3d) -> np.ndarray:
+    """Converts label array to int16 (<=32767) or int32 (<=2147483647) without wrap-around."""
+    clean = np.nan_to_num(np.asarray(data_3d, dtype=np.float64), nan=0.0, posinf=0.0, neginf=0.0)
+    arr_i64 = np.rint(clean).astype(np.int64)
+    arr_i64[arr_i64 < 0] = 0
+    max_val = int(arr_i64.max()) if arr_i64.size > 0 else 0
+    if max_val > 2147483647:
+        raise ValueError(f"Atlas contains label ID {max_val} exceeding NIfTI int32 maximum (2147483647).")
+    return arr_i64.astype(np.int16 if max_val <= 32767 else np.int32)
+
+
 def write_int16_label_nifti_bytes(
     data_3d: np.ndarray,
     affine_4x4: np.ndarray,
@@ -774,18 +797,18 @@ def write_int16_label_nifti_bytes(
     sform_code: int = 1,
 ) -> tuple:
     """
-    Encodes a 3D integer label volume as int16 NIfTI-1 (.nii.gz) with NII_INTENT_LABEL (1002),
-    scl_slope=1.0, scl_inter=0.0, cal_min=0, cal_max=max_label. Returns (nii_gz_bytes, max_label).
+    Encodes a 3D integer label volume as int16 (or int32 when max_label > 32767) NIfTI-1 (.nii.gz)
+    with NII_INTENT_LABEL (1002), scl_slope=1.0, scl_inter=0.0, cal_min=0, cal_max=max_label.
+    Returns (nii_gz_bytes, max_label).
     """
-    arr = np.rint(np.asarray(data_3d)).astype(np.int16)
-    arr[arr < 0] = 0
+    arr = _to_safe_label_int_array(data_3d)
     aff = np.asarray(affine_4x4, dtype=np.float64)
     if aff.shape != (4, 4) or not np.all(np.isfinite(aff)) or abs(np.linalg.det(aff[:3, :3])) < 1e-10:
         aff = np.eye(4, dtype=np.float64)
     max_val = int(arr.max()) if arr.size > 0 else 0
     img = nib.Nifti1Image(arr, aff)
     hdr = img.header
-    hdr.set_data_dtype(np.int16)
+    hdr.set_data_dtype(arr.dtype)
     hdr.set_intent(1002, (), "Label")
     hdr.set_slope_inter(1.0, 0.0)
     hdr["cal_min"] = 0.0
@@ -849,8 +872,16 @@ def _infer_hemi_from_label(name: str, rid: int = 0, atlas_id: str = "") -> str:
 def _normalize_lut_entry(rid: int, name: str, rgb=None, short_name=None, hemi=None, atlas_id: str = "") -> dict:
     clean_name = str(name or f"Region {rid}").strip() or f"Region {rid}"
     inferred_hemi = hemi or _infer_hemi_from_label(clean_name, rid=rid, atlas_id=atlas_id)
-    if rgb is not None and len(rgb) >= 3:
-        r, g, b = [max(0, min(255, int(round(float(c))))) for c in rgb[:3]]
+    parsed_rgb = None
+    if isinstance(rgb, (list, tuple)) and len(rgb) >= 3:
+        try:
+            vals = [float(c) for c in rgb[:3]]
+            if all(math.isfinite(v) for v in vals):
+                parsed_rgb = [max(0, min(255, int(round(v)))) for v in vals]
+        except (TypeError, ValueError, OverflowError):
+            parsed_rgb = None
+    if parsed_rgb is not None:
+        r, g, b = parsed_rgb
     else:
         r, g, b = generate_distinct_lut_rgb(rid, hemi=inferred_hemi)
     sname = str(short_name or clean_name).strip() or clean_name
@@ -889,7 +920,10 @@ def parse_lut_text(text: str, filename: str = "", atlas_id: str = "") -> dict:
                 for item in obj["labels"]:
                     if not isinstance(item, dict) or "id" not in item:
                         continue
-                    rid = int(item["id"])
+                    try:
+                        rid = int(item["id"])
+                    except (TypeError, ValueError):
+                        continue
                     if rid <= 0:
                         continue
                     rgb = item.get("rgb")
@@ -907,7 +941,11 @@ def parse_lut_text(text: str, filename: str = "", atlas_id: str = "") -> dict:
             if isinstance(obj, dict):
                 for k, item in obj.items():
                     if isinstance(item, dict):
-                        rid = int(item.get("id", k)) if str(item.get("id", k)).lstrip("-").isdigit() else None
+                        raw_id = item.get("id", k)
+                        try:
+                            rid = int(raw_id) if str(raw_id).strip().lstrip("-").isdigit() else None
+                        except (TypeError, ValueError):
+                            rid = None
                         if rid is None or rid <= 0:
                             continue
                         rgb = item.get("rgb")
@@ -922,13 +960,16 @@ def parse_lut_text(text: str, filename: str = "", atlas_id: str = "") -> dict:
                             atlas_id=atlas_id,
                         )
                     elif str(k).lstrip("-").isdigit():
-                        rid = int(k)
+                        try:
+                            rid = int(k)
+                        except (TypeError, ValueError):
+                            continue
                         if rid > 0:
                             out[str(rid)] = _normalize_lut_entry(rid, str(item), atlas_id=atlas_id)
-                if out:
-                    return out
+                return out
         except Exception:
-            pass
+            return out
+        return out
 
     # 2. FSL Atlas XML
     if stripped.startswith("<") and "<atlas" in stripped.lower() or lower_fn.endswith(".xml"):
@@ -1174,9 +1215,23 @@ def _find_container_binary() -> str:
     return ""
 
 
+_SAFE_DOCKER_IMG_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/@:-]{0,199}$")
+
+
 def detect_hips_thomas_docker(custom_image: str = "") -> dict:
     """Detects native HIPS-THOMAS CLI, explicit custom image override, or local Docker container."""
     user_custom_img = str(custom_image or "").strip()
+    if user_custom_img and not _SAFE_DOCKER_IMG_RE.match(user_custom_img):
+        return {
+            "available": False,
+            "mode": "template_only",
+            "dockerInstalled": bool(_find_container_binary()),
+            "dockerRunning": False,
+            "dockerBin": _find_container_binary() or None,
+            "dockerImage": None,
+            "cliPath": None,
+            "statusLabel": f"Invalid custom Docker image '{user_custom_img[:64]}' — FNIRT/FLIRT backup ready",
+        }
     if not user_custom_img:
         native_cli = shutil.which("hipsthomas.sh") or shutil.which("hips_thomas.sh")
         if native_cli and (IS_WINDOWS or os.access(native_cli, os.X_OK)):
@@ -1218,10 +1273,10 @@ def detect_hips_thomas_docker(custom_image: str = "") -> dict:
                         if ln.lower() == c_low or norm.lower() == c_low or norm.lower().startswith(c_low + ":"):
                             hit = ln
                             break
-                    if not hit and re.match(r"^[a-zA-Z0-9._/@:-]+$", user_custom_img):
+                    if not hit and _SAFE_DOCKER_IMG_RE.match(user_custom_img):
                         try:
                             insp = subprocess.run(
-                                [docker_bin, "image", "inspect", user_custom_img],
+                                [docker_bin, "image", "inspect", "--", user_custom_img],
                                 capture_output=True,
                                 text=True,
                                 timeout=3.0,
@@ -1242,7 +1297,7 @@ def detect_hips_thomas_docker(custom_image: str = "") -> dict:
                             "statusLabel": f"Custom image '{user_custom_img}' not found locally — FNIRT/FLIRT backup ready",
                         }
                 else:
-                    if env_img:
+                    if env_img and _SAFE_DOCKER_IMG_RE.match(env_img):
                         env_low = env_img.lower()
                         for ln in raw_lines:
                             norm = ln[len("docker.io/"):] if ln.startswith("docker.io/") else ln
@@ -1264,7 +1319,7 @@ def detect_hips_thomas_docker(custom_image: str = "") -> dict:
                             if re.search(r"(^|/)(hips?[-_]?thomas|sthomas|thomasmerged)(:|$)", norm, flags=re.IGNORECASE):
                                 hit = ln
                                 break
-                if hit:
+                if hit and _SAFE_DOCKER_IMG_RE.match(hit):
                     return {
                         "available": True,
                         "mode": "docker",
@@ -1465,7 +1520,10 @@ def compute_atlas_region_stats(data_3d: np.ndarray, affine: np.ndarray, lut: dic
         return []
 
     aff = np.asarray(affine, dtype=np.float64)
-    vox_vol_mm3 = abs(float(np.linalg.det(aff[:3, :3]))) or 1.0
+    if aff.shape != (4, 4) or not np.all(np.isfinite(aff)):
+        aff = np.eye(4, dtype=np.float64)
+    det = abs(float(np.linalg.det(aff[:3, :3])))
+    vox_vol_mm3 = det if (math.isfinite(det) and det > 1e-10) else 1.0
 
     # Flatten coordinates for single-pass grouping
     ii, jj, kk = np.nonzero(nz_mask)
@@ -1505,31 +1563,66 @@ def compute_atlas_region_stats(data_3d: np.ndarray, affine: np.ndarray, lut: dic
             rgb = norm_e["rgb"]
             hex_col = norm_e["hex"]
 
+        vol_mm3 = round(cnt * vox_vol_mm3, 2)
+        if not math.isfinite(vol_mm3):
+            vol_mm3 = 0.0
+        c_ras_clean = [round(float(x), 2) if math.isfinite(float(x)) else 0.0 for x in c_ras]
         regions.append({
             "id": rid,
             "name": name,
             "shortName": short_name,
             "hemisphere": hemi,
             "voxelCount": cnt,
-            "volumeMm3": round(cnt * vox_vol_mm3, 2),
-            "centroidRAS": [round(float(c_ras[0]), 2), round(float(c_ras[1]), 2), round(float(c_ras[2]), 2)],
+            "volumeMm3": vol_mm3,
+            "centroidRAS": c_ras_clean,
             "rgb": [int(c) for c in rgb[:3]],
             "hex": hex_col,
         })
     return regions
 
 
+def _atomic_copy_file(src_path: str, dst_path: str):
+    """Copies src_path -> dst_path via a same-directory temp file and atomic os.replace."""
+    dst_dir = os.path.dirname(dst_path) or "."
+    os.makedirs(dst_dir, exist_ok=True)
+    tmp_dst = f"{dst_path}.{uuid.uuid4().hex[:8]}.tmp"
+    try:
+        shutil.copyfile(src_path, tmp_dst)
+        os.replace(tmp_dst, dst_path)
+    except Exception:
+        try:
+            if os.path.exists(tmp_dst):
+                os.remove(tmp_dst)
+        except OSError:
+            pass
+        raise
+
+
 def _get_scipy_9dof_fallback(t1_3d, t1_aff, src_img, sub_brain_path, mni_brain_path, cache_dir):
     """Cached pure-Python SciPy 9-DOF MNI152 -> Subject transform when FSL is absent/fails."""
     cached_aff_npy = os.path.join(cache_dir, "mni2sub_scipy9dof.npy")
     if os.path.isfile(cached_aff_npy):
-        return np.load(cached_aff_npy), True
+        try:
+            return np.load(cached_aff_npy), True
+        except Exception:
+            pass
     sub_brain_img = nib.load(sub_brain_path) if os.path.isfile(sub_brain_path) else src_img
     mni_brain_img = nib.load(mni_brain_path)
     _, _, new_mni_aff = optimize_multimodal_registration(sub_brain_img, mni_brain_img, dof=9)
-    # new_mni_aff maps MNI voxel -> Subject World RAS; save inverse world transform
+    # new_mni_aff maps MNI voxel -> Subject World RAS; save atomically via temp file
     os.makedirs(cache_dir, exist_ok=True)
-    np.save(cached_aff_npy, new_mni_aff)
+    tmp_npy = f"{cached_aff_npy}.{uuid.uuid4().hex[:8]}.tmp"
+    try:
+        with open(tmp_npy, "wb") as nf:
+            np.save(nf, new_mni_aff)
+        os.replace(tmp_npy, cached_aff_npy)
+    except Exception:
+        try:
+            if os.path.exists(tmp_npy):
+                os.remove(tmp_npy)
+        except OSError:
+            pass
+        raise
     return new_mni_aff, False
 
 
@@ -1666,8 +1759,8 @@ def compute_or_load_mni_to_subject_warp(
                         timeout=30,
                     )
                     if os.path.isfile(mni2sub_mat_tmp):
-                        shutil.copyfile(mni2sub_mat_tmp, cached_aff_mat)
-                shutil.copyfile(mni2sub_warp_tmp, cached_warp)
+                        _atomic_copy_file(mni2sub_mat_tmp, cached_aff_mat)
+                _atomic_copy_file(mni2sub_warp_tmp, cached_warp)
                 return {
                     "mode": "fnirt_nonlinear",
                     "requestedMode": req_mode,
@@ -1747,7 +1840,7 @@ def compute_or_load_mni_to_subject_warp(
             timeout=90,
         )
         if os.path.isfile(mni2sub_tmp):
-            shutil.copyfile(mni2sub_tmp, cached_aff_mat)
+            _atomic_copy_file(mni2sub_tmp, cached_aff_mat)
             return {
                 "mode": "flirt_12dof",
                 "requestedMode": req_mode,
@@ -1793,7 +1886,7 @@ def warp_mni_label_volume_to_subject(
     fsl_env["FSLOUTPUTTYPE"] = "NIFTI_GZ"
 
     atlas_img = nib.load(atlas_nifti_path)
-    atlas_data = np.rint(get_clean_3d_data(atlas_img)).astype(np.int16)
+    atlas_data = _to_safe_label_int_array(get_clean_3d_data(atlas_img, dtype=np.float64))
     atlas_aff = get_best_affine(atlas_img)
     t1_img = nib.load(in_t1_path)
 
@@ -1817,7 +1910,7 @@ def warp_mni_label_volume_to_subject(
             )
             if not same_origin:
                 vox2atlas = safe_inv4x4(atlas_aff) @ mni1_img.affine
-                std_arr = affine_transform(
+                std_arr = _to_safe_label_int_array(affine_transform(
                     atlas_data,
                     vox2atlas[:3, :3],
                     offset=vox2atlas[:3, 3],
@@ -1825,7 +1918,7 @@ def warp_mni_label_volume_to_subject(
                     order=0,
                     mode="constant",
                     cval=0,
-                ).astype(np.int16)
+                ))
                 apply_in_path = os.path.join(tmpdir, "atlas_on_mni1mm.nii.gz")
                 std_nii = nib.Nifti1Image(std_arr, mni1_img.affine)
                 std_nii.set_sform(mni1_img.affine, code=4)
@@ -1847,8 +1940,7 @@ def warp_mni_label_volume_to_subject(
             text=True,
             timeout=120,
         )
-        warped_data = np.rint(get_clean_3d_data(nib.load(out_warped_path))).astype(np.int16)
-        warped_data[warped_data < 0] = 0
+        warped_data = _to_safe_label_int_array(get_clean_3d_data(nib.load(out_warped_path), dtype=np.float64))
         return warped_data, "FSL FNIRT Nonlinear MNI152 -> Subject"
 
     if warp_bundle["mode"] == "flirt_12dof":
@@ -1876,8 +1968,7 @@ def warp_mni_label_volume_to_subject(
             text=True,
             timeout=90,
         )
-        warped_data = np.rint(get_clean_3d_data(nib.load(out_warped_path))).astype(np.int16)
-        warped_data[warped_data < 0] = 0
+        warped_data = _to_safe_label_int_array(get_clean_3d_data(nib.load(out_warped_path), dtype=np.float64))
         return warped_data, "FSL FLIRT 12-DOF Affine MNI152 -> Subject"
 
     # Pure-Python SciPy 9-DOF fallback
@@ -1887,7 +1978,7 @@ def warp_mni_label_volume_to_subject(
     w_ras = new_mni_aff @ safe_inv4x4(ref_mni_aff)
     # Atlas voxel -> Subject voxel = inv(target_aff) @ W_ras @ atlas_aff; inverse is Subject voxel -> Atlas voxel
     sub_vox_to_atlas_vox = safe_inv4x4(atlas_aff) @ safe_inv4x4(w_ras) @ target_aff
-    warped_data = affine_transform(
+    warped_data = _to_safe_label_int_array(affine_transform(
         atlas_data,
         sub_vox_to_atlas_vox[:3, :3],
         offset=sub_vox_to_atlas_vox[:3, 3],
@@ -1895,8 +1986,7 @@ def warp_mni_label_volume_to_subject(
         order=0,
         mode="constant",
         cval=0,
-    ).astype(np.int16)
-    warped_data[warped_data < 0] = 0
+    ))
     return warped_data, "SciPy 9-DOF Template Affine MNI152 -> Subject"
 
 
@@ -2407,6 +2497,8 @@ def run_hips_thomas_segmentation(
 
         if job_state is not None:
             with ATLAS_JOBS_LOCK:
+                if job_state.get("cancelRequested"):
+                    return None, None, False, "Cancelled by user", True
                 job_state["containerName"] = None if is_native else container_name
                 job_state["dockerBin"] = None if is_native else docker_bin
                 job_state["stage"] = f"Launching HIPS-THOMAS ({img_id})..."
@@ -2425,9 +2517,34 @@ def run_hips_thomas_segmentation(
             print(f"[NeuroCoreg] HIPS-THOMAS launch error: {run_err}", flush=True)
             return None, None, False, f"HIPS-THOMAS launch failed: {run_err}", False
 
+        early_cancel = False
         if job_state is not None:
             with ATLAS_JOBS_LOCK:
                 job_state["proc"] = proc
+                early_cancel = bool(job_state.get("cancelRequested"))
+        if early_cancel:
+            if not is_native:
+                _stop_hips_container(docker_bin, container_name)
+            try:
+                proc.terminate()
+                proc.wait(timeout=5)
+            except Exception:
+                try:
+                    proc.kill()
+                    proc.wait(timeout=3)
+                except Exception:
+                    pass
+            finally:
+                if proc.stdout is not None and hasattr(proc.stdout, "close"):
+                    try:
+                        proc.stdout.close()
+                    except Exception:
+                        pass
+                if job_state is not None:
+                    with ATLAS_JOBS_LOCK:
+                        job_state["proc"] = None
+            print("[NeuroCoreg] HIPS-THOMAS job cancelled before execution.", flush=True)
+            return None, None, False, "Cancelled by user", True
 
         timed_out = {"flag": False}
 
@@ -2468,6 +2585,11 @@ def run_hips_thomas_segmentation(
                 rc = -1
         finally:
             timer.cancel()
+            if proc.stdout is not None and hasattr(proc.stdout, "close"):
+                try:
+                    proc.stdout.close()
+                except Exception:
+                    pass
             if job_state is not None:
                 with ATLAS_JOBS_LOCK:
                     job_state["proc"] = None
@@ -2888,16 +3010,37 @@ def optimize_multimodal_registration(ref_img: nib.Nifti1Image, mov_img: nib.Nift
     return full_best_12[:9], W_best, new_mov_affine
 
 
+_LOOPBACK_ORIGIN_RE = re.compile(
+    r"^https?://(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$",
+    re.IGNORECASE,
+)
+
+
+def _is_blocked_static_path(url_path: str) -> bool:
+    decoded = unquote(urlparse(url_path or "").path).replace("\\", "/")
+    parts = [p for p in decoded.split("/") if p]
+    return any(p.startswith(".") for p in parts)
+
+
 class MultimodalHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=ROOT_DIR, **kwargs)
 
     def end_headers(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = (self.headers.get("Origin") or "").strip() if hasattr(self, "headers") and self.headers else ""
+        if origin and _LOOPBACK_ORIGIN_RE.match(origin):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
         super().end_headers()
+
+    def send_head(self):
+        if _is_blocked_static_path(self.path):
+            self.send_error(403, "Forbidden")
+            return None
+        return super().send_head()
 
     def do_OPTIONS(self):
         self.send_response(200)
@@ -4549,6 +4692,13 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
             "error": None,
         }
         with ATLAS_JOBS_LOCK:
+            running_cnt = sum(1 for j in ATLAS_JOBS.values() if j.get("status") == "running")
+            if running_cnt >= MAX_CONCURRENT_ATLAS_JOBS:
+                self._send_json(
+                    429,
+                    {"error": "An atlas generation job is already running. Cancel it or wait for completion."},
+                )
+                return
             ATLAS_JOBS[job_id] = job
 
         def _worker():
@@ -4596,6 +4746,8 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                     "cancelRequested": bool(job.get("cancelRequested")),
                 }
                 if job.get("status") == "done":
+                    if job.get("result") is not None and not job.get("resultFetchedAt"):
+                        job["resultFetchedAt"] = time.time()
                     snap["result"] = job.get("result")
                 elif job.get("status") in ("error", "cancelled"):
                     snap["error"] = job.get("error")
@@ -4646,14 +4798,27 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                         self._send_json(400, {"error": "No HIPS-THOMAS NIfTI files provided."})
                         return
 
+                    base_hips_dir = os.path.realpath(os.path.join(tmpdir, "hips_in"))
+                    os.makedirs(base_hips_dir, exist_ok=True)
                     saved_list = []
                     for idx, fobj in enumerate(files_payload):
-                        rel_name = (fobj.get("relativePath") or fobj.get("name") or f"file_{idx}.nii.gz").replace("\\", "/")
+                        rel_name = str(fobj.get("relativePath") or fobj.get("name") or f"file_{idx}.nii.gz").replace("\\", "/")
                         lower_rel = rel_name.lower()
                         if not lower_rel.endswith((".nii", ".nii.gz")):
                             continue
-                        dest_rel = re.sub(r"[^a-zA-Z0-9._/-]", "_", rel_name).lstrip("/")
-                        dest_full = os.path.join(tmpdir, "hips_in", dest_rel)
+                        raw_parts = [seg for seg in rel_name.split("/") if seg]
+                        if not raw_parts or any(seg in (".", "..") for seg in raw_parts):
+                            self._send_json(400, {"error": "Invalid relative path in uploaded HIPS-THOMAS files."})
+                            return
+                        safe_parts = [re.sub(r"[^a-zA-Z0-9._-]", "_", seg) for seg in raw_parts]
+                        if any((not seg or seg in (".", "..")) for seg in safe_parts):
+                            self._send_json(400, {"error": "Invalid relative path in uploaded HIPS-THOMAS files."})
+                            return
+                        dest_rel = "/".join(safe_parts)
+                        dest_full = os.path.realpath(os.path.join(base_hips_dir, *safe_parts))
+                        if os.path.commonpath([base_hips_dir, dest_full]) != base_hips_dir or dest_full == base_hips_dir:
+                            self._send_json(400, {"error": "Path traversal rejected in uploaded HIPS-THOMAS files."})
+                            return
                         os.makedirs(os.path.dirname(dest_full), exist_ok=True)
                         with open(dest_full, "wb") as df:
                             df.write(base64.b64decode(fobj["dataBase64"]))
@@ -4710,8 +4875,11 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                 space = str(body.get("space") or "subject").strip().lower()
 
                 atlas_img = load_neuro_image_from_bytes(src_bytes, file_name, tmpdir)
-                atlas_3d = np.rint(get_clean_3d_data(atlas_img)).astype(np.int16)
-                atlas_3d[atlas_3d < 0] = 0
+                try:
+                    atlas_3d = _to_safe_label_int_array(get_clean_3d_data(atlas_img, dtype=np.float64))
+                except ValueError as lbl_err:
+                    self._send_json(400, {"error": str(lbl_err)})
+                    return
                 out_aff = get_best_affine(atlas_img)
                 out_data = atlas_3d
                 warp_cache_hit = False
@@ -5091,8 +5259,26 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
         import threading
         threading.Thread(target=_stop_server, daemon=True).start()
 
+    @staticmethod
+    def _sanitize_json_value(obj):
+        if isinstance(obj, dict):
+            return {k: MultimodalHandler._sanitize_json_value(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [MultimodalHandler._sanitize_json_value(v) for v in obj]
+        if isinstance(obj, np.ndarray):
+            return MultimodalHandler._sanitize_json_value(obj.tolist())
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, (float, np.floating)):
+            fv = float(obj)
+            return fv if math.isfinite(fv) else None
+        return obj
+
     def _send_json(self, status, payload):
-        raw = json.dumps(payload).encode("utf-8")
+        safe_payload = MultimodalHandler._sanitize_json_value(payload)
+        raw = json.dumps(safe_payload, allow_nan=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(raw)))
