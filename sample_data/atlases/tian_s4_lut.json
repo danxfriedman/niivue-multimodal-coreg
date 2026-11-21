@@ -1,0 +1,549 @@
+{
+  "atlasId": "tian_s4",
+  "name": "Tian Melbourne Subcortex Scale 4 (54 ROIs)",
+  "space": "MNI152NLin6Asym",
+  "resolution": "1mm",
+  "source": "https://github.com/yetianmed/subcortex",
+  "labels": [
+    {
+      "id": 1,
+      "name": "HIP-head-m1-rh",
+      "shortName": "HIP-head-m1-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 109,
+      "b": 67,
+      "a": 255
+    },
+    {
+      "id": 2,
+      "name": "HIP-head-m2-rh",
+      "shortName": "HIP-head-m2-rh",
+      "hemisphere": "R",
+      "r": 50,
+      "g": 60,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 3,
+      "name": "THA-VAip-rh",
+      "shortName": "THA-VAip-rh",
+      "hemisphere": "R",
+      "r": 104,
+      "g": 240,
+      "b": 34,
+      "a": 255
+    },
+    {
+      "id": 4,
+      "name": "THA-VAia-rh",
+      "shortName": "THA-VAia-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 67,
+      "b": 177,
+      "a": 255
+    },
+    {
+      "id": 5,
+      "name": "HIP-head-l-rh",
+      "shortName": "HIP-head-l-rh",
+      "hemisphere": "R",
+      "r": 50,
+      "g": 226,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 6,
+      "name": "HIP-body-rh",
+      "shortName": "HIP-body-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 195,
+      "b": 34,
+      "a": 255
+    },
+    {
+      "id": 7,
+      "name": "HIP-tail-rh",
+      "shortName": "HIP-tail-rh",
+      "hemisphere": "R",
+      "r": 152,
+      "g": 67,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 8,
+      "name": "THA-VPm-rh",
+      "shortName": "THA-VPm-rh",
+      "hemisphere": "R",
+      "r": 50,
+      "g": 240,
+      "b": 88,
+      "a": 255
+    },
+    {
+      "id": 9,
+      "name": "THA-VPl-rh",
+      "shortName": "THA-VPl-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 34,
+      "b": 53,
+      "a": 255
+    },
+    {
+      "id": 10,
+      "name": "THA-VAs-rh",
+      "shortName": "THA-VAs-rh",
+      "hemisphere": "R",
+      "r": 67,
+      "g": 134,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 11,
+      "name": "THA-DAm-rh",
+      "shortName": "THA-DAm-rh",
+      "hemisphere": "R",
+      "r": 179,
+      "g": 240,
+      "b": 50,
+      "a": 255
+    },
+    {
+      "id": 12,
+      "name": "THA-DAl-rh",
+      "shortName": "THA-DAl-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 34,
+      "b": 233,
+      "a": 255
+    },
+    {
+      "id": 13,
+      "name": "PUT-VA-rh",
+      "shortName": "PUT-VA-rh",
+      "hemisphere": "R",
+      "r": 67,
+      "g": 240,
+      "b": 195,
+      "a": 255
+    },
+    {
+      "id": 14,
+      "name": "PUT-DA-rh",
+      "shortName": "PUT-DA-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 135,
+      "b": 50,
+      "a": 255
+    },
+    {
+      "id": 15,
+      "name": "PUT-VP-rh",
+      "shortName": "PUT-VP-rh",
+      "hemisphere": "R",
+      "r": 65,
+      "g": 34,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 16,
+      "name": "PUT-DP-rh",
+      "shortName": "PUT-DP-rh",
+      "hemisphere": "R",
+      "r": 91,
+      "g": 240,
+      "b": 67,
+      "a": 255
+    },
+    {
+      "id": 17,
+      "name": "CAU-VA-rh",
+      "shortName": "CAU-VA-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 50,
+      "b": 132,
+      "a": 255
+    },
+    {
+      "id": 18,
+      "name": "CAU-DA-rh",
+      "shortName": "CAU-DA-rh",
+      "hemisphere": "R",
+      "r": 34,
+      "g": 182,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 19,
+      "name": "CAU-body-rh",
+      "shortName": "CAU-body-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 238,
+      "b": 67,
+      "a": 255
+    },
+    {
+      "id": 20,
+      "name": "CAU-tail-rh",
+      "shortName": "CAU-tail-rh",
+      "hemisphere": "R",
+      "r": 182,
+      "g": 50,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 21,
+      "name": "lAMY-rh",
+      "shortName": "lAMY-rh",
+      "hemisphere": "R",
+      "r": 34,
+      "g": 240,
+      "b": 117,
+      "a": 255
+    },
+    {
+      "id": 22,
+      "name": "mAMY-rh",
+      "shortName": "mAMY-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 86,
+      "b": 67,
+      "a": 255
+    },
+    {
+      "id": 23,
+      "name": "THA-DP-rh",
+      "shortName": "THA-DP-rh",
+      "hemisphere": "R",
+      "r": 50,
+      "g": 84,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 24,
+      "name": "NAc-shell-rh",
+      "shortName": "NAc-shell-rh",
+      "hemisphere": "R",
+      "r": 131,
+      "g": 240,
+      "b": 34,
+      "a": 255
+    },
+    {
+      "id": 25,
+      "name": "NAc-core-rh",
+      "shortName": "NAc-core-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 67,
+      "b": 199,
+      "a": 255
+    },
+    {
+      "id": 26,
+      "name": "pGP-rh",
+      "shortName": "pGP-rh",
+      "hemisphere": "R",
+      "r": 50,
+      "g": 240,
+      "b": 229,
+      "a": 255
+    },
+    {
+      "id": 27,
+      "name": "aGP-rh",
+      "shortName": "aGP-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 168,
+      "b": 34,
+      "a": 255
+    },
+    {
+      "id": 28,
+      "name": "HIP-head-m1-lh",
+      "shortName": "HIP-head-m1-lh",
+      "hemisphere": "L",
+      "r": 82,
+      "g": 63,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 29,
+      "name": "HIP-head-m2-lh",
+      "shortName": "HIP-head-m2-lh",
+      "hemisphere": "L",
+      "r": 77,
+      "g": 224,
+      "b": 47,
+      "a": 255
+    },
+    {
+      "id": 30,
+      "name": "THA-VAip-lh",
+      "shortName": "THA-VAip-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 31,
+      "b": 121,
+      "a": 255
+    },
+    {
+      "id": 31,
+      "name": "THA-VAia-lh",
+      "shortName": "THA-VAia-lh",
+      "hemisphere": "L",
+      "r": 63,
+      "g": 185,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 32,
+      "name": "HIP-head-l-lh",
+      "shortName": "HIP-head-l-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 216,
+      "b": 47,
+      "a": 255
+    },
+    {
+      "id": 33,
+      "name": "HIP-body-lh",
+      "shortName": "HIP-body-lh",
+      "hemisphere": "L",
+      "r": 159,
+      "g": 31,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 34,
+      "name": "HIP-tail-lh",
+      "shortName": "HIP-tail-lh",
+      "hemisphere": "L",
+      "r": 63,
+      "g": 224,
+      "b": 123,
+      "a": 255
+    },
+    {
+      "id": 35,
+      "name": "THA-VPm-lh",
+      "shortName": "THA-VPm-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 61,
+      "b": 47,
+      "a": 255
+    },
+    {
+      "id": 36,
+      "name": "THA-VPl-lh",
+      "shortName": "THA-VPl-lh",
+      "hemisphere": "L",
+      "r": 31,
+      "g": 72,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 37,
+      "name": "THA-VAs-lh",
+      "shortName": "THA-VAs-lh",
+      "hemisphere": "L",
+      "r": 144,
+      "g": 224,
+      "b": 63,
+      "a": 255
+    },
+    {
+      "id": 38,
+      "name": "THA-DAm-lh",
+      "shortName": "THA-DAm-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 47,
+      "b": 188,
+      "a": 255
+    },
+    {
+      "id": 39,
+      "name": "THA-DAl-lh",
+      "shortName": "THA-DAl-lh",
+      "hemisphere": "L",
+      "r": 31,
+      "g": 224,
+      "b": 207,
+      "a": 255
+    },
+    {
+      "id": 40,
+      "name": "PUT-VA-lh",
+      "shortName": "PUT-VA-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 163,
+      "b": 63,
+      "a": 255
+    },
+    {
+      "id": 41,
+      "name": "PUT-DA-lh",
+      "shortName": "PUT-DA-lh",
+      "hemisphere": "L",
+      "r": 105,
+      "g": 47,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 42,
+      "name": "PUT-VP-lh",
+      "shortName": "PUT-VP-lh",
+      "hemisphere": "L",
+      "r": 31,
+      "g": 224,
+      "b": 38,
+      "a": 255
+    },
+    {
+      "id": 43,
+      "name": "PUT-DP-lh",
+      "shortName": "PUT-DP-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 63,
+      "b": 104,
+      "a": 255
+    },
+    {
+      "id": 44,
+      "name": "CAU-VA-lh",
+      "shortName": "CAU-VA-lh",
+      "hemisphere": "L",
+      "r": 47,
+      "g": 144,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 45,
+      "name": "CAU-DA-lh",
+      "shortName": "CAU-DA-lh",
+      "hemisphere": "L",
+      "r": 193,
+      "g": 224,
+      "b": 31,
+      "a": 255
+    },
+    {
+      "id": 46,
+      "name": "CAU-body-lh",
+      "shortName": "CAU-body-lh",
+      "hemisphere": "L",
+      "r": 203,
+      "g": 63,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 47,
+      "name": "CAU-tail-lh",
+      "shortName": "CAU-tail-lh",
+      "hemisphere": "L",
+      "r": 47,
+      "g": 224,
+      "b": 149,
+      "a": 255
+    },
+    {
+      "id": 48,
+      "name": "lAMY-lh",
+      "shortName": "lAMY-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 87,
+      "b": 31,
+      "a": 255
+    },
+    {
+      "id": 49,
+      "name": "mAMY-lh",
+      "shortName": "mAMY-lh",
+      "hemisphere": "L",
+      "r": 63,
+      "g": 64,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 50,
+      "name": "THA-DP-lh",
+      "shortName": "THA-DP-lh",
+      "hemisphere": "L",
+      "r": 100,
+      "g": 224,
+      "b": 47,
+      "a": 255
+    },
+    {
+      "id": 51,
+      "name": "NAc-shell-lh",
+      "shortName": "NAc-shell-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 31,
+      "b": 145,
+      "a": 255
+    },
+    {
+      "id": 52,
+      "name": "NAc-core-lh",
+      "shortName": "NAc-core-lh",
+      "hemisphere": "L",
+      "r": 63,
+      "g": 205,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 53,
+      "name": "pGP-lh",
+      "shortName": "pGP-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 194,
+      "b": 47,
+      "a": 255
+    },
+    {
+      "id": 54,
+      "name": "aGP-lh",
+      "shortName": "aGP-lh",
+      "hemisphere": "L",
+      "r": 135,
+      "g": 31,
+      "b": 224,
+      "a": 255
+    }
+  ]
+}

@@ -1,0 +1,329 @@
+{
+  "atlasId": "tian_s2",
+  "name": "Tian Melbourne Subcortex Scale 2 (32 ROIs)",
+  "space": "MNI152NLin6Asym",
+  "resolution": "1mm",
+  "source": "https://github.com/yetianmed/subcortex",
+  "labels": [
+    {
+      "id": 1,
+      "name": "aHIP-rh",
+      "shortName": "aHIP-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 109,
+      "b": 67,
+      "a": 255
+    },
+    {
+      "id": 2,
+      "name": "pHIP-rh",
+      "shortName": "pHIP-rh",
+      "hemisphere": "R",
+      "r": 50,
+      "g": 60,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 3,
+      "name": "lAMY-rh",
+      "shortName": "lAMY-rh",
+      "hemisphere": "R",
+      "r": 104,
+      "g": 240,
+      "b": 34,
+      "a": 255
+    },
+    {
+      "id": 4,
+      "name": "mAMY-rh",
+      "shortName": "mAMY-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 67,
+      "b": 177,
+      "a": 255
+    },
+    {
+      "id": 5,
+      "name": "THA-DP-rh",
+      "shortName": "THA-DP-rh",
+      "hemisphere": "R",
+      "r": 50,
+      "g": 226,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 6,
+      "name": "THA-VP-rh",
+      "shortName": "THA-VP-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 195,
+      "b": 34,
+      "a": 255
+    },
+    {
+      "id": 7,
+      "name": "THA-VA-rh",
+      "shortName": "THA-VA-rh",
+      "hemisphere": "R",
+      "r": 152,
+      "g": 67,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 8,
+      "name": "THA-DA-rh",
+      "shortName": "THA-DA-rh",
+      "hemisphere": "R",
+      "r": 50,
+      "g": 240,
+      "b": 88,
+      "a": 255
+    },
+    {
+      "id": 9,
+      "name": "NAc-shell-rh",
+      "shortName": "NAc-shell-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 34,
+      "b": 53,
+      "a": 255
+    },
+    {
+      "id": 10,
+      "name": "NAc-core-rh",
+      "shortName": "NAc-core-rh",
+      "hemisphere": "R",
+      "r": 67,
+      "g": 134,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 11,
+      "name": "pGP-rh",
+      "shortName": "pGP-rh",
+      "hemisphere": "R",
+      "r": 179,
+      "g": 240,
+      "b": 50,
+      "a": 255
+    },
+    {
+      "id": 12,
+      "name": "aGP-rh",
+      "shortName": "aGP-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 34,
+      "b": 233,
+      "a": 255
+    },
+    {
+      "id": 13,
+      "name": "aPUT-rh",
+      "shortName": "aPUT-rh",
+      "hemisphere": "R",
+      "r": 67,
+      "g": 240,
+      "b": 195,
+      "a": 255
+    },
+    {
+      "id": 14,
+      "name": "pPUT-rh",
+      "shortName": "pPUT-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 135,
+      "b": 50,
+      "a": 255
+    },
+    {
+      "id": 15,
+      "name": "aCAU-rh",
+      "shortName": "aCAU-rh",
+      "hemisphere": "R",
+      "r": 65,
+      "g": 34,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 16,
+      "name": "pCAU-rh",
+      "shortName": "pCAU-rh",
+      "hemisphere": "R",
+      "r": 91,
+      "g": 240,
+      "b": 67,
+      "a": 255
+    },
+    {
+      "id": 17,
+      "name": "aHIP-lh",
+      "shortName": "aHIP-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 47,
+      "b": 166,
+      "a": 255
+    },
+    {
+      "id": 18,
+      "name": "pHIP-lh",
+      "shortName": "pHIP-lh",
+      "hemisphere": "L",
+      "r": 31,
+      "g": 217,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 19,
+      "name": "lAMY-lh",
+      "shortName": "lAMY-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 184,
+      "b": 63,
+      "a": 255
+    },
+    {
+      "id": 20,
+      "name": "mAMY-lh",
+      "shortName": "mAMY-lh",
+      "hemisphere": "L",
+      "r": 128,
+      "g": 47,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 21,
+      "name": "THA-DP-lh",
+      "shortName": "THA-DP-lh",
+      "hemisphere": "L",
+      "r": 31,
+      "g": 224,
+      "b": 63,
+      "a": 255
+    },
+    {
+      "id": 22,
+      "name": "THA-VP-lh",
+      "shortName": "THA-VP-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 63,
+      "b": 83,
+      "a": 255
+    },
+    {
+      "id": 23,
+      "name": "THA-VA-lh",
+      "shortName": "THA-VA-lh",
+      "hemisphere": "L",
+      "r": 47,
+      "g": 121,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 24,
+      "name": "THA-DA-lh",
+      "shortName": "THA-DA-lh",
+      "hemisphere": "L",
+      "r": 169,
+      "g": 224,
+      "b": 31,
+      "a": 255
+    },
+    {
+      "id": 25,
+      "name": "NAc-shell-lh",
+      "shortName": "NAc-shell-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 63,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 26,
+      "name": "NAc-core-lh",
+      "shortName": "NAc-core-lh",
+      "hemisphere": "L",
+      "r": 47,
+      "g": 224,
+      "b": 172,
+      "a": 255
+    },
+    {
+      "id": 27,
+      "name": "pGP-lh",
+      "shortName": "pGP-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 111,
+      "b": 31,
+      "a": 255
+    },
+    {
+      "id": 28,
+      "name": "aGP-lh",
+      "shortName": "aGP-lh",
+      "hemisphere": "L",
+      "r": 82,
+      "g": 63,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 29,
+      "name": "aPUT-lh",
+      "shortName": "aPUT-lh",
+      "hemisphere": "L",
+      "r": 77,
+      "g": 224,
+      "b": 47,
+      "a": 255
+    },
+    {
+      "id": 30,
+      "name": "pPUT-lh",
+      "shortName": "pPUT-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 31,
+      "b": 121,
+      "a": 255
+    },
+    {
+      "id": 31,
+      "name": "aCAU-lh",
+      "shortName": "aCAU-lh",
+      "hemisphere": "L",
+      "r": 63,
+      "g": 185,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 32,
+      "name": "pCAU-lh",
+      "shortName": "pCAU-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 216,
+      "b": 47,
+      "a": 255
+    }
+  ]
+}

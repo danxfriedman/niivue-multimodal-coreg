@@ -35,6 +35,25 @@ const COLORMAPS = [
   "actc",
 ];
 
+function loadSavedHipsCustomImage() {
+  try {
+    return typeof localStorage !== "undefined" ? (localStorage.getItem("neurocoreg_hips_docker_image") || "") : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function persistHipsCustomImage(val) {
+  try {
+    if (typeof localStorage === "undefined") return;
+    const trimmed = String(val || "").trim();
+    if (trimmed) localStorage.setItem("neurocoreg_hips_docker_image", trimmed);
+    else localStorage.removeItem("neurocoreg_hips_docker_image");
+  } catch (_) {
+    // ignore storage errors
+  }
+}
+
 // Global Application State
 const state = {
   nv: null,
@@ -56,6 +75,28 @@ const state = {
   dktLut: {}, // labelId string -> { id, name, title, rgb, hex }
   neuroToolsStatus: null,
   activeDktVolId: null,
+  activeAtlasVolId: null,
+  atlasRegistry: [],
+  atlasLuts: new Map(), // atlasId -> normalized LUT object
+  atlasPreferredModeById: new Map(), // atlasId -> user's explicitly chosen pipeline mode
+  lastPopulatedAtlasModeId: null,
+  atlasOverlayStyle: "filled", // "filled" | "filled_outline" | "outline"
+  atlasStudioPopout: null,
+  atlasStudioState: {
+    search: "",
+    hemi: "all", // "all" | "L" | "R"
+    selectedAtlasVolId: null,
+    customNiftiFile: null,
+    customLutFile: null,
+    customSpace: "subject",
+    customName: "",
+    warpCacheHit: null,
+    hipsCacheHit: null,
+    hipsContrast: "t1", // "t1" | "wmn"
+    hipsForceRecompute: false,
+    hipsCustomImage: loadSavedHipsCustomImage(),
+  },
+  activeAtlasJob: null, // { jobId, atlasId, atlasShort, regEntry, modeLabel, startedAtMs, timerId, elapsedTimerId, stage, logTail, cancelling }
   zoom2d: {
     zoom: 1.0,
     panMM: [0, 0, 0],
@@ -617,10 +658,86 @@ function toggleCoregPanel(forceState = null) {
 function inferModalityAndStyle(filename) {
   const lower = filename.toLowerCase();
   if (lower.includes("destrieux") || lower.includes("a2009s")) {
-    return { modality: "Destrieux Atlas (FreeSurferColorLUT)", colormap: "actc", opacity: 0.35, isMask: true, isDktAtlas: true, atlasType: "destrieux" };
+    return {
+      modality: "Destrieux Atlas (148 ROIs)",
+      colormap: "actc",
+      opacity: 0.45,
+      isMask: true,
+      isAtlas: true,
+      isDktAtlas: true,
+      isFreeSurferAtlas: true,
+      atlasType: "destrieux",
+      atlasId: "destrieux",
+      atlasShortName: "Destrieux",
+      atlasBadge: "DESTRIEUX",
+      atlasCategory: "cortical",
+    };
+  }
+  if (lower.includes("thomas") || lower.includes("sthomas")) {
+    return {
+      modality: "THOMAS Thalamic Nuclei Atlas",
+      colormap: "actc",
+      opacity: 0.55,
+      isMask: true,
+      isAtlas: true,
+      isDktAtlas: true,
+      isFreeSurferAtlas: false,
+      atlasType: "thomas",
+      atlasId: "thomas",
+      atlasShortName: "THOMAS",
+      atlasBadge: "THOMAS",
+      atlasCategory: "thalamic",
+    };
+  }
+  const tianMatch = lower.match(/tian[_-]?subcortex[_-]?s([1-4])|tian[_-]?s([1-4])/);
+  if (tianMatch) {
+    const sc = tianMatch[1] || tianMatch[2];
+    return {
+      modality: `Tian Melbourne Subcortex S${sc}`,
+      colormap: "actc",
+      opacity: 0.5,
+      isMask: true,
+      isAtlas: true,
+      isDktAtlas: true,
+      isFreeSurferAtlas: false,
+      atlasType: `tian_s${sc}`,
+      atlasId: `tian_s${sc}`,
+      atlasShortName: `Tian S${sc}`,
+      atlasBadge: `TIAN S${sc}`,
+      atlasCategory: "subcortical",
+    };
+  }
+  if (lower.includes("harvardoxford") || lower.includes("jhu") || lower.includes("cerebellum") || lower.includes("_stn_") || lower.startsWith("stn")) {
+    return {
+      modality: "FSL MNI152 Atlas",
+      colormap: "actc",
+      opacity: 0.48,
+      isMask: true,
+      isAtlas: true,
+      isDktAtlas: true,
+      isFreeSurferAtlas: false,
+      atlasType: "fsl",
+      atlasId: "fsl",
+      atlasShortName: "FSL Atlas",
+      atlasBadge: "FSL",
+      atlasCategory: "fsl",
+    };
   }
   if (lower.includes("dkt") || lower.includes("aparc") || lower.includes("aseg") || lower.includes("atlas")) {
-    return { modality: "DKT Atlas (104 ROIs)", colormap: "actc", opacity: 0.38, isMask: true, isDktAtlas: true, atlasType: "dkt" };
+    return {
+      modality: "DKT Atlas (104 ROIs)",
+      colormap: "actc",
+      opacity: 0.38,
+      isMask: true,
+      isAtlas: true,
+      isDktAtlas: true,
+      isFreeSurferAtlas: true,
+      atlasType: "dkt",
+      atlasId: "dkt",
+      atlasShortName: "DKT",
+      atlasBadge: "DKT",
+      atlasCategory: "cortical",
+    };
   }
   if (lower.includes("mask") || lower.includes("seeg") || lower.includes("elec") || lower.includes("roi") || lower.includes("seg")) {
     return { modality: "ROI / Contacts Mask", colormap: "green", opacity: 0.9, isMask: true, isDktAtlas: false };
@@ -655,24 +772,43 @@ function registerVolumeMeta(vol, overrides = {}) {
   const isChild = Boolean(overrides.isChildOfMov || overrides.role === "child");
   const isDrawingLayer = Boolean(overrides.isDrawingLayer);
   const isMask = overrides.isMask !== undefined ? Boolean(overrides.isMask) : isDrawingLayer || inferred.isMask;
-  const isDktAtlas = !isDrawingLayer && (overrides.isDktAtlas !== undefined ? Boolean(overrides.isDktAtlas) : Boolean(inferred.isDktAtlas));
-  const atlasType = overrides.atlasType || inferred.atlasType || (isDktAtlas ? resolveAtlasTypeForVolume(vol) : null);
+  const isDktAtlas = !isDrawingLayer && (overrides.isDktAtlas !== undefined ? Boolean(overrides.isDktAtlas) : Boolean(overrides.isAtlas || inferred.isDktAtlas));
+  const atlasType = overrides.atlasType || overrides.atlasId || inferred.atlasType || (isDktAtlas ? resolveAtlasTypeForVolume(vol) : null);
+  const atlasId = overrides.atlasId || atlasType || null;
+  const isFreeSurferAtlas =
+    overrides.isFreeSurferAtlas !== undefined
+      ? Boolean(overrides.isFreeSurferAtlas)
+      : atlasId === "dkt" || atlasId === "destrieux";
 
   state.layerMeta.set(vol.id, {
     label: overrides.label || vol.name || "Volume",
     modality: overrides.modality || (isDrawingLayer ? "Drawing VOI" : inferred.modality),
     visible,
     savedOpacity,
+    userAtlasOpacity: overrides.userAtlasOpacity ?? (initialOpacity > 0 ? initialOpacity : 0.48),
     origAffine,
     params: { tx: 0, ty: 0, tz: 0, rx: 0, ry: 0, rz: 0, sx: 1, sy: 1, sz: 1 },
     isChildOfMov: isChild,
     isCheckedForChildApply: !isDrawingLayer && (isChild || isMask),
     isCheckedForExport: !isDrawingLayer && (isChild || overrides.role === "moving" || isDktAtlas),
     isMask,
+    isAtlas: isDktAtlas,
     isDktAtlas,
+    isFreeSurferAtlas,
     isDrawingLayer,
     drawingLayerId: overrides.drawingLayerId || null,
     atlasType,
+    atlasId,
+    atlasName: overrides.atlasName || overrides.label || inferred.modality,
+    atlasShortName: overrides.atlasShortName || inferred.atlasShortName || (atlasId ? atlasId.toUpperCase() : null),
+    atlasCategory: overrides.atlasCategory || inferred.atlasCategory || "cortical",
+    atlasBadge: overrides.atlasBadge || inferred.atlasBadge || (atlasId ? atlasId.toUpperCase() : "ATLAS"),
+    atlasEngine: overrides.atlasEngine || null,
+    atlasSpace: overrides.atlasSpace || null,
+    lut: overrides.lut || null,
+    regions: Array.isArray(overrides.regions) ? overrides.regions : null,
+    visibleRegionIds: overrides.visibleRegionIds instanceof Set ? new Set(overrides.visibleRegionIds) : null,
+    rawAtlasVoxels: overrides.rawAtlasVoxels || null,
     rawBytes: overrides.rawBytes || null,
     isSyntheticVerification: Boolean(overrides.isSyntheticVerification),
     isEdgeOfMov: Boolean(overrides.isEdgeOfMov),
@@ -681,6 +817,7 @@ function registerVolumeMeta(vol, overrides = {}) {
 
   if (isDktAtlas) {
     state.activeDktVolId = vol.id;
+    state.activeAtlasVolId = vol.id;
   }
 
   if (!state.refVolId && !overrides.isSyntheticVerification && !isDktAtlas && !isDrawingLayer) {
@@ -705,8 +842,14 @@ function toggleVolumeVisibility(volId, forceState = null) {
   if (!meta) return;
 
   const nextVis = forceState !== null ? forceState : !meta.visible;
-  meta.visible = nextVis;
 
+  // Atlas overlays share single-active-slice-overlay semantics while keeping all loaded atlases active for stacked hover
+  if (meta.isAtlas || meta.isDktAtlas) {
+    activateAtlasOverlay(volId, nextVis);
+    return;
+  }
+
+  meta.visible = nextVis;
   const targetOpacity = nextVis ? (meta.savedOpacity > 0 ? meta.savedOpacity : 0.75) : 0.0;
   state.nv.setOpacity(idx, targetOpacity);
 
@@ -716,27 +859,6 @@ function toggleVolumeVisibility(volId, forceState = null) {
       dLayer.visible = nextVis;
       renderDrawingStudioUI();
     }
-  }
-
-  // If the user explicitly turns ON a DKT or Destrieux atlas layer in the Image Stack, make it the active atlas
-  if (meta.isDktAtlas && nextVis) {
-    state.activeDktVolId = volId;
-    const vol = state.nv.volumes[idx];
-    const detectedType = resolveAtlasTypeForVolume(vol);
-    const atlasSelect = document.getElementById("selectAtlasType");
-    if (atlasSelect && atlasSelect.value !== detectedType) {
-      atlasSelect.value = detectedType;
-      syncAtlasTypeSelectionUI(false, false);
-    }
-    state.nv.volumes.forEach((otherVol, otherIdx) => {
-      if (otherVol.id !== volId) {
-        const otherMeta = state.layerMeta.get(otherVol.id);
-        if (otherMeta?.isDktAtlas && otherMeta.visible) {
-          otherMeta.visible = false;
-          state.nv.setOpacity(otherIdx, 0.0);
-        }
-      }
-    });
   }
 
   state.nv.drawScene();
@@ -772,7 +894,8 @@ function renderLayerList() {
     const isRef = vol.id === state.refVolId;
     const isMov = vol.id === state.movVolId;
     const isChild = Boolean(meta.isChildOfMov) && !isRef && !isMov;
-    const isDkt = Boolean(meta.isDktAtlas);
+    const isDkt = Boolean(meta.isAtlas || meta.isDktAtlas);
+    const atlasBadgeInfo = isDkt ? getAtlasBadgeInfo(meta) : null;
     const isBet = Boolean(meta.isBetBrain);
     const isSolo = vol.id === state.soloVolId;
 
@@ -827,7 +950,7 @@ function renderLayerList() {
         </div>
       `;
     } else {
-      const canConvert = !meta.isSyntheticVerification && !meta.isDktAtlas;
+      const canConvert = !meta.isSyntheticVerification && !meta.isDktAtlas && !meta.isAtlas;
       card.innerHTML = `
         <div class="layer-top-row">
           <label class="vis-switch-label" title="Toggle volume visibility ON / OFF">
@@ -836,7 +959,7 @@ function renderLayerList() {
           </label>
           <div class="layer-badges">
             ${isBet ? `<span class="role-badge bet" title="Skull-Stripped Brain Extracted Volume (FSL BET)">BET</span>` : ""}
-            ${isDkt ? `<span class="role-badge dkt" title="Active DKT Anatomical Parcellation Atlas for Cursor Hover">DKT</span>` : ""}
+            ${isDkt && atlasBadgeInfo ? `<span class="role-badge dkt ${atlasBadgeInfo.cls}" title="Loaded Brain Atlas (${meta.atlasName || meta.label}) — Stacked Hover Active">${atlasBadgeInfo.text}</span>` : ""}
             <button class="role-badge ${isRef ? "ref" : "inactive"}" data-action="set-ref" data-id="${vol.id}" title="Set as Fixed Reference Volume">REF</button>
             <button class="role-badge ${isMov ? "mov" : "inactive"}" data-action="set-mov" data-id="${vol.id}" title="Set as Moving Parent Volume">MOV</button>
             <button class="role-badge ${isChild ? "child" : "inactive"}" data-action="toggle-child" data-id="${vol.id}" title="Link/Unlink as Child of Moving Volume (inherits Moving transforms automatically)">CHILD</button>
@@ -936,7 +1059,7 @@ function syncNeuroT1Selector() {
   const selectIds = ["selectBetT1Vol", "selectDktT1Vol", "selectNeuroT1Vol"];
   const candidateVols = state.nv.volumes.filter((v) => {
     const m = state.layerMeta.get(v.id);
-    return m && !m.isSyntheticVerification && !m.isDktAtlas && !m.isMask && !m.isDrawingLayer;
+    return m && !m.isSyntheticVerification && !m.isAtlas && !m.isDktAtlas && !m.isMask && !m.isDrawingLayer;
   });
 
   const t1Match = candidateVols.find(
@@ -962,6 +1085,9 @@ function syncNeuroT1Selector() {
       })
       .join("");
   });
+  if (typeof syncAtlasStudioUI === "function" && state.atlasStudioPopout?.isOpen?.()) {
+    syncAtlasStudioUI();
+  }
 }
 
 // Render Section 4 (Child Images list) and Section 5 (NIfTI Export Checklist)
@@ -2267,12 +2393,17 @@ async function loadLocalNiftiFiles(fileList) {
         if (convData.dktLut) state.dktLut = convData.dktLut;
       }
 
-      if (inferred.isDktAtlas) {
-        await addDktAtlasVolumeToWorkspace(
-          rawBytes,
+      if (inferred.isDktAtlas || inferred.isAtlas) {
+        await addAtlasVolumeToWorkspace(rawBytes, {
           fileName,
-          `DKT Atlas (${file.name.replace(/\.(nii\.gz|nii|mgz|mgh)$/i, "")})`
-        );
+          displayLabel: `${inferred.atlasShortName || "Atlas"} (${file.name.replace(/\.(nii\.gz|nii|mgz|mgh)$/i, "")})`,
+          atlasId: inferred.atlasId || "dkt",
+          atlasName: inferred.modality,
+          atlasShortName: inferred.atlasShortName || "DKT",
+          atlasCategory: inferred.atlasCategory || "cortical",
+          atlasBadge: inferred.atlasBadge || "DKT",
+          isFreeSurferAtlas: Boolean(inferred.isFreeSurferAtlas),
+        });
         continue;
       }
 
@@ -2411,6 +2542,9 @@ function createNewPatientWorkspace(confirmIfLoaded = true, presetPatientId = nul
   state.movVolId = null;
   state.soloVolId = null;
   state.activeDktVolId = null;
+  state.activeAtlasVolId = null;
+  state.atlasStudioState.selectedAtlasVolId = null;
+  state.atlasStudioState.warpCacheHit = null;
   state.baselineMetrics = null;
   state.savedTransforms = [];
   state.zoom2d.panCalib = null;
@@ -2425,6 +2559,7 @@ function createNewPatientWorkspace(confirmIfLoaded = true, presetPatientId = nul
   renderSavedTransformsDropdown();
   renderLayerList();
   resetDktInspectorUI();
+  syncAtlasStudioUI();
 
   // Reset voxel inspector & quantitative metrics footer
   const voxelTable = document.getElementById("voxelReadoutTable");
@@ -2520,8 +2655,20 @@ function buildProjectBundleData() {
         isCheckedForChildApply: Boolean(m?.isCheckedForChildApply),
         isCheckedForExport: Boolean(m?.isCheckedForExport),
         isMask: Boolean(m?.isMask),
-        isDktAtlas: Boolean(m?.isDktAtlas),
+        isAtlas: Boolean(m?.isAtlas || m?.isDktAtlas),
+        isDktAtlas: Boolean(m?.isDktAtlas || m?.isAtlas),
         atlasType: m?.atlasType || null,
+        atlasId: m?.atlasId || m?.atlasType || null,
+        atlasName: m?.atlasName || m?.label || null,
+        atlasShortName: m?.atlasShortName || null,
+        atlasCategory: m?.atlasCategory || null,
+        atlasBadge: m?.atlasBadge || null,
+        isFreeSurferAtlas: m?.isFreeSurferAtlas !== undefined ? Boolean(m.isFreeSurferAtlas) : null,
+        userAtlasOpacity: m?.userAtlasOpacity ?? null,
+        atlasEngine: m?.atlasEngine || null,
+        atlasSpace: m?.atlasSpace || null,
+        visibleRegionIds: m?.visibleRegionIds instanceof Set ? Array.from(m.visibleRegionIds) : null,
+        customLut: m?.lut && (!m.isFreeSurferAtlas || m.atlasCategory === "custom") ? m.lut : null,
         visible: m ? Boolean(m.visible) : true,
         opacity: vol.opacity,
         savedOpacity: m?.savedOpacity ?? 0.75,
@@ -2577,6 +2724,7 @@ function buildProjectBundleData() {
     currentMetrics,
     activeMovingWorldMatrix: W_ras,
     activeMovingFlirtMatrix: flirtMat,
+    atlasOverlayStyle: state.atlasOverlayStyle || "filled",
     savedTransforms: state.savedTransforms,
     volumes: volumeEntries.map((ve) => ve.entry),
     drawingLayers: drawingEntries.map((de) => de.entry),
@@ -2869,16 +3017,33 @@ async function restoreProjectWorkspace(manifest, niftiBytesByName, drawingBytesB
     });
 
     state.nv.addVolume(vol);
+    const vIsAtlas = Boolean(vEntry.isAtlas || vEntry.isDktAtlas);
+    const vAtlasId = vEntry.atlasId || vEntry.atlasType || null;
+    const vIsFS =
+      vEntry.isFreeSurferAtlas !== null && vEntry.isFreeSurferAtlas !== undefined
+        ? Boolean(vEntry.isFreeSurferAtlas)
+        : vAtlasId === "dkt" || vAtlasId === "destrieux";
     registerVolumeMeta(vol, {
       label: vEntry.label || vEntry.name,
       modality: vEntry.modality || "Neuro Volume",
       opacity: vEntry.savedOpacity ?? vEntry.opacity ?? 0.85,
+      userAtlasOpacity: vEntry.userAtlasOpacity ?? vEntry.opacity ?? vEntry.savedOpacity ?? 0.48,
       visible: vEntry.visible !== false,
       role: vEntry.role,
       isChildOfMov: Boolean(vEntry.isChildOfMov),
       isMask: Boolean(vEntry.isMask),
-      isDktAtlas: Boolean(vEntry.isDktAtlas),
-      atlasType: vEntry.atlasType || null,
+      isDktAtlas: vIsAtlas,
+      atlasType: vEntry.atlasType || vAtlasId,
+      atlasId: vAtlasId,
+      atlasName: vEntry.atlasName || vEntry.label,
+      atlasShortName: vEntry.atlasShortName || null,
+      atlasCategory: vEntry.atlasCategory || null,
+      atlasBadge: vEntry.atlasBadge || null,
+      isFreeSurferAtlas: vIsFS,
+      lut: vEntry.customLut || null,
+      visibleRegionIds: Array.isArray(vEntry.visibleRegionIds) ? new Set(vEntry.visibleRegionIds.map(Number)) : null,
+      atlasEngine: vEntry.atlasEngine || null,
+      atlasSpace: vEntry.atlasSpace || null,
       rawBytes,
     });
 
@@ -2888,6 +3053,15 @@ async function restoreProjectWorkspace(manifest, niftiBytesByName, drawingBytesB
       if (vEntry.params) meta.params = { ...vEntry.params };
       if (vEntry.isCheckedForChildApply !== undefined) meta.isCheckedForChildApply = Boolean(vEntry.isCheckedForChildApply);
       if (vEntry.isCheckedForExport !== undefined) meta.isCheckedForExport = Boolean(vEntry.isCheckedForExport);
+      if (vIsAtlas && vol.img) {
+        meta.rawAtlasVoxels = new Int16Array(vol.img.length);
+        for (let i = 0; i < vol.img.length; i++) {
+          meta.rawAtlasVoxels[i] = Math.round(vol.img[i]);
+        }
+        if (!meta.lut && vAtlasId && !vIsFS) {
+          meta.lut = await ensureAtlasLutLoaded(vAtlasId);
+        }
+      }
     }
 
     const volIdx = getVolumeIndexById(vol.id);
@@ -2895,10 +3069,11 @@ async function restoreProjectWorkspace(manifest, niftiBytesByName, drawingBytesB
       setVolumeAffineMatrix(volIdx, vEntry.currentAffine, true);
     }
 
-    if (vEntry.isDktAtlas || vEntry.colormap === "FreeSurferColorLUT") {
-      await applyFreeSurferColorLutToVolume(vol);
-      if (vEntry.isDktAtlas) {
+    if (vIsAtlas || vEntry.colormap === "FreeSurferColorLUT") {
+      await applyAtlasColormapToVolume(vol);
+      if (vIsAtlas && vEntry.visible !== false) {
         state.activeDktVolId = vol.id;
+        state.activeAtlasVolId = vol.id;
       }
     }
 
@@ -2906,9 +3081,14 @@ async function restoreProjectWorkspace(manifest, niftiBytesByName, drawingBytesB
     if (vEntry.role === "moving") state.movVolId = vol.id;
   }
 
-  // If both a brain mask and DKT Atlas volume were restored, ensure the DKT overlay is brain-masked
-  if (getDktVolume() && findActiveBrainMaskVolume()) {
-    await applyBrainMaskToDktVolume(getDktVolume(), findActiveBrainMaskVolume());
+  state.atlasOverlayStyle = manifest.atlasOverlayStyle || "filled";
+  const restoredPrimaryAtlas = getDktVolume();
+  if (restoredPrimaryAtlas) {
+    const pm = state.layerMeta.get(restoredPrimaryAtlas.id);
+    if (pm?.isFreeSurferAtlas && findActiveBrainMaskVolume()) {
+      await applyBrainMaskToDktVolume(restoredPrimaryAtlas, findActiveBrainMaskVolume());
+    }
+    activateAtlasOverlay(restoredPrimaryAtlas.id, pm?.visible !== false);
   }
 
   state.savedTransforms = Array.isArray(manifest.savedTransforms) ? manifest.savedTransforms : [];
@@ -3119,13 +3299,36 @@ async function checkNeuroToolsStatus(showToastMsg = false) {
   }
 
   try {
-    const resp = await fetch("/api/neuro-tools-status");
+    const customImg = String(state.atlasStudioState?.hipsCustomImage || "").trim();
+    const qSuffix = customImg ? `?hipsImage=${encodeURIComponent(customImg)}` : "";
+    const resp = await fetch(`/api/neuro-tools-status${qSuffix}`);
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || "Status check failed");
 
     state.neuroToolsStatus = data;
     if (data.dktLut && Object.keys(data.dktLut).length > 0) {
       state.dktLut = data.dktLut;
+      state.atlasLuts.set("dkt", data.dktLut);
+      state.atlasLuts.set("destrieux", data.dktLut);
+    }
+
+    if (Array.isArray(data.atlases) && data.atlases.length > 0) {
+      state.atlasRegistry = data.atlases;
+      populateAtlasTypeSelect(state.atlasRegistry);
+    } else {
+      try {
+        const regResp = await fetch(`/api/atlases${qSuffix}`);
+        if (regResp.ok) {
+          const regData = await regResp.json();
+          if (Array.isArray(regData.atlases)) {
+            state.atlasRegistry = regData.atlases;
+            populateAtlasTypeSelect(state.atlasRegistry);
+          }
+          if (regData.hipsThomas) state.neuroToolsStatus.hipsThomas = regData.hipsThomas;
+        }
+      } catch (_) {
+        // fallback gracefully
+      }
     }
 
     if (betBadge) {
@@ -3136,25 +3339,19 @@ async function checkNeuroToolsStatus(showToastMsg = false) {
 
     if (fsBadge) {
       const fs = data.fastsurfer || {};
+      const fnirtOk = Boolean(data.fnirt?.available);
+      const hipsOk = Boolean(data.hipsThomas?.available);
+      const atlasCnt = data.atlasCount || state.atlasRegistry.length || 7;
       if (fs.available) {
-        fsBadge.textContent = fs.mode === "docker" ? "FastSurfer (Docker)" : "FastSurfer Ready";
-        fsBadge.title = fs.statusLabel || fs.fastsurferHome || "FastSurfer Ready";
+        const extras = [fnirtOk ? "FNIRT" : "", hipsOk ? "HIPS" : ""].filter(Boolean);
+        fsBadge.textContent = extras.length ? `FS + ${extras.join("/")} · ${atlasCnt} Atlases` : "FastSurfer Ready";
+        fsBadge.title = `${fs.statusLabel || fs.fastsurferHome || "FastSurfer Ready"}${fnirtOk ? " + FSL FNIRT Nonlinear" : ""}${hipsOk ? ` + ${data.hipsThomas.statusLabel || "HIPS-THOMAS"}` : ""}`;
         fsBadge.className = "tool-mini-badge ready";
-        if (fsNote) {
-          if (fs.mode === "macos_native" && fs.fastsurferHome) {
-            const folderName = fs.fastsurferHome.split(/[\\/]/).pop();
-            fsNote.textContent = `FastSurfer Ready (${folderName}/macos_setup_fastsurfer.sh configured per MACOS.md).`;
-          } else {
-            fsNote.textContent = `FastSurfer detected (${fs.cliPath || "Docker"}). Click "Generate DKT Atlas" to segment T1w into 104 DKT regions.`;
-          }
-        }
-      } else if (fs.fallbackAvailable) {
-        fsBadge.textContent = "FastSurfer N/A · DKT Ready";
+      } else if (fs.fallbackAvailable || fnirtOk || hipsOk) {
+        const engTag = hipsOk && fnirtOk ? "HIPS + FNIRT" : hipsOk ? "HIPS-THOMAS" : fnirtOk ? "FNIRT" : "";
+        fsBadge.textContent = engTag ? `${engTag} · ${atlasCnt} Atlases` : `${atlasCnt} Atlases Ready`;
+        fsBadge.title = data.hipsThomas?.statusLabel || `${atlasCnt} Atlases Ready`;
         fsBadge.className = "tool-mini-badge fallback";
-        if (fsNote) {
-          fsNote.textContent =
-            "FastSurfer CLI not installed locally — using Template Registration + FreeSurfer 104-region DKT (aparc.DKTatlas+aseg) parcellation.";
-        }
       } else {
         fsBadge.textContent = "FastSurfer Not Found";
         fsBadge.className = "tool-mini-badge checking";
@@ -3162,12 +3359,26 @@ async function checkNeuroToolsStatus(showToastMsg = false) {
     }
 
     syncAtlasTypeSelectionUI(false, false);
+    syncAtlasStudioUI();
 
-    if (showToastMsg) {
+    const serverMissingAtlasJob = Boolean(data && !data.capabilities?.atlasJob);
+    if (serverMissingAtlasJob) {
+      console.warn(
+        "NeuroCoreg backend is running an older server.py without /api/atlas-job — restart server.py for async HIPS-THOMAS progress & Cancel."
+      );
+      if (showToastMsg || data.hipsThomas?.available) {
+        showToast(
+          "Restart server.py to enable live HIPS-THOMAS background progress, Cancel, & default Docker priority.",
+          5500
+        );
+      }
+    } else if (showToastMsg) {
       const fs = data.fastsurfer || {};
+      const fnirtNote = data.fnirt?.available ? " + FSL FNIRT" : "";
+      const hipsNote = data.hipsThomas?.available ? " + HIPS-THOMAS Docker" : "";
       const msg = fs.available
-        ? `FastSurfer configured from ${fs.setupScript || fs.fastsurferHome || fs.statusLabel} & FSL BET ready!`
-        : `FastSurfer CLI not installed locally — FSL BET & FreeSurfer 104-region DKT Atlas parcellation ready!`;
+        ? `Brain Atlases ready (${state.atlasRegistry.length || 7} atlases): FastSurfer${fnirtNote}${hipsNote} + FSL BET!`
+        : `Brain Atlases ready (${state.atlasRegistry.length || 7} atlases): Template Registration${fnirtNote}${hipsNote} + FSL BET!`;
       showToast(msg, 4500);
     }
   } catch (err) {
@@ -3324,39 +3535,237 @@ async function runFslBetSkullStrip() {
   }
 }
 
-// Helper: Determine whether an atlas volume or type string is Destrieux ('destrieux', max ID 12175) vs DKT ('dkt', max ID 2035)
+function getLoadedAtlasVolumes() {
+  if (!state.nv || !Array.isArray(state.nv.volumes)) return [];
+  return state.nv.volumes.filter((v) => {
+    const m = state.layerMeta.get(v.id);
+    return Boolean(m && (m.isAtlas || m.isDktAtlas));
+  });
+}
+
+function getAtlasBadgeInfo(meta) {
+  const aid = String(meta?.atlasId || meta?.atlasType || "").toLowerCase();
+  const badgeRaw = meta?.atlasBadge;
+  if (aid === "thomas" || badgeRaw === "THOMAS") return { text: "THOMAS", cls: "atlas-thomas" };
+  if (aid.startsWith("tian")) {
+    const sc = aid.replace("tian_", "").toUpperCase();
+    return { text: `TIAN ${sc}`, cls: "atlas-tian" };
+  }
+  if (aid.startsWith("fsl") || badgeRaw === "FSL") {
+    return { text: meta?.atlasShortName ? `FSL:${meta.atlasShortName}` : "FSL", cls: "atlas-fsl" };
+  }
+  if (meta?.atlasCategory === "custom" || badgeRaw === "CUSTOM" || aid.startsWith("custom_")) {
+    return { text: "CUSTOM", cls: "atlas-custom" };
+  }
+  if (aid === "destrieux" || badgeRaw === "DESTRIEUX") {
+    return { text: "DESTRIEUX", cls: "atlas-destrieux" };
+  }
+  return { text: badgeRaw || "DKT", cls: "" };
+}
+
+function generateDeterministicRgb(labelId, hemi = "C") {
+  const idx = Math.max(1, Math.abs(Math.round(labelId)));
+  const hue = (idx * 0.618033988749895 + (hemi === "R" ? 0.04 : 0.0)) % 1.0;
+  const sat = 0.74;
+  const val = hemi === "R" ? 0.94 : 0.88;
+  const h6 = hue * 6;
+  const sector = Math.floor(h6) % 6;
+  const f = h6 - Math.floor(h6);
+  const p = val * (1 - sat);
+  const q = val * (1 - f * sat);
+  const t = val * (1 - (1 - f) * sat);
+  const table = [
+    [val, t, p],
+    [q, val, p],
+    [p, val, t],
+    [p, q, val],
+    [t, p, val],
+    [val, p, q],
+  ];
+  const [r, g, b] = table[sector];
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function getAtlasRegistryEntry(atlasId) {
+  const aid = String(atlasId || "dkt").toLowerCase();
+  return (state.atlasRegistry || []).find((a) => a.id === aid) || null;
+}
+
+function populateAtlasTypeSelect(registry = []) {
+  const selectEl = document.getElementById("selectAtlasType");
+  if (!selectEl || !Array.isArray(registry) || registry.length === 0) return;
+  const prevVal = selectEl.value || state.selectedAtlasType || "dkt";
+  const groupLabels = [
+    { key: "cortical", label: "Cortical & Whole-Brain" },
+    { key: "thalamic", label: "Thalamic Nuclei" },
+    { key: "subcortical", label: "Subcortical Parcellations (Tian)" },
+    { key: "fsl", label: "Local FSL Atlases (Auto-Discovered)" },
+  ];
+  selectEl.innerHTML = "";
+  for (const grp of groupLabels) {
+    const items = registry.filter((a) => a.category === grp.key);
+    if (!items.length) continue;
+    const og = document.createElement("optgroup");
+    og.label = grp.label;
+    for (const item of items) {
+      const opt = document.createElement("option");
+      opt.value = item.id;
+      opt.textContent = item.available ? item.name : `${item.name} [Missing Assets]`;
+      opt.disabled = !item.available;
+      og.appendChild(opt);
+    }
+    selectEl.appendChild(og);
+  }
+  const hasPrev = Array.from(selectEl.options).some((o) => o.value === prevVal && !o.disabled);
+  selectEl.value = hasPrev ? prevVal : "dkt";
+}
+
+function getAtlasPipelineModeOptions(atlasId) {
+  const aid = String(atlasId || "dkt").toLowerCase();
+  const isFS = aid === "dkt" || aid === "destrieux";
+  const fnirtOk = Boolean(state.neuroToolsStatus?.fnirt?.available ?? true);
+  const hipsInfo = state.neuroToolsStatus?.hipsThomas || {};
+  const hipsOk = Boolean(hipsInfo.available);
+
+  if (isFS) {
+    if (aid === "destrieux") {
+      return [
+        { v: "fastsurfer_vinn", l: "FastSurfer Surface + --fsaparc (aparc.a2009s, Slower)" },
+        { v: "template_fnirt", l: fnirtOk ? "MNI152 Nonlinear FNIRT (Cached)" : "MNI152 Nonlinear (Fallback FLIRT)" },
+        { v: "template_flirt", l: "Quick Template Destrieux (FSL FLIRT ~2s)" },
+      ];
+    }
+    return [
+      { v: "fastsurfer_vinn", l: "FastSurferVINN DKT-Only (Fast, Recommended)" },
+      { v: "fastsurfer_full", l: "Full FastSurfer (--seg_only + Cereb/HypVINN)" },
+      { v: "template_fnirt", l: fnirtOk ? "MNI152 Nonlinear FNIRT (Cached)" : "MNI152 Nonlinear (Fallback FLIRT)" },
+      { v: "template_flirt", l: "Quick Template DKT (FSL FLIRT ~2s)" },
+    ];
+  }
+
+  if (aid === "thomas") {
+    if (hipsOk) {
+      const containerTag = hipsInfo.mode === "native" ? "CLI" : "Docker";
+      return [
+        { v: "hips_thomas_docker", l: `HIPS-THOMAS ${containerTag} (Max Accuracy — Default)` },
+        {
+          v: "fnirt_nonlinear",
+          l: fnirtOk ? "Backup: Nonlinear FNIRT (MNI152 -> Subject, Cached)" : "Backup: Template Registration (FLIRT/SciPy)",
+        },
+        { v: "flirt_12dof", l: "Backup: Fast Linear FLIRT (12-DOF ~2s)" },
+      ];
+    }
+    const hipsDisabledLabel =
+      hipsInfo.dockerInstalled && !hipsInfo.dockerRunning
+        ? "HIPS-THOMAS Docker (Start Docker & click Check)"
+        : "HIPS-THOMAS Docker (Not Installed — pull anagrammarian/sthomas)";
+    return [
+      {
+        v: "fnirt_nonlinear",
+        l: fnirtOk ? "Nonlinear FNIRT (MNI152 -> Subject, Backup Default)" : "Template Registration (FLIRT/SciPy Backup)",
+      },
+      { v: "flirt_12dof", l: "Fast Linear FLIRT (12-DOF ~2s, Cached)" },
+      { v: "hips_thomas_docker", l: hipsDisabledLabel, disabled: true },
+    ];
+  }
+
+  return [
+    {
+      v: "fnirt_nonlinear",
+      l: fnirtOk ? "Nonlinear FNIRT (MNI152 -> Subject, Recommended)" : "Template Registration (FLIRT/SciPy Fallback)",
+    },
+    { v: "flirt_12dof", l: "Fast Linear FLIRT (12-DOF ~2s, Cached)" },
+  ];
+}
+
+function resolvePreferredAtlasPipelineMode(atlasId, opts) {
+  const aid = String(atlasId || "dkt").toLowerCase();
+  const isEnabled = (val) => Boolean(val && opts.some((o) => o.v === val && !o.disabled));
+  const savedPref = state.atlasPreferredModeById?.get(aid);
+  if (isEnabled(savedPref)) return savedPref;
+  const firstEnabled = opts.find((o) => !o.disabled);
+  return firstEnabled ? firstEnabled.v : (opts[0]?.v || "fnirt_nonlinear");
+}
+
+function populateAtlasPipelineModes(atlasId) {
+  const modeSelect = document.getElementById("selectDktMode");
+  if (!modeSelect) return;
+  const aid = String(atlasId || "dkt").toLowerCase();
+  const opts = getAtlasPipelineModeOptions(aid);
+
+  modeSelect.innerHTML = "";
+  for (const o of opts) {
+    const el = document.createElement("option");
+    el.value = o.v;
+    el.textContent = o.l;
+    if (o.disabled) el.disabled = true;
+    modeSelect.appendChild(el);
+  }
+  modeSelect.value = resolvePreferredAtlasPipelineMode(aid, opts);
+  state.lastPopulatedAtlasModeId = aid;
+}
+
+// Helper: Resolve canonical atlas ID/type for any loaded atlas volume
 function resolveAtlasTypeForVolume(vol = null, explicitType = null) {
   if (explicitType) {
     const t = String(explicitType).toLowerCase();
     if (t.includes("destrieux") || t.includes("a2009s")) return "destrieux";
-    if (t.includes("dkt")) return "dkt";
+    if (t.includes("thomas")) return "thomas";
+    const tm = t.match(/tian[_-]?s?([1-4])/);
+    if (tm) return `tian_s${tm[1]}`;
+    if (t === "dkt" || t.startsWith("fsl_") || t.startsWith("custom_")) return t;
+    return t;
   }
   if (vol) {
     const meta = state.layerMeta.get(vol.id);
+    if (meta?.atlasId) return meta.atlasId;
     if (meta?.atlasType) return meta.atlasType;
-    if (/destrieux|a2009s/i.test(vol.name || "") || /destrieux|a2009s/i.test(meta?.label || "")) {
-      return "destrieux";
-    }
-    const srcArr = meta?.unmaskedDktData || vol.img;
+    const inf = inferModalityAndStyle(vol.name || meta?.label || "");
+    if (inf.atlasId) return inf.atlasId;
+    const srcArr = meta?.rawAtlasVoxels || meta?.unmaskedDktData || vol.img;
     if (srcArr && srcArr.length) {
       for (let i = 0; i < srcArr.length; i += 8) {
         if (srcArr[i] >= 11100) return "destrieux";
       }
     }
   }
-  const sel = document.getElementById("selectAtlasType")?.value;
-  return sel === "destrieux" ? "destrieux" : "dkt";
+  return document.getElementById("selectAtlasType")?.value || state.selectedAtlasType || "dkt";
 }
 
 function getAtlasDefaultMaxLabel(vol = null, explicitType = null) {
-  return resolveAtlasTypeForVolume(vol, explicitType) === "destrieux" ? 12175 : 2035;
+  if (vol) {
+    const meta = state.layerMeta.get(vol.id);
+    if (meta?.lut) {
+      let mx = 1;
+      for (const k of Object.keys(meta.lut)) {
+        const n = parseInt(k, 10);
+        if (Number.isFinite(n) && n > mx) mx = n;
+      }
+      if (mx > 1) return mx;
+    }
+  }
+  const aid = resolveAtlasTypeForVolume(vol, explicitType);
+  if (aid === "destrieux") return 12175;
+  if (aid === "dkt") return 2035;
+  if (aid === "thomas") return 118;
+  return 255;
 }
 
 function getAtlasShortTitle(vol = null, explicitType = null) {
-  return resolveAtlasTypeForVolume(vol, explicitType) === "destrieux" ? "Destrieux Atlas" : "DKT Atlas";
+  if (vol) {
+    const meta = state.layerMeta.get(vol.id);
+    if (meta?.atlasShortName) return meta.atlasShortName;
+  }
+  const aid = resolveAtlasTypeForVolume(vol, explicitType);
+  const reg = getAtlasRegistryEntry(aid);
+  if (reg?.shortName) return reg.shortName;
+  if (aid === "destrieux") return "Destrieux Atlas";
+  if (aid === "thomas") return "THOMAS";
+  if (aid.startsWith("tian_s")) return `Tian ${aid.replace("tian_", "").toUpperCase()}`;
+  return "DKT Atlas";
 }
 
-// Synchronize the Atlas Tab UI (Pipeline options, Slow-Processing Warning Banner, Generate/Load buttons, and Active Atlas Volume)
+// Synchronize the Brain Atlases Panel UI (Pipeline options, Slow Notice, Buttons, and Active Atlas Volume)
 function syncAtlasTypeSelectionUI(showSlowNoticeToast = false, switchActiveVolume = false) {
   const atlasSelect = document.getElementById("selectAtlasType");
   const modeSelect = document.getElementById("selectDktMode");
@@ -3365,33 +3774,20 @@ function syncAtlasTypeSelectionUI(showSlowNoticeToast = false, switchActiveVolum
   const loadLbl = document.getElementById("lblLoadDktBtn");
   const detailNote = document.getElementById("fastsurferDetailNote");
 
-  const atlasType = atlasSelect?.value === "destrieux" ? "destrieux" : "dkt";
-  const isDestrieux = atlasType === "destrieux";
-  state.selectedAtlasType = atlasType;
+  const atlasId = atlasSelect?.value || state.selectedAtlasType || "dkt";
+  const isDestrieux = atlasId === "destrieux";
+  const isDkt = atlasId === "dkt";
+  state.selectedAtlasType = atlasId;
 
-  if (modeSelect) {
-    const optVinn = modeSelect.querySelector('option[value="fastsurfer_vinn"]');
-    const optFull = modeSelect.querySelector('option[value="fastsurfer_full"]');
-    const optTmpl = modeSelect.querySelector('option[value="template_flirt"]');
-    if (isDestrieux) {
-      if (optVinn) optVinn.textContent = "FastSurfer Surface + --fsaparc (aparc.a2009s, Slower)";
-      if (optFull) optFull.textContent = "Full FastSurfer + --fsaparc (aparc.a2009s + Cereb/HypVINN, Slower)";
-      if (optTmpl) optTmpl.textContent = "Quick Template Destrieux (FSL FLIRT ~2s)";
-    } else {
-      if (optVinn) optVinn.textContent = "FastSurferVINN DKT-Only (Fast, Recommended)";
-      if (optFull) optFull.textContent = "Full FastSurfer (--seg_only + Cereb/HypVINN)";
-      if (optTmpl) optTmpl.textContent = "Quick Template DKT (FSL FLIRT ~2s)";
-    }
-  }
+  populateAtlasPipelineModes(atlasId);
 
   const modeVal = modeSelect?.value || "fastsurfer_vinn";
-  const isSlowFsAparc = isDestrieux && modeVal !== "template_flirt";
+  const isSlowFsAparc = isDestrieux && !modeVal.startsWith("template_");
 
   if (warnBanner) {
     warnBanner.hidden = !isSlowFsAparc;
   }
 
-  // Update FreeSurfer License status indicator in the Destrieux notice banner
   const licStatusEl = document.getElementById("fsLicenseStatusText");
   const licBtnLbl = document.getElementById("lblSelectFsLicenseBtn");
   const licInfo = state.neuroToolsStatus?.fsLicense || state.neuroToolsStatus?.fastsurfer?.fsLicense || null;
@@ -3403,46 +3799,51 @@ function syncAtlasTypeSelectionUI(showSlowNoticeToast = false, switchActiveVolum
       if (licBtnLbl) licBtnLbl.textContent = "Change...";
     } else {
       licStatusEl.textContent = "⚠ FS License: Not Found";
-      licStatusEl.title = "No valid FreeSurfer license file automatically found in $FS_LICENSE, ~/license.txt, or $FREESURFER_HOME";
+      licStatusEl.title = "No valid FreeSurfer license file found";
       licStatusEl.className = "fs-license-status is-missing";
       if (licBtnLbl) licBtnLbl.textContent = "Select License...";
     }
   }
 
+  const regEntry = getAtlasRegistryEntry(atlasId);
+  const shortTitle = regEntry?.shortName || getAtlasShortTitle(null, atlasId);
   if (detailNote) {
-    detailNote.textContent = isDestrieux
-      ? "Destrieux (aparc.a2009s+aseg, 148 cortical gyral/sulcal + subcortical regions): runs FastSurfer with --fsaparc and without --seg_only, or reverts to MNI152 template registration when FastSurfer is unavailable."
-      : "DKT (aparc.DKTatlas+aseg, 104 cortical + subcortical regions): runs FastSurferVINN (--seg_only) or MNI152 template registration for interactive cursor hover.";
+    if (atlasId === "thomas") {
+      const hipsInfo = state.neuroToolsStatus?.hipsThomas || {};
+      if (hipsInfo.available) {
+        const containerLbl =
+          hipsInfo.dockerImage || (hipsInfo.cliPath ? hipsInfo.cliPath.split("/").pop() : "HIPS-THOMAS");
+        detailNote.textContent = `THOMAS: Using HIPS-THOMAS (${containerLbl}) by default for maximal native subject accuracy (cached per T1w; FNIRT/FLIRT available as fast backups).`;
+      } else {
+        const hipsNote = hipsInfo.statusLabel || "HIPS-THOMAS Docker not found";
+        detailNote.textContent = `THOMAS: ${hipsNote}. Using MNI152 FNIRT/FLIRT backup (pull anagrammarian/sthomas and click Check to enable HIPS-THOMAS).`;
+      }
+    } else if (regEntry?.description) {
+      detailNote.textContent = `${regEntry.shortName}: ${regEntry.description}`;
+    } else if (isDestrieux) {
+      detailNote.textContent = "Destrieux (aparc.a2009s+aseg, 148 regions): runs FastSurfer --fsaparc or MNI152 FNIRT/FLIRT.";
+    } else {
+      detailNote.textContent = "DKT (aparc.DKTatlas+aseg, 104 regions): runs FastSurferVINN or MNI152 FNIRT/FLIRT.";
+    }
   }
 
-  if (runBtn && !runBtn.disabled) {
-    runBtn.textContent = isDestrieux ? "Generate Destrieux Atlas" : "Generate DKT Atlas";
+  if (runBtn && !state.activeAtlasJob && !runBtn.disabled) {
+    runBtn.textContent = `Generate ${shortTitle}`;
   }
   if (loadLbl) {
-    loadLbl.textContent = isDestrieux ? "Load Destrieux" : "Load DKT";
+    loadLbl.textContent = isDkt || isDestrieux ? `Load ${shortTitle}` : "Load";
   }
+
+  syncHipsThomasOptionsUI();
+  renderActiveAtlasJobUI();
 
   if (switchActiveVolume && state.nv && Array.isArray(state.nv.volumes)) {
     const matchingAtlasVol = state.nv.volumes.find((v) => {
       const m = state.layerMeta.get(v.id);
-      return m?.isDktAtlas && resolveAtlasTypeForVolume(v) === atlasType;
+      return (m?.isAtlas || m?.isDktAtlas) && resolveAtlasTypeForVolume(v) === atlasId;
     });
     if (matchingAtlasVol) {
-      state.activeDktVolId = matchingAtlasVol.id;
-      // Show the selected atlas overlay and hide other loaded parcellation overlays so only one atlas overlay is visible at a time
-      state.nv.volumes.forEach((v, idx) => {
-        const m = state.layerMeta.get(v.id);
-        if (m?.isDktAtlas) {
-          const isSelected = v.id === matchingAtlasVol.id;
-          m.visible = isSelected;
-          const targetAlpha = isSelected ? (m.savedOpacity > 0 ? m.savedOpacity : 0.35) : 0;
-          state.nv.setOpacity(idx, targetAlpha);
-        }
-      });
-      state.nv.drawScene();
-      renderLayerList();
-      const dktInfo = lookupDktRegionAtRAS(state.lastCrosshairRAS);
-      updateDktReadoutUI(dktInfo, null);
+      activateAtlasOverlay(matchingAtlasVol.id, true);
     } else {
       syncDktOverlayControlsUI();
     }
@@ -3452,10 +3853,68 @@ function syncAtlasTypeSelectionUI(showSlowNoticeToast = false, switchActiveVolum
 
   if (showSlowNoticeToast && isSlowFsAparc) {
     showToast(
-      "Destrieux (aparc.a2009s) selected: FastSurfer will run with --fsaparc and without --seg_only (full surface reconstruction — processing is significantly slower). Reverts to template registration only if FastSurfer is unavailable.",
+      "Destrieux (aparc.a2009s) selected: FastSurfer will run with --fsaparc and without --seg_only (full surface reconstruction — processing is slower). Or pick MNI152 FNIRT/FLIRT.",
       5800
     );
   }
+}
+
+async function ensureAtlasLutLoaded(atlasId) {
+  const aid = String(atlasId || "dkt").toLowerCase();
+  if (aid === "dkt" || aid === "destrieux") {
+    return await ensureDktLutLoaded();
+  }
+  if (state.atlasLuts.has(aid)) {
+    const cached = state.atlasLuts.get(aid);
+    if (cached && Object.keys(cached).length > 0) return cached;
+  }
+  try {
+    const resp = await fetch(`/api/atlases?lut=${encodeURIComponent(aid)}`);
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.lut && Object.keys(data.lut).length > 0) {
+        state.atlasLuts.set(aid, data.lut);
+        return data.lut;
+      }
+    }
+  } catch (_) {
+    // fallback to static bundled files if server unavailable
+  }
+  const staticMap = {
+    thomas: "/sample_data/atlases/thomas_lut.json",
+    tian_s1: "/sample_data/atlases/tian_s1_lut.json",
+    tian_s2: "/sample_data/atlases/tian_s2_lut.json",
+    tian_s3: "/sample_data/atlases/tian_s3_lut.json",
+    tian_s4: "/sample_data/atlases/tian_s4_lut.json",
+  };
+  if (staticMap[aid]) {
+    try {
+      const r = await fetch(staticMap[aid]);
+      if (r.ok) {
+        const j = await r.json();
+        const lutObj = {};
+        for (const item of j.labels || []) {
+          if (item && item.id > 0) {
+            const rgb = [item.r ?? 128, item.g ?? 128, item.b ?? 128];
+            lutObj[String(item.id)] = {
+              id: item.id,
+              name: item.name,
+              shortName: item.shortName || item.name,
+              title: item.name,
+              hemisphere: item.hemisphere || "C",
+              rgb,
+              hex: `#${rgb.map((c) => Number(c).toString(16).padStart(2, "0")).join("")}`,
+            };
+          }
+        }
+        state.atlasLuts.set(aid, lutObj);
+        return lutObj;
+      }
+    } catch (_) {
+      // ignore
+    }
+  }
+  return {};
 }
 
 // Validate & save a user-selected FreeSurfer license file via /api/set-fs-license
@@ -3497,131 +3956,559 @@ async function uploadAndSetFsLicenseFile(file) {
   }
 }
 
-// Generate DKT (aparc.DKTatlas+aseg) or Destrieux (aparc.a2009s+aseg) anatomical segmentation & add interactive atlas to workspace
-async function runDktSegmentation() {
-  if (!state.nv) return;
+function isTargetVolumeSkullStripped(vol) {
+  if (!vol) return false;
+  const meta = state.layerMeta.get(vol.id);
+  if (meta?.isBetBrain || meta?.modality === "BRAIN") return true;
+  const label = `${vol.name || ""} ${meta?.label || ""}`;
+  return /(_brain|\bbet\b|skull[_-]?strip)/i.test(label);
+}
+
+function syncHipsThomasOptionsUI(explicitT1VolId = null) {
+  const atlasId = String(document.getElementById("selectAtlasType")?.value || state.selectedAtlasType || "dkt").toLowerCase();
+  const modeVal = String(document.getElementById("selectDktMode")?.value || "");
+  const showHipsOpts = atlasId === "thomas" && modeVal === "hips_thomas_docker";
+
+  const t1Id =
+    explicitT1VolId ||
+    document.getElementById("selectDktT1Vol")?.value ||
+    state.refVolId;
+  const t1Idx = getVolumeIndexById(t1Id);
+  const t1Vol = t1Idx >= 0 ? state.nv?.volumes?.[t1Idx] : null;
+  const isDm = isTargetVolumeSkullStripped(t1Vol);
+
+  const sideBox = document.getElementById("hipsThomasOptionsRow");
+  if (sideBox) sideBox.hidden = !showHipsOpts;
+  const sideContrast = document.getElementById("selectHipsContrast");
+  if (sideContrast) sideContrast.value = state.atlasStudioState?.hipsContrast || "t1";
+  const sideForce = document.getElementById("chkHipsForceRecompute");
+  if (sideForce) sideForce.checked = Boolean(state.atlasStudioState?.hipsForceRecompute);
+  const sideDmBadge = document.getElementById("hipsAutoDmBadge");
+  if (sideDmBadge) sideDmBadge.hidden = !(showHipsOpts && isDm);
+}
+
+function formatElapsedMMSS(totalSec) {
+  const s = Math.max(0, Math.floor(Number(totalSec) || 0));
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return `${String(m).padStart(2, "0")}:${String(rem).padStart(2, "0")}`;
+}
+
+function renderActiveAtlasJobUI() {
+  const job = state.activeAtlasJob;
+  const runBtn = document.getElementById("btnRunDktAtlas");
+  const sideStrip = document.getElementById("hipsJobProgressStrip");
+  const sideStage = document.getElementById("hipsJobStageText");
+  const sideElapsed = document.getElementById("hipsJobElapsed");
+  const sideLog = document.getElementById("hipsJobLogTail");
+  const sideCancel = document.getElementById("btnCancelHipsJob");
+
+  const popBody = state.atlasStudioPopout?.bodyEl;
+  const studioGenBtn = popBody?.querySelector("#atlasStudioBtnGenerate");
+  const studioStrip = popBody?.querySelector("#atlasStudioJobProgress");
+  const studioStage = popBody?.querySelector("#atlasStudioJobStage");
+  const studioElapsed = popBody?.querySelector("#atlasStudioJobElapsed");
+  const studioLog = popBody?.querySelector("#atlasStudioJobLog");
+  const studioCancel = popBody?.querySelector("#atlasStudioBtnCancelJob");
+
+  if (!job) {
+    if (sideStrip) sideStrip.hidden = true;
+    if (studioStrip) studioStrip.hidden = true;
+    if (runBtn) {
+      runBtn.disabled = false;
+      const regEntry = getAtlasRegistryEntry(state.selectedAtlasType);
+      const shortTitle = regEntry?.shortName || getAtlasShortTitle(null, state.selectedAtlasType);
+      runBtn.textContent = `Generate ${shortTitle}`;
+    }
+    if (studioGenBtn) {
+      studioGenBtn.disabled = false;
+      studioGenBtn.textContent = "Generate Atlas in Subject Space";
+    }
+    return;
+  }
+
+  const elapsedSec = job.elapsedSec !== undefined
+    ? job.elapsedSec
+    : (Date.now() - (job.startedAtMs || Date.now())) / 1000;
+  const elapsedTxt = formatElapsedMMSS(elapsedSec);
+  const stageTxt = job.stage || "Running HIPS-THOMAS...";
+  const lastLog = Array.isArray(job.logTail) && job.logTail.length > 0
+    ? job.logTail[job.logTail.length - 1]
+    : "Executing hipsthomas.sh inside Docker...";
+
+  if (sideStrip) sideStrip.hidden = false;
+  if (sideStage) sideStage.textContent = stageTxt;
+  if (sideElapsed) sideElapsed.textContent = elapsedTxt;
+  if (sideLog) {
+    sideLog.textContent = lastLog;
+    sideLog.title = (job.logTail || []).join("\n");
+  }
+  if (sideCancel) {
+    sideCancel.disabled = Boolean(job.cancelling);
+    sideCancel.textContent = job.cancelling ? "Stopping..." : "Cancel";
+  }
+
+  if (studioStrip) studioStrip.hidden = false;
+  if (studioStage) studioStage.textContent = stageTxt;
+  if (studioElapsed) studioElapsed.textContent = elapsedTxt;
+  if (studioLog) {
+    studioLog.textContent = lastLog;
+    studioLog.title = (job.logTail || []).join("\n");
+  }
+  if (studioCancel) {
+    studioCancel.disabled = Boolean(job.cancelling);
+    studioCancel.textContent = job.cancelling ? "Stopping..." : "Cancel";
+  }
+
+  if (runBtn) {
+    runBtn.disabled = true;
+    runBtn.textContent = job.cancelling ? "Cancelling HIPS-THOMAS..." : "Running HIPS-THOMAS...";
+  }
+  if (studioGenBtn) {
+    studioGenBtn.disabled = true;
+    studioGenBtn.textContent = job.cancelling ? "Cancelling HIPS-THOMAS..." : "Running HIPS-THOMAS...";
+  }
+}
+
+function clearActiveAtlasJobTimers(job) {
+  if (!job) return;
+  if (job.timerId) clearInterval(job.timerId);
+  if (job.elapsedTimerId) clearInterval(job.elapsedTimerId);
+  job.timerId = null;
+  job.elapsedTimerId = null;
+}
+
+async function applyAtlasGenerationResult(data, { atlasId, atlasShort, regEntry, modeLabel }) {
+  const resolvedId = data.atlasId || data.atlasType || atlasId;
+  const isFS =
+    data.isFreeSurferAtlas !== undefined
+      ? Boolean(data.isFreeSurferAtlas)
+      : resolvedId === "dkt" || resolvedId === "destrieux";
+  const lutObj = data.lut || data.dktLut || null;
+  if (lutObj && Object.keys(lutObj).length > 0) {
+    if (isFS) state.dktLut = lutObj;
+    else state.atlasLuts.set(resolvedId, lutObj);
+  }
+
+  state.atlasStudioState.warpCacheHit = data.warpCacheHit !== undefined ? Boolean(data.warpCacheHit) : null;
+  state.atlasStudioState.hipsCacheHit =
+    data.hipsCacheHit === true ? true : data.regModeUsed === "hips_thomas_docker" ? false : null;
+
+  const bytes = base64ToUint8Array(data.niftiBase64);
+  const unmaskedBytes = data.unmaskedNiftiBase64 ? base64ToUint8Array(data.unmaskedNiftiBase64) : null;
+  const vol = await addAtlasVolumeToWorkspace(bytes, {
+    fileName: data.fileName,
+    displayLabel: `${data.shortName || atlasShort} (${data.regionCount || 0} Regions)`,
+    atlasId: resolvedId,
+    atlasName: data.atlasName || atlasShort,
+    atlasShortName: data.shortName || atlasShort,
+    atlasCategory: data.category || regEntry?.category || "cortical",
+    atlasBadge: data.badge || regEntry?.badge || atlasShort.toUpperCase(),
+    isFreeSurferAtlas: isFS,
+    lut: lutObj,
+    regions: data.regions || null,
+    unmaskedBytes,
+    atlasEngine: data.engineUsed || data.engine || modeLabel,
+    atlasSpace: data.space || "subject",
+  });
+
+  setCoregStatus("Ready", false);
+  if (data.fallbackUsed) {
+    const reasonTxt = data.fallbackReason ? ` (${data.fallbackReason})` : "";
+    showToast(
+      `${data.shortName || atlasShort}: HIPS-THOMAS fallback -> ${data.engineUsed || data.engine}${reasonTxt}`,
+      6500
+    );
+  } else {
+    const cacheTag = data.hipsCacheHit
+      ? " [HIPS-THOMAS Cache Hit ~1s]"
+      : data.warpCacheHit
+      ? " [Warp Cache Hit ~1s]"
+      : "";
+    showToast(
+      `${data.shortName || atlasShort} ready (${data.regionCount || 0} ROIs via ${data.engineUsed || data.engine}${cacheTag})!`,
+      5200
+    );
+  }
+  syncAtlasStudioUI();
+  return vol;
+}
+
+async function cancelActiveAtlasJob() {
+  const job = state.activeAtlasJob;
+  if (!job || job.cancelling) return false;
+  job.cancelling = true;
+  job.stage = "Cancelling HIPS-THOMAS container...";
+  renderActiveAtlasJobUI();
+  setCoregStatus("Cancelling HIPS-THOMAS...", true);
+  try {
+    await fetch(`/api/atlas-job/${encodeURIComponent(job.jobId)}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    return true;
+  } catch (err) {
+    console.warn("Cancel atlas job request error:", err);
+    return false;
+  }
+}
+
+async function pollActiveAtlasJobOnce() {
+  const job = state.activeAtlasJob;
+  if (!job || job.pollInFlight) return null;
+  job.pollInFlight = true;
+  try {
+    const resp = await fetch(`/api/atlas-job/${encodeURIComponent(job.jobId)}`);
+    const jobData = await resp.json();
+    if (state.activeAtlasJob !== job) return null;
+
+    if (!resp.ok) {
+      throw new Error(jobData.error || "Atlas job status failed");
+    }
+
+    job.stage = jobData.stage || job.stage;
+    if (Array.isArray(jobData.logTail)) job.logTail = jobData.logTail;
+    if (typeof jobData.elapsedSec === "number") job.elapsedSec = jobData.elapsedSec;
+    renderActiveAtlasJobUI();
+
+    if (jobData.status === "done" && jobData.result) {
+      clearActiveAtlasJobTimers(job);
+      state.activeAtlasJob = null;
+      renderActiveAtlasJobUI();
+      return await applyAtlasGenerationResult(jobData.result, {
+        atlasId: job.atlasId,
+        atlasShort: job.atlasShort,
+        regEntry: job.regEntry,
+        modeLabel: job.modeLabel,
+      });
+    }
+    if (jobData.status === "cancelled") {
+      clearActiveAtlasJobTimers(job);
+      state.activeAtlasJob = null;
+      renderActiveAtlasJobUI();
+      setCoregStatus("Ready", false);
+      showToast("HIPS-THOMAS job cancelled.", 3500);
+      syncAtlasTypeSelectionUI(false, false);
+      syncAtlasStudioUI();
+      return null;
+    }
+    if (jobData.status === "error") {
+      clearActiveAtlasJobTimers(job);
+      state.activeAtlasJob = null;
+      renderActiveAtlasJobUI();
+      setCoregStatus("Ready", false);
+      showToast(`${job.atlasShort} Error: ${jobData.error || "Background job failed"}`, 5000);
+      syncAtlasTypeSelectionUI(false, false);
+      syncAtlasStudioUI();
+      return null;
+    }
+    return jobData;
+  } catch (err) {
+    if (state.activeAtlasJob === job) {
+      clearActiveAtlasJobTimers(job);
+      state.activeAtlasJob = null;
+      renderActiveAtlasJobUI();
+      setCoregStatus("Ready", false);
+      showToast(`${job.atlasShort} Poll Error: ${err.message}`, 4500);
+    }
+    return null;
+  } finally {
+    job.pollInFlight = false;
+  }
+}
+
+async function runAtlasGeneration(explicitAtlasId = null, explicitMode = null, explicitT1VolId = null) {
+  if (!state.nv) return null;
+  if (state.activeAtlasJob) {
+    showToast("A HIPS-THOMAS job is already running. Wait or click Cancel first.", 3500);
+    return null;
+  }
   const t1Select = document.getElementById("selectDktT1Vol") || document.getElementById("selectNeuroT1Vol");
-  const targetVolId = t1Select?.value || state.refVolId;
+  const targetVolId = explicitT1VolId || t1Select?.value || state.refVolId;
   const volIdx = getVolumeIndexById(targetVolId);
   if (volIdx < 0) {
     showToast("Select a T1w structural volume first.");
-    return;
+    return null;
   }
 
   const srcVol = state.nv.volumes[volIdx];
   const srcMeta = state.layerMeta.get(srcVol.id);
-  const atlasType = document.getElementById("selectAtlasType")?.value === "destrieux" ? "destrieux" : "dkt";
-  const isDestrieux = atlasType === "destrieux";
-  const atlasShort = isDestrieux ? "Destrieux" : "DKT";
-  const aparcName = isDestrieux ? "aparc.a2009s+aseg" : "aparc.DKTatlas+aseg";
+  const atlasId = (explicitAtlasId || document.getElementById("selectAtlasType")?.value || "dkt").toLowerCase();
+  const isDestrieux = atlasId === "destrieux";
+  const regEntry = getAtlasRegistryEntry(atlasId);
+  const atlasShort = regEntry?.shortName || getAtlasShortTitle(null, atlasId);
 
   if (!srcMeta?.rawBytes) {
-    showToast(`Selected volume does not have raw NIfTI bytes available for ${atlasShort} segmentation.`);
-    return;
+    showToast(`Selected volume does not have raw NIfTI bytes available for ${atlasShort}.`);
+    return null;
   }
 
-  const btn = document.getElementById("btnRunDktAtlas");
-  let dktMode = document.getElementById("selectDktMode")?.value || "fastsurfer_vinn";
+  let mode = explicitMode || document.getElementById("selectDktMode")?.value || regEntry?.defaultMode || "fnirt_nonlinear";
 
-  // If Destrieux + FastSurfer (--fsaparc) is selected, ensure tools status has been checked and verify FreeSurfer license
-  if (isDestrieux && dktMode !== "template_flirt") {
-    if (!state.neuroToolsStatus) {
-      await checkNeuroToolsStatus(false);
-    }
+  // Check FreeSurfer license if Destrieux + FastSurfer --fsaparc selected
+  if (isDestrieux && !mode.startsWith("template_")) {
+    if (!state.neuroToolsStatus) await checkNeuroToolsStatus(false);
     const fsAvail = Boolean(state.neuroToolsStatus?.fastsurfer?.available);
     const licAvail = Boolean(
-      state.neuroToolsStatus?.fsLicense?.available ||
-      state.neuroToolsStatus?.fastsurfer?.fsLicense?.available
+      state.neuroToolsStatus?.fsLicense?.available || state.neuroToolsStatus?.fastsurfer?.fsLicense?.available
     );
     if (fsAvail && !licAvail) {
       const wantSelect = window.confirm(
-        "FastSurfer --fsaparc (Destrieux aparc.a2009s surface pipeline) requires a valid FreeSurfer license file (license.txt / .license), and none was automatically found in standard paths ($FS_LICENSE, ~/license.txt, $FREESURFER_HOME/license.txt).\n\nClick OK to select your local FreeSurfer license file now, or click Cancel to run Quick Template Destrieux registration instead."
+        "FastSurfer --fsaparc requires a valid FreeSurfer license file (license.txt). Click OK to choose your license file, or Cancel to run Template Destrieux instead."
       );
       if (wantSelect) {
         state._pendingDestrieuxRunAfterLicense = true;
         document.getElementById("fsLicenseFileInput")?.click();
-        return;
-      } else {
-        dktMode = "template_flirt";
+        return null;
       }
+      mode = "template_fnirt";
     }
   }
+
+  const btn = document.getElementById("btnRunDktAtlas");
   const fracInput = document.getElementById("betFracInput");
   const betFrac = Math.max(0.05, Math.min(0.95, parseFloat(fracInput?.value || "0.5") || 0.5));
   const activeBrainVol = findActiveBrainMaskVolume();
   const activeBrainMeta = activeBrainVol ? state.layerMeta.get(activeBrainVol.id) : null;
+  const useAsyncHipsJob = atlasId === "thomas" && mode === "hips_thomas_docker";
+  const contrastVal = state.atlasStudioState?.hipsContrast === "wmn" ? "wmn" : "t1";
+  const forceRecomputeVal = Boolean(state.atlasStudioState?.hipsForceRecompute);
+  const customHipsImgVal = String(state.atlasStudioState?.hipsCustomImage || "").trim();
+
+  const modeLabel = mode === "hips_thomas_docker"
+    ? `HIPS-THOMAS Container (${contrastVal === "wmn" ? "WMn Native" : "T1w -t1"} — background job, cached per T1w)`
+    : mode === "fnirt_nonlinear" || mode === "template_fnirt"
+    ? "FNIRT Nonlinear (MNI152 -> Subject)"
+    : mode === "flirt_12dof" || mode === "template_flirt"
+    ? "FLIRT 12-DOF Affine"
+    : mode;
 
   try {
     if (btn) {
       btn.disabled = true;
-      btn.textContent = isDestrieux ? "Segmenting Destrieux..." : "Segmenting DKT...";
+      btn.textContent = useAsyncHipsJob ? "Starting HIPS-THOMAS..." : `Generating ${atlasShort}...`;
     }
-    setCoregStatus(`Segmenting ${atlasShort}...`, true);
-    if (isDestrieux && dktMode !== "template_flirt") {
-      showToast(
-        `Running FastSurfer with --fsaparc (without --seg_only) to generate Destrieux (${aparcName}) for ${srcMeta.label}. Please note: full surface reconstruction is slower (reverts to template registration only if FastSurfer is unavailable)...`,
-        0
-      );
-    } else {
-      showToast(
-        `Running ${dktMode === "template_flirt" ? `Template ${atlasShort}` : `FastSurfer ${atlasShort}`} parcellation (${aparcName}) for ${srcMeta.label}...`,
-        0
-      );
-    }
+    setCoregStatus(`Generating ${atlasShort}...`, true);
+    showToast(`Generating ${atlasShort} for ${srcMeta.label} via ${modeLabel}...`, useAsyncHipsJob ? 4000 : 0);
 
     const reqPayload = {
+      atlasId,
+      atlasType: atlasId,
       sourceName: srcVol.name,
       sourceBase64: uint8ArrayToBase64(srcMeta.rawBytes),
       currentAffine: srcVol.hdr.affine,
-      dktMode,
-      atlasType,
+      mode,
+      dktMode: mode,
       betFrac,
     };
     if (activeBrainMeta?.rawBytes) {
       reqPayload.brainMaskBase64 = uint8ArrayToBase64(activeBrainMeta.rawBytes);
       reqPayload.brainMaskAffine = activeBrainVol.hdr?.affine || null;
     }
+    if (atlasId === "thomas") {
+      reqPayload.contrast = contrastVal;
+      reqPayload.forceRecompute = forceRecomputeVal;
+      reqPayload.isSkullStripped = isTargetVolumeSkullStripped(srcVol);
+      if (customHipsImgVal) reqPayload.hipsDockerImage = customHipsImgVal;
+    }
 
-    const resp = await fetch("/api/dkt-segment", {
+    if (useAsyncHipsJob) {
+      const startResp = await fetch("/api/atlas-job", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reqPayload),
+      });
+      const startData = await startResp.json().catch(() => ({}));
+      if (startResp.status === 404 || /unknown api endpoint/i.test(startData?.error || "")) {
+        showToast(
+          "Older server.py detected — restart server.py for live progress & Cancel. Running synchronous /api/atlas-generate...",
+          5500
+        );
+      } else {
+        if (!startResp.ok || !startData.jobId) {
+          throw new Error(startData.error || "Could not start HIPS-THOMAS background job");
+        }
+        const job = {
+          jobId: startData.jobId,
+          atlasId,
+          atlasShort,
+          regEntry,
+          modeLabel,
+          startedAtMs: Date.now(),
+          stage: startData.stage || "Starting HIPS-THOMAS...",
+          logTail: [],
+          cancelling: false,
+          pollInFlight: false,
+          timerId: null,
+          elapsedTimerId: null,
+        };
+        state.activeAtlasJob = job;
+        renderActiveAtlasJobUI();
+        job.timerId = setInterval(() => {
+          pollActiveAtlasJobOnce();
+        }, 1500);
+        job.elapsedTimerId = setInterval(() => {
+          renderActiveAtlasJobUI();
+        }, 1000);
+        return { asyncJob: true, jobId: job.jobId };
+      }
+    }
+
+    const resp = await fetch("/api/atlas-generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(reqPayload),
     });
     const data = await resp.json();
     if (!resp.ok || !data.niftiBase64) {
-      throw new Error(data.error || `${atlasShort} segmentation failed`);
+      throw new Error(data.error || `${atlasShort} generation failed`);
     }
 
-    if (data.dktLut && Object.keys(data.dktLut).length > 0) {
-      state.dktLut = data.dktLut;
-    }
-
-    const dktBytes = base64ToUint8Array(data.niftiBase64);
-    const unmaskedBytes = data.unmaskedNiftiBase64 ? base64ToUint8Array(data.unmaskedNiftiBase64) : null;
-    const resolvedType = data.atlasType || atlasType;
-    const resolvedTitle = resolvedType === "destrieux" ? "Destrieux Atlas" : "DKT Atlas";
-    await addDktAtlasVolumeToWorkspace(
-      dktBytes,
-      data.fileName,
-      `${resolvedTitle} (${data.regionCount || (resolvedType === "destrieux" ? 185 : 104)} Regions)`,
-      unmaskedBytes,
-      resolvedType
-    );
-
-    setCoregStatus("Ready", false);
-    showToast(
-      `${resolvedTitle} loaded & brain-masked (${data.regionCount} anatomical regions via ${data.engine})! Hover cursor over brain to inspect ${resolvedTitle} areas.`,
-      5200
-    );
+    return await applyAtlasGenerationResult(data, { atlasId, atlasShort, regEntry, modeLabel });
   } catch (err) {
-    console.error(`${atlasShort} segmentation error:`, err);
+    console.error(`${atlasShort} generation error:`, err);
     setCoregStatus("Ready", false);
-    showToast(`${atlasShort} Segmentation Error: ${err.message}`, 4500);
+    showToast(`${atlasShort} Error: ${err.message}`, 4500);
+    return null;
   } finally {
-    if (btn) {
-      btn.disabled = false;
-      syncAtlasTypeSelectionUI(false, false);
+    if (!state.activeAtlasJob) {
+      if (btn) {
+        btn.disabled = false;
+        syncAtlasTypeSelectionUI(false, false);
+      }
+      syncAtlasStudioUI();
     }
+  }
+}
+
+// Backward-compatible entry point
+async function runDktSegmentation() {
+  return await runAtlasGeneration();
+}
+
+async function importCustomAtlasFromFiles({ niftiFile, lutFile = null, atlasName = "", space = "subject", refVolId = null }) {
+  if (!niftiFile) {
+    showToast("Select a custom atlas NIfTI (.nii, .nii.gz, .mgz) file first.");
+    return null;
+  }
+  try {
+    setCoregStatus("Importing Custom Atlas...", true);
+    showToast(`Importing atlas "${niftiFile.name}"...`, 0);
+    const niiBytes = new Uint8Array(await niftiFile.arrayBuffer());
+    const lutText = lutFile ? await lutFile.text() : "";
+    const payload = {
+      importKind: "custom",
+      fileName: niftiFile.name,
+      niftiBase64: uint8ArrayToBase64(niiBytes),
+      lutText,
+      lutFileName: lutFile ? lutFile.name : "",
+      atlasName: atlasName || niftiFile.name.replace(/\.(nii\.gz|nii|mgz|mgh)$/i, ""),
+      space: space || "subject",
+    };
+
+    if (space === "mni152_fnirt" || space === "mni152_flirt") {
+      const t1Idx = getVolumeIndexById(refVolId || state.refVolId);
+      const refVol = t1Idx >= 0 ? state.nv.volumes[t1Idx] : null;
+      const refMeta = refVol ? state.layerMeta.get(refVol.id) : null;
+      if (!refMeta?.rawBytes) {
+        throw new Error("Reference T1w raw bytes required to warp MNI152 custom atlas to subject space.");
+      }
+      payload.refName = refVol.name;
+      payload.refBase64 = uint8ArrayToBase64(refMeta.rawBytes);
+      payload.refAffine = refVol.hdr?.affine || null;
+    }
+
+    const resp = await fetch("/api/atlas-import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.niftiBase64) {
+      throw new Error(data.error || "Custom atlas import failed");
+    }
+
+    const outBytes = base64ToUint8Array(data.niftiBase64);
+    const vol = await addAtlasVolumeToWorkspace(outBytes, {
+      fileName: data.fileName,
+      displayLabel: `${data.atlasName} (${data.regionCount} ROIs)`,
+      atlasId: data.atlasId,
+      atlasName: data.atlasName,
+      atlasShortName: data.shortName,
+      atlasCategory: "custom",
+      atlasBadge: "CUSTOM",
+      isFreeSurferAtlas: false,
+      lut: data.lut || {},
+      regions: data.regions || null,
+      atlasEngine: data.engineUsed,
+      atlasSpace: data.space,
+    });
+    setCoregStatus("Ready", false);
+    showToast(`Imported Custom Atlas "${data.atlasName}" (${data.regionCount} ROIs)!`, 4500);
+    return vol;
+  } catch (err) {
+    console.error("Custom atlas import error:", err);
+    setCoregStatus("Ready", false);
+    showToast(`Custom Atlas Import Error: ${err.message}`, 4500);
+    return null;
+  }
+}
+
+async function importHipsThomasFiles(fileList) {
+  const arr = Array.from(fileList || []).filter((f) => /\.(nii|nii\.gz)$/i.test(f.name || ""));
+  if (!arr.length) {
+    showToast("Select HIPS-THOMAS NIfTI files (sthomas_LR_labels.nii.gz, thomasfull_L/R, or nucleus folder).");
+    return null;
+  }
+  try {
+    setCoregStatus("Merging HIPS-THOMAS...", true);
+    showToast(`Importing & merging ${arr.length} HIPS-THOMAS file(s)...`, 0);
+    const filesPayload = [];
+    for (const f of arr) {
+      const ab = await f.arrayBuffer();
+      filesPayload.push({
+        name: f.name,
+        relativePath: f.webkitRelativePath || f.name,
+        dataBase64: uint8ArrayToBase64(new Uint8Array(ab)),
+      });
+    }
+    const resp = await fetch("/api/atlas-import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        importKind: arr.length > 2 ? "hips_thomas_folder" : "hips_thomas_pair",
+        files: filesPayload,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.niftiBase64) {
+      throw new Error(data.error || "HIPS-THOMAS import failed");
+    }
+    if (data.lut) state.atlasLuts.set("thomas", data.lut);
+    const outBytes = base64ToUint8Array(data.niftiBase64);
+    const vol = await addAtlasVolumeToWorkspace(outBytes, {
+      fileName: data.fileName,
+      displayLabel: `${data.atlasName} (${data.regionCount} Nuclei)`,
+      atlasId: "thomas",
+      atlasName: data.atlasName,
+      atlasShortName: "THOMAS",
+      atlasCategory: "thalamic",
+      atlasBadge: "THOMAS",
+      isFreeSurferAtlas: false,
+      lut: data.lut,
+      regions: data.regions || null,
+      atlasEngine: data.engineUsed,
+      atlasSpace: "subject",
+    });
+    setCoregStatus("Ready", false);
+    showToast(`Imported HIPS-THOMAS Atlas (${data.regionCount} thalamic nuclei)!`, 4500);
+    return vol;
+  } catch (err) {
+    console.error("HIPS-THOMAS import error:", err);
+    setCoregStatus("Ready", false);
+    showToast(`HIPS-THOMAS Import Error: ${err.message}`, 4500);
+    return null;
   }
 }
 
@@ -3673,7 +4560,6 @@ function buildFreeSurferNiiVueLabelColormap(dktLutObj, maxVolLabel = 2100, calMi
   const lutIds = Object.keys(lutSource)
     .map((k) => parseInt(k, 10))
     .filter((n) => Number.isFinite(n) && n >= 0);
-  // Support both DKT (max 2035) and Destrieux aparc.a2009s+aseg (max 12175)
   const maxId = Math.min(16384, Math.max(2100, maxVolLabel, ...(lutIds.length ? lutIds : [2100])));
   const effMin = Number.isFinite(Number(calMin)) ? Math.max(0.5, Number(calMin)) : 0.5;
   const effMax = Number.isFinite(Number(calMax)) && Number(calMax) >= effMin ? Number(calMax) : maxId;
@@ -3692,11 +4578,9 @@ function buildFreeSurferNiiVueLabelColormap(dktLutObj, maxVolLabel = 2100, calMi
       R[i] = entry.rgb[0] ?? 0;
       G[i] = entry.rgb[1] ?? 0;
       B[i] = entry.rgb[2] ?? 0;
-      // Translucent label alpha (72/255) so 3D volume raycasting renders brain anatomy without an opaque shell
       A[i] = 72;
       labels[i] = entry.name || `ROI_${i}`;
     } else {
-      // Background (0), out-of-window labels (< cal_min or > cal_max), unmapped integers, and non-brain IDs are 100% transparent
       R[i] = 0;
       G[i] = 0;
       B[i] = 0;
@@ -3707,36 +4591,107 @@ function buildFreeSurferNiiVueLabelColormap(dktLutObj, maxVolLabel = 2100, calMi
   return { R, G, B, A, I, labels };
 }
 
-async function applyFreeSurferColorLutToVolume(vol) {
-  if (!vol) return;
-  const dktLutObj = await ensureDktLutLoaded();
-  const meta = state.layerMeta.get(vol.id);
+function buildAtlasDiscreteColormap(vol, meta) {
+  const isFS = Boolean(meta?.isFreeSurferAtlas);
+  const lutObj =
+    meta?.lut && Object.keys(meta.lut).length > 0
+      ? meta.lut
+      : isFS
+      ? state.dktLut || {}
+      : {};
+  const rawArr = meta?.rawAtlasVoxels || vol?.img || [];
+  let maxVox = 1;
+  for (let i = 0; i < rawArr.length; i++) {
+    const v = Math.round(rawArr[i]);
+    if (v > maxVox && v <= 16384) maxVox = v;
+  }
+  let maxLutId = 1;
+  for (const k of Object.keys(lutObj)) {
+    const n = parseInt(k, 10);
+    if (Number.isFinite(n) && n > maxLutId && n <= 16384) maxLutId = n;
+  }
 
-  // Register "FreeSurferColorLUT" as a named 256-entry NiiVue colormap where low/outside-brain bins are 100% transparent (alpha = 0)
+  if (isFS) {
+    const cmap = buildFreeSurferNiiVueLabelColormap(
+      lutObj,
+      Math.max(maxVox, maxLutId),
+      vol?.cal_min ?? 0.5,
+      vol?.cal_max ?? Infinity
+    );
+    return { ...cmap, maxLabelId: cmap.I.length - 1 };
+  }
+
+  const maxLabelId = Math.min(16384, Math.max(1, maxVox, maxLutId));
+  const R = new Array(maxLabelId + 1).fill(0);
+  const G = new Array(maxLabelId + 1).fill(0);
+  const B = new Array(maxLabelId + 1).fill(0);
+  const A = new Array(maxLabelId + 1).fill(0);
+  const I = new Array(maxLabelId + 1);
+  const labels = new Array(maxLabelId + 1).fill("");
+
+  for (let i = 0; i <= maxLabelId; i++) {
+    I[i] = i;
+    if (i === 0) {
+      A[0] = 0;
+      continue;
+    }
+    const entry = lutObj[String(i)];
+    if (entry && Array.isArray(entry.rgb)) {
+      R[i] = entry.rgb[0] ?? 128;
+      G[i] = entry.rgb[1] ?? 128;
+      B[i] = entry.rgb[2] ?? 128;
+      A[i] = 255;
+      labels[i] = entry.name || entry.title || `ROI_${i}`;
+    } else {
+      const [dr, dg, db] = generateDeterministicRgb(i, "C");
+      R[i] = dr;
+      G[i] = dg;
+      B[i] = db;
+      A[i] = 255;
+      labels[i] = `Region ${i}`;
+    }
+  }
+  return { R, G, B, A, I, labels, maxLabelId };
+}
+
+function syncOverlayStyleButtonsUI() {
+  const activeStyle = state.atlasOverlayStyle || "filled";
+  document.querySelectorAll(".atlas-style-btn[data-atlas-style]").forEach((btn) => {
+    const s = btn.getAttribute("data-atlas-style");
+    btn.classList.toggle("active", s === activeStyle);
+  });
+}
+
+async function applyAtlasColormapToVolume(vol) {
+  if (!vol) return;
+  let meta = state.layerMeta.get(vol.id);
+  const isDiscreteAtlas = Boolean(meta?.isAtlas || meta?.isDktAtlas);
+  const isFreeSurfer = meta ? Boolean(meta.isFreeSurferAtlas) : true;
+  const aid = resolveAtlasTypeForVolume(vol);
+
+  if (isFreeSurfer) {
+    await ensureDktLutLoaded();
+  } else if (meta && (!meta.lut || Object.keys(meta.lut).length === 0) && aid) {
+    meta.lut = await ensureAtlasLutLoaded(aid);
+  }
+
+  // Register fallback 256-bin FreeSurferColorLUT once if needed by NiiVue
   if (state.nv && typeof state.nv.addColormap === "function" && !state._fsColormapRegistered) {
+    const dktLutObj = state.dktLut || {};
     const cR = new Array(256).fill(0);
     const cG = new Array(256).fill(0);
     const cB = new Array(256).fill(0);
     const cA = new Array(256).fill(0);
     const cI = new Array(256).fill(0);
     const validEntries = Object.values(dktLutObj).filter((e) => e && isBrainFreeSurferLutEntry(e.id, e));
-    // Bins 0..48 correspond to background air and outside-brain tissue intensities -> keep 100% transparent (alpha = 0)
-    const transparentCutoffBin = 48;
     for (let k = 0; k < 256; k++) {
       cI[k] = k;
-      if (k <= transparentCutoffBin) {
-        cR[k] = 0;
-        cG[k] = 0;
-        cB[k] = 0;
-        cA[k] = 0;
-      } else {
+      if (k > 48) {
         const pick = validEntries.length > 0 ? validEntries[k % validEntries.length] : null;
         cR[k] = pick ? pick.rgb[0] : (k * 73) % 200 + 55;
         cG[k] = pick ? pick.rgb[1] : (k * 151) % 200 + 55;
         cB[k] = pick ? pick.rgb[2] : (k * 199) % 200 + 55;
-        // Smoothly ramp 3D raycast alpha from 12 to 88 so it never obscures the 3D brain volume render
-        const t = (k - transparentCutoffBin) / (255 - transparentCutoffBin);
-        cA[k] = Math.round(12 + t * 76);
+        cA[k] = Math.round(12 + ((k - 48) / 207) * 76);
       }
     }
     try {
@@ -3747,54 +4702,94 @@ async function applyFreeSurferColorLutToVolume(vol) {
     }
   }
 
-  // Determine whether `vol` is a discrete DKT/Destrieux/label volume vs a continuous structural MRI/CT volume
-  const isDiscreteLabelVol = Boolean(
-    meta?.isDktAtlas ||
-      meta?.isMask ||
-      /dkt|destrieux|a2009s|aparc|aseg|atlas|seg|mask/i.test(vol.name || "")
-  );
+  if (isDiscreteAtlas || meta?.isMask || /dkt|destrieux|a2009s|aparc|aseg|atlas|thomas|tian/i.test(vol.name || "")) {
+    if (!vol.hdr) vol.hdr = {};
+    vol.hdr.intent_code = 1002;
+    vol.hdr.scl_slope = 1;
+    vol.hdr.scl_inter = 0;
 
-  if (isDiscreteLabelVol) {
-    let maxVox = 2100;
     if (vol.img && vol.img.length) {
-      const srcArr = meta?.unmaskedDktData || vol.img;
-      for (let i = 0; i < vol.img.length; i++) {
-        const lbl = Math.round(srcArr[i]);
-        // Zero out any non-brain / exterior / skull / CSF / unmapped label so it is 0 and transparent
-        if (lbl <= 0 || !isBrainFreeSurferLutEntry(lbl, dktLutObj[String(lbl)])) {
-          vol.img[i] = 0;
-        } else if (lbl > maxVox) {
-          maxVox = lbl;
+      if (meta && !meta.rawAtlasVoxels) {
+        const snap = new Int16Array(vol.img.length);
+        for (let i = 0; i < vol.img.length; i++) {
+          snap[i] = Math.round(vol.img[i]);
         }
+        meta.rawAtlasVoxels = snap;
+      }
+      const rawSrc = meta?.rawAtlasVoxels || meta?.unmaskedDktData || vol.img;
+      const isolatedSet = meta?.visibleRegionIds instanceof Set ? meta.visibleRegionIds : null;
+      const fsLut = meta?.lut || state.dktLut || {};
+      let maxVox = 1;
+      for (let i = 0; i < vol.img.length; i++) {
+        const lbl = Math.round(rawSrc[i]);
+        let keep = lbl > 0;
+        if (keep && isFreeSurfer) {
+          keep = isBrainFreeSurferLutEntry(lbl, fsLut[String(lbl)]);
+        }
+        if (keep && isolatedSet) {
+          keep = isolatedSet.has(lbl);
+        }
+        if (!keep) {
+          vol.img[i] = 0;
+        } else {
+          vol.img[i] = lbl;
+          if (lbl > maxVox) maxVox = lbl;
+        }
+      }
+      if (isFreeSurfer) {
+        if (!Number.isFinite(vol.cal_min) || vol.cal_min < 0.5) vol.cal_min = 0.5;
+        const fsMaxTarget = maxVox >= 11100 ? 12175 : Math.max(maxVox, getAtlasDefaultMaxLabel(vol));
+        if (!meta?.userCustomWindow || !Number.isFinite(vol.cal_max) || vol.cal_max <= 0) {
+          vol.cal_max = Math.max(vol.cal_max || 0, fsMaxTarget);
+        }
+      } else {
+        vol.cal_min = 0;
+        vol.cal_max = Math.max(1, getAtlasDefaultMaxLabel(vol), maxVox);
       }
     }
 
-    if (meta && !meta.atlasType) {
-      meta.atlasType = maxVox >= 11100 ? "destrieux" : resolveAtlasTypeForVolume(vol);
-    }
-    const defaultMax = maxVox >= 11100 ? 12175 : getAtlasDefaultMaxLabel(vol);
-
-    if (!Number.isFinite(vol.cal_min) || vol.cal_min < 0.5) {
-      vol.cal_min = 0.5;
-    }
-    if (!Number.isFinite(vol.cal_max) || vol.cal_max <= 0) {
-      vol.cal_max = defaultMax;
-    }
-
-    const labelCmap = buildFreeSurferNiiVueLabelColormap(dktLutObj, maxVox, vol.cal_min, vol.cal_max);
+    const labelCmap = buildAtlasDiscreteColormap(vol, meta || { isFreeSurferAtlas: isFreeSurfer });
     labelCmap.A[0] = 0;
-
     vol.colormap = "FreeSurferColorLUT";
     if (typeof vol.setColormapLabel === "function") {
       vol.setColormapLabel(labelCmap);
+    } else {
+      vol.colormapLabel = labelCmap;
+    }
+
+    // Apply Filled / +Edge / Outline style & opacity
+    const isVisible = meta ? Boolean(meta.visible) : true;
+    const baseOp = meta?.userAtlasOpacity > 0 ? meta.userAtlasOpacity : meta?.savedOpacity > 0 ? meta.savedOpacity : 0.48;
+    const style = state.atlasOverlayStyle || "filled";
+    let outlineVal = 0;
+    let targetOp = baseOp;
+    if (style === "filled_outline") {
+      outlineVal = 0.95;
+      targetOp = Math.min(baseOp, 0.55);
+    } else if (style === "outline") {
+      outlineVal = 0.95;
+      targetOp = 0.02;
+    }
+    const finalOp = isVisible ? targetOp : 0.0;
+    const volIdx = getVolumeIndexById(vol.id);
+    if (volIdx >= 0 && typeof state.nv?.setOpacity === "function") {
+      state.nv.setOpacity(volIdx, finalOp);
+    } else {
+      vol.opacity = finalOp;
+    }
+    if (isVisible && state.nv) {
+      if (typeof state.nv.setAtlasOutline === "function") {
+        state.nv.setAtlasOutline(outlineVal);
+      }
+      if (state.nv.opts) {
+        state.nv.opts.atlasOutline = outlineVal;
+      }
+      syncOverlayStyleButtonsUI();
     }
   } else {
-    // Continuous structural volume (e.g. T1w / FLAIR / CT):
-    // Do NOT attach a 0..2100 integer label LUT to raw continuous MRI intensities (where outside-brain air/scalp noise is 1..2100!).
-    // Instead, mask out non-brain voxels if a brain mask or DKT atlas is available, and set cal_min to the brain parenchyma threshold.
+    // Continuous structural volume branch: preserve existing masking + threshold logic
     vol.colormapLabel = null;
     vol.colormap = "FreeSurferColorLUT";
-
     if (vol.img && vol.img.length) {
       if (meta && !meta.unmaskedVolumeData) {
         meta.unmaskedVolumeData = vol.img.slice();
@@ -3808,7 +4803,6 @@ async function applyFreeSurferColorLutToVolume(vol) {
           vol.img[i] = mImg[i] > 0 ? origData[i] : 0;
         }
       }
-      // Compute brain intensity threshold so any residual outside-brain / background voxels fall into the transparent 0..48 LUT bins
       let maxVal = 0;
       for (let i = 0; i < origData.length; i += 4) {
         if (origData[i] > maxVal) maxVal = origData[i];
@@ -3820,33 +4814,174 @@ async function applyFreeSurferColorLutToVolume(vol) {
   }
 }
 
+async function applyFreeSurferColorLutToVolume(vol) {
+  return await applyAtlasColormapToVolume(vol);
+}
+
+async function setAtlasOverlayStyle(style) {
+  const norm = style === "filled_outline" || style === "outline" ? style : "filled";
+  state.atlasOverlayStyle = norm;
+  syncOverlayStyleButtonsUI();
+  const activeVol = getDktVolume();
+  if (activeVol) {
+    await applyAtlasColormapToVolume(activeVol);
+    state.nv?.updateGLVolume?.();
+    state.nv?.drawScene?.();
+  } else if (state.nv) {
+    const ov = norm === "filled" ? 0 : 0.95;
+    if (typeof state.nv.setAtlasOutline === "function") state.nv.setAtlasOutline(ov);
+    if (state.nv.opts) state.nv.opts.atlasOutline = ov;
+    state.nv.drawScene?.();
+  }
+  syncDktOverlayControlsUI();
+  syncAtlasStudioUI();
+}
+
+async function activateAtlasOverlay(volId, visible = true) {
+  if (!state.nv) return;
+  const idx = getVolumeIndexById(volId);
+  if (idx < 0) return;
+  const vol = state.nv.volumes[idx];
+  const meta = state.layerMeta.get(volId);
+  if (!meta) return;
+
+  if (visible) {
+    state.activeDktVolId = volId;
+    state.activeAtlasVolId = volId;
+    state.atlasStudioState.selectedAtlasVolId = volId;
+    state.nv.volumes.forEach((otherVol, otherIdx) => {
+      if (otherVol.id !== volId) {
+        const om = state.layerMeta.get(otherVol.id);
+        if (om && (om.isAtlas || om.isDktAtlas)) {
+          om.visible = false;
+          state.nv.setOpacity?.(otherIdx, 0);
+        }
+      }
+    });
+    meta.visible = true;
+    await applyAtlasColormapToVolume(vol);
+    const atlasSelect = document.getElementById("selectAtlasType");
+    if (atlasSelect && meta.atlasId && Array.from(atlasSelect.options).some((o) => o.value === meta.atlasId)) {
+      if (atlasSelect.value !== meta.atlasId) {
+        atlasSelect.value = meta.atlasId;
+        syncAtlasTypeSelectionUI(false, false);
+      }
+    }
+  } else {
+    meta.visible = false;
+    state.nv.setOpacity?.(idx, 0);
+  }
+
+  state.nv.updateGLVolume?.();
+  state.nv.drawScene?.();
+  renderLayerList();
+  syncDktOverlayControlsUI();
+  syncAtlasStudioUI();
+  updateDktReadoutUI(lookupDktRegionAtRAS(state.lastCrosshairRAS), null);
+}
+
+function computeClientAtlasRegions(vol, lutObj = {}) {
+  const meta = vol ? state.layerMeta.get(vol.id) : null;
+  const data = meta?.rawAtlasVoxels || vol?.img;
+  if (!vol || !data || !vol.hdr?.affine) return [];
+  const dims = getVolDims(vol);
+  const nx = dims[1] || 0;
+  const ny = dims[2] || 0;
+  const nz = dims[3] || 0;
+  if (!(nx > 0 && ny > 0 && nz > 0)) return [];
+
+  const aff = vol.hdr.affine;
+  const det =
+    aff[0][0] * (aff[1][1] * aff[2][2] - aff[1][2] * aff[2][1]) -
+    aff[0][1] * (aff[1][0] * aff[2][2] - aff[1][2] * aff[2][0]) +
+    aff[0][2] * (aff[1][0] * aff[2][1] - aff[1][1] * aff[2][0]);
+  const voxVol = Math.abs(det) || 1.0;
+
+  const acc = new Map();
+  const sliceStride = nx * ny;
+  for (let k = 0; k < nz; k++) {
+    const kOff = k * sliceStride;
+    for (let j = 0; j < ny; j++) {
+      const rowOff = kOff + j * nx;
+      for (let i = 0; i < nx; i++) {
+        const lbl = Math.round(data[rowOff + i]);
+        if (lbl <= 0) continue;
+        let rec = acc.get(lbl);
+        if (!rec) {
+          rec = { c: 0, si: 0, sj: 0, sk: 0 };
+          acc.set(lbl, rec);
+        }
+        rec.c++;
+        rec.si += i;
+        rec.sj += j;
+        rec.sk += k;
+      }
+    }
+  }
+
+  const out = [];
+  for (const [lid, rec] of acc.entries()) {
+    const entry = lutObj?.[String(lid)];
+    const name = entry?.name || entry?.title || `Region ${lid}`;
+    const shortName = entry?.shortName || entry?.abbr || name;
+    const rgb = entry?.rgb || generateDeterministicRgb(lid);
+    const hex = entry?.hex || `#${rgb.map((c) => Math.max(0, Math.min(255, Math.round(c))).toString(16).padStart(2, "0")).join("")}`;
+    let hemi = entry?.hemisphere || "C";
+    if (!entry?.hemisphere) {
+      const low = name.toLowerCase();
+      if (low.startsWith("left") || low.startsWith("l-") || low.endsWith("-lh") || low.startsWith("ctx-lh")) hemi = "L";
+      else if (low.startsWith("right") || low.startsWith("r-") || low.endsWith("-rh") || low.startsWith("ctx-rh")) hemi = "R";
+      else if (meta?.atlasId === "thomas") hemi = lid >= 100 ? "R" : "L";
+    }
+    const centroidRAS = applyMat4Pt(aff, [rec.si / rec.c, rec.sj / rec.c, rec.sk / rec.c]).map((v) =>
+      Math.round(v * 100) / 100
+    );
+    out.push({
+      id: lid,
+      name,
+      shortName,
+      hemisphere: hemi,
+      voxelCount: rec.c,
+      volumeMm3: Math.round(rec.c * voxVol * 100) / 100,
+      centroidRAS,
+      rgb,
+      hex,
+    });
+  }
+  out.sort((a, b) => a.id - b.id);
+  return out;
+}
+
 // Find the active BET / skull-stripped brain mask volume in the workspace if present
 function findActiveBrainMaskVolume() {
   if (!state.nv || !Array.isArray(state.nv.volumes)) return null;
-  // 1. Prefer explicitly generated BET volume (meta.isBetBrain === true)
   const betVol = state.nv.volumes.find((v) => state.layerMeta.get(v.id)?.isBetBrain);
   if (betVol) return betVol;
-  // 2. Fallback to any non-DKT volume whose filename contains "_brain"
   const brainNamedVol = state.nv.volumes.find((v) => {
     const m = state.layerMeta.get(v.id);
-    if (m?.isDktAtlas) return false;
+    if (m?.isDktAtlas || m?.isAtlas) return false;
     return /_brain(\.nii(\.gz)?$|\b)/i.test(v.name || "");
   });
   return brainNamedVol || null;
 }
 
-// Mask the DKT / Destrieux Atlas volume in-place using the active brain mask volume so any voxel outside the brain is set to 0 and transparent
+// Mask ONLY FreeSurfer (DKT / Destrieux) cortical/whole-brain atlases against the subject BET brain mask
 async function applyBrainMaskToDktVolume(dktVol = null, brainVolOverride = null) {
   const targetDktVol = dktVol || getDktVolume();
   if (!targetDktVol || !targetDktVol.img) return false;
+
+  const dktMeta = state.layerMeta.get(targetDktVol.id);
+  if (dktMeta && !dktMeta.isFreeSurferAtlas) {
+    // Subcortical, thalamic (THOMAS), Tian, FSL, and custom atlases must NEVER be clipped by rough BET masks
+    return false;
+  }
 
   const dktLutObj = await ensureDktLutLoaded();
   const brainVol = brainVolOverride || findActiveBrainMaskVolume();
   if (!brainVol || !brainVol.img) return false;
 
-  const dktMeta = state.layerMeta.get(targetDktVol.id);
   if (dktMeta && !dktMeta.unmaskedDktData) {
-    dktMeta.unmaskedDktData = new Int16Array(targetDktVol.img);
+    dktMeta.unmaskedDktData = dktMeta.rawAtlasVoxels ? new Int16Array(dktMeta.rawAtlasVoxels) : new Int16Array(targetDktVol.img);
   }
   const sourceLabels = dktMeta?.unmaskedDktData || targetDktVol.img;
 
@@ -3875,8 +5010,7 @@ async function applyBrainMaskToDktVolume(dktVol = null, brainVolOverride = null)
   if (sameDims && sameAffine) {
     const bImg = brainVol.img;
     const dImg = targetDktVol.img;
-    const len = dImg.length;
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < dImg.length; i++) {
       const lbl = Math.round(sourceLabels[i]);
       dImg[i] = bImg[i] > 0 && isBrainFreeSurferLutEntry(lbl, dktLutObj[String(lbl)]) ? lbl : 0;
     }
@@ -3910,16 +5044,31 @@ async function applyBrainMaskToDktVolume(dktVol = null, brainVolOverride = null)
     }
   }
 
+  if (dktMeta) {
+    dktMeta.rawAtlasVoxels = new Int16Array(targetDktVol.img.length);
+    for (let i = 0; i < targetDktVol.img.length; i++) {
+      dktMeta.rawAtlasVoxels[i] = Math.round(targetDktVol.img[i]);
+    }
+  }
   targetDktVol.cal_min = 0.5;
-  await applyFreeSurferColorLutToVolume(targetDktVol);
+  await applyAtlasColormapToVolume(targetDktVol);
   return true;
 }
 
-async function addDktAtlasVolumeToWorkspace(dktBytes, fileName, displayLabel, unmaskedBytes = null, explicitAtlasType = null) {
-  // Remove any previously loaded atlas with the same filename
+async function addAtlasVolumeToWorkspace(niftiBytes, opts = {}) {
+  const fileName = opts.fileName || "atlas.nii.gz";
+  const inferred = inferModalityAndStyle(fileName);
+  const atlasId = opts.atlasId || opts.explicitAtlasType || inferred.atlasId || "dkt";
+  const isFS =
+    opts.isFreeSurferAtlas !== undefined
+      ? Boolean(opts.isFreeSurferAtlas)
+      : atlasId === "dkt" || atlasId === "destrieux";
+
+  // Replace existing volume ONLY if it shares exact atlasId + fileName (allows DKT + THOMAS + Tian S1..S4 simultaneously!)
   const existingIdx = state.nv.volumes.findIndex((v) => {
     const m = state.layerMeta.get(v.id);
-    return m?.isDktAtlas && v.name === fileName;
+    if (!m?.isDktAtlas && !m?.isAtlas) return false;
+    return (m.atlasId === atlasId && atlasId !== "custom" && !String(atlasId).startsWith("custom_")) || v.name === fileName;
   });
   if (existingIdx >= 0) {
     const oldId = state.nv.volumes[existingIdx].id;
@@ -3927,108 +5076,136 @@ async function addDktAtlasVolumeToWorkspace(dktBytes, fileName, displayLabel, un
     state.layerMeta.delete(oldId);
   }
 
-  await ensureDktLutLoaded();
+  let lutObj = opts.lut || null;
+  if (isFS) {
+    lutObj = await ensureDktLutLoaded();
+  } else if (!lutObj || Object.keys(lutObj).length === 0) {
+    lutObj = await ensureAtlasLutLoaded(atlasId);
+  }
 
-  const initialType = resolveAtlasTypeForVolume(null, explicitAtlasType || fileName);
-  const initialMax = initialType === "destrieux" ? 12175 : 2035;
+  const atlasTitle = opts.atlasName || inferred.modality || "Brain Atlas";
+  const atlasShort = opts.atlasShortName || inferred.atlasShortName || atlasId.toUpperCase();
+  const initialOp = opts.opacity ?? (isFS ? 0.38 : 0.52);
 
-  const dktVol = await loadNVImageFromBytes(dktBytes, {
+  const vol = await loadNVImageFromBytes(niftiBytes, {
     name: fileName,
     colormap: "gray",
-    opacity: 0.35,
-    cal_min: 0.5,
-    cal_max: initialMax,
+    opacity: initialOp,
+    cal_min: isFS ? 0.5 : 0,
+    cal_max: isFS ? (atlasId === "destrieux" ? 12175 : 2035) : 255,
   });
 
+  if (!vol.hdr) vol.hdr = {};
+  vol.hdr.intent_code = 1002;
+  vol.hdr.scl_slope = 1;
+  vol.hdr.scl_inter = 0;
+
   let unmaskedDktData = null;
-  if (unmaskedBytes) {
+  if (opts.unmaskedBytes && isFS) {
     try {
-      const unmaskedVol = await loadNVImageFromBytes(unmaskedBytes, {
+      const unmaskedVol = await loadNVImageFromBytes(opts.unmaskedBytes, {
         name: `unmasked_${fileName}`,
         colormap: "gray",
         opacity: 0.0,
       });
-      if (unmaskedVol?.img?.length === dktVol.img?.length) {
+      if (unmaskedVol?.img?.length === vol.img?.length) {
         unmaskedDktData = new Int16Array(unmaskedVol.img);
       }
     } catch (_) {
-      // Fallback to dktVol.img below
+      // ignore
     }
   }
-  if (!unmaskedDktData && dktVol.img) {
-    unmaskedDktData = new Int16Array(dktVol.img);
+
+  const rawAtlasVoxels = new Int16Array(vol.img?.length || 0);
+  if (vol.img) {
+    for (let i = 0; i < vol.img.length; i++) {
+      rawAtlasVoxels[i] = Math.round(vol.img[i]);
+    }
+  }
+  if (!unmaskedDktData) {
+    unmaskedDktData = new Int16Array(rawAtlasVoxels);
   }
 
-  const detectedAtlasType = resolveAtlasTypeForVolume(dktVol, explicitAtlasType || fileName);
-  const isDestrieux = detectedAtlasType === "destrieux";
-  const atlasTitle = isDestrieux ? "Destrieux Atlas" : "DKT Atlas";
-  dktVol.cal_max = isDestrieux ? 12175 : 2035;
-
-  // Hide any other loaded parcellation overlays so only the newly activated atlas color overlay is displayed
-  state.nv.volumes.forEach((v, idx) => {
-    const m = state.layerMeta.get(v.id);
-    if (m?.isDktAtlas) {
-      m.visible = false;
-      state.nv.setOpacity(idx, 0);
-    }
-  });
-
-  await applyFreeSurferColorLutToVolume(dktVol);
-
-  state.nv.addVolume(dktVol);
-  registerVolumeMeta(dktVol, {
-    label: displayLabel || `${atlasTitle} (${fileName})`,
-    modality: `${atlasTitle} (FreeSurferColorLUT)`,
-    opacity: 0.35,
+  state.nv.addVolume(vol);
+  registerVolumeMeta(vol, {
+    label: opts.displayLabel || `${atlasTitle}`,
+    modality: `${atlasShort} (${isFS ? "FreeSurferColorLUT" : "Discrete Label LUT"})`,
+    opacity: initialOp,
+    userAtlasOpacity: initialOp,
     visible: true,
     isMask: true,
+    isAtlas: true,
     isDktAtlas: true,
-    atlasType: detectedAtlasType,
-    rawBytes: dktBytes,
+    atlasType: atlasId,
+    atlasId,
+    atlasName: atlasTitle,
+    atlasShortName: atlasShort,
+    atlasCategory: opts.atlasCategory || inferred.atlasCategory || "cortical",
+    atlasBadge: opts.atlasBadge || inferred.atlasBadge || atlasShort.toUpperCase(),
+    isFreeSurferAtlas: isFS,
+    lut: lutObj,
+    regions: Array.isArray(opts.regions) ? opts.regions : null,
+    rawAtlasVoxels,
+    atlasEngine: opts.atlasEngine || null,
+    atlasSpace: opts.atlasSpace || "subject",
+    rawBytes: niftiBytes,
   });
-  const dktMeta = state.layerMeta.get(dktVol.id);
-  if (dktMeta && unmaskedDktData) {
-    dktMeta.unmaskedDktData = unmaskedDktData;
-  }
-  state.activeDktVolId = dktVol.id;
 
-  // Sync the Atlas Type dropdown to match the newly loaded/generated atlas
-  const atlasSelect = document.getElementById("selectAtlasType");
-  if (atlasSelect && atlasSelect.value !== detectedAtlasType) {
-    atlasSelect.value = detectedAtlasType;
-  }
-  syncAtlasTypeSelectionUI(false, false);
-
-  // If a brain mask volume is present in the stack, ensure the Atlas overlay is masked to it
-  if (findActiveBrainMaskVolume()) {
-    await applyBrainMaskToDktVolume(dktVol);
+  const meta = state.layerMeta.get(vol.id);
+  if (meta) {
+    meta.unmaskedDktData = unmaskedDktData;
+    if (!meta.regions || meta.regions.length === 0) {
+      meta.regions = computeClientAtlasRegions(vol, lutObj);
+    }
   }
 
-  state.nv.updateGLVolume();
-  state.nv.drawScene();
-  renderLayerList();
+  if (isFS && findActiveBrainMaskVolume()) {
+    await applyBrainMaskToDktVolume(vol);
+  }
 
-  // Immediately evaluate Atlas region at current crosshair position
-  const dktInfo = lookupDktRegionAtRAS(state.lastCrosshairRAS);
-  updateDktReadoutUI(dktInfo, null);
+  await activateAtlasOverlay(vol.id, true);
+  return vol;
+}
+
+// Backward-compatible DKT / Destrieux wrapper
+async function addDktAtlasVolumeToWorkspace(dktBytes, fileName, displayLabel, unmaskedBytes = null, explicitAtlasType = null) {
+  const detectedId = resolveAtlasTypeForVolume(null, explicitAtlasType || fileName);
+  const reg = getAtlasRegistryEntry(detectedId);
+  const inf = inferModalityAndStyle(fileName);
+  const isFS = detectedId === "dkt" || detectedId === "destrieux";
+  return await addAtlasVolumeToWorkspace(dktBytes, {
+    fileName,
+    displayLabel,
+    unmaskedBytes,
+    explicitAtlasType: detectedId,
+    atlasId: detectedId,
+    atlasName: reg?.name || inf.modality,
+    atlasShortName: reg?.shortName || inf.atlasShortName || (detectedId === "destrieux" ? "Destrieux" : "DKT"),
+    atlasCategory: reg?.category || inf.atlasCategory || "cortical",
+    atlasBadge: reg?.badge || inf.atlasBadge || (detectedId === "destrieux" ? "DESTRIEUX" : "DKT"),
+    isFreeSurferAtlas: isFS,
+  });
 }
 
 async function loadDktAtlasFile(file) {
   if (!file) return;
-  const selectedType = document.getElementById("selectAtlasType")?.value === "destrieux" ? "destrieux" : "dkt";
+  const inf = inferModalityAndStyle(file.name);
+  const selectedId = document.getElementById("selectAtlasType")?.value || "dkt";
+  const detectedId = inf.atlasId && inf.atlasId !== "dkt" ? inf.atlasId : /dkt/i.test(file.name) ? "dkt" : selectedId;
+  const isFS = detectedId === "dkt" || detectedId === "destrieux";
   try {
     setCoregStatus("Loading Atlas...", true);
     showToast(`Loading Atlas file ${file.name}...`, 0);
 
-    // Ensure FreeSurfer/DKT/Destrieux LUT is loaded
-    if (!state.dktLut || Object.keys(state.dktLut).length === 0) {
+    if (isFS && (!state.dktLut || Object.keys(state.dktLut).length === 0)) {
       await checkNeuroToolsStatus(false);
     }
 
     const ab = await file.arrayBuffer();
-    let dktBytes = new Uint8Array(ab);
+    let atlasBytes = new Uint8Array(ab);
     let fileName = file.name;
-    let detectedType = /destrieux|a2009s/i.test(file.name) ? "destrieux" : (/dkt/i.test(file.name) ? "dkt" : selectedType);
+    let finalId = detectedId;
+    let lutObj = isFS ? state.dktLut : await ensureAtlasLutLoaded(finalId);
 
     if (file.name.toLowerCase().endsWith(".mgz") || file.name.toLowerCase().endsWith(".mgh")) {
       const resp = await fetch("/api/convert-volume", {
@@ -4036,24 +5213,35 @@ async function loadDktAtlasFile(file) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sourceName: file.name,
-          sourceBase64: uint8ArrayToBase64(dktBytes),
-          isDktAtlas: true,
+          sourceBase64: uint8ArrayToBase64(atlasBytes),
+          isDktAtlas: isFS,
         }),
       });
       const data = await resp.json();
       if (!resp.ok || !data.niftiBase64) {
         throw new Error(data.error || "Failed to convert FreeSurfer .mgz volume");
       }
-      dktBytes = base64ToUint8Array(data.niftiBase64);
+      atlasBytes = base64ToUint8Array(data.niftiBase64);
       fileName = data.fileName;
-      if (data.dktLut) state.dktLut = data.dktLut;
-      if (data.atlasType) detectedType = data.atlasType;
+      if (data.dktLut && isFS) lutObj = state.dktLut = data.dktLut;
+      if (data.atlasType && isFS) finalId = data.atlasType;
     }
 
-    const atlasTitle = detectedType === "destrieux" ? "Destrieux Atlas" : "DKT Atlas";
-    await addDktAtlasVolumeToWorkspace(dktBytes, fileName, `${atlasTitle} (${file.name})`, null, detectedType);
+    const reg = getAtlasRegistryEntry(finalId);
+    const shortTitle = reg?.shortName || inf.atlasShortName || finalId.toUpperCase();
+    await addAtlasVolumeToWorkspace(atlasBytes, {
+      fileName,
+      displayLabel: `${shortTitle} (${file.name})`,
+      atlasId: finalId,
+      atlasName: reg?.name || `${shortTitle} Atlas`,
+      atlasShortName: shortTitle,
+      atlasCategory: reg?.category || inf.atlasCategory || "cortical",
+      atlasBadge: reg?.badge || inf.atlasBadge || shortTitle.toUpperCase(),
+      isFreeSurferAtlas: isFS,
+      lut: lutObj,
+    });
     setCoregStatus("Ready", false);
-    showToast(`Loaded ${atlasTitle} "${file.name}"! Hover cursor over brain slices to view ${atlasTitle} anatomical areas.`);
+    showToast(`Loaded ${shortTitle} "${file.name}"! Hover cursor or move crosshair to inspect stacked atlases.`);
   } catch (err) {
     console.error("Failed to load Atlas file:", err);
     setCoregStatus("Ready", false);
@@ -4061,45 +5249,256 @@ async function loadDktAtlasFile(file) {
   }
 }
 
-// Find the active DKT / Destrieux Atlas NVImage volume in workspace
+// Find the active Brain Atlas NVImage volume in workspace
 function getDktVolume() {
   if (!state.nv) return null;
-  if (state.activeDktVolId) {
-    const idx = getVolumeIndexById(state.activeDktVolId);
+  const activeId = state.activeAtlasVolId || state.activeDktVolId;
+  if (activeId) {
+    const idx = getVolumeIndexById(activeId);
     if (idx >= 0) return state.nv.volumes[idx];
   }
   const preferredType = document.getElementById("selectAtlasType")?.value || state.selectedAtlasType || "dkt";
   const preferred = state.nv.volumes.find((v) => {
     const m = state.layerMeta.get(v.id);
-    return m?.isDktAtlas && resolveAtlasTypeForVolume(v) === preferredType;
+    return (m?.isAtlas || m?.isDktAtlas) && resolveAtlasTypeForVolume(v) === preferredType;
   });
   if (preferred) {
     state.activeDktVolId = preferred.id;
+    state.activeAtlasVolId = preferred.id;
     return preferred;
   }
-  const found = state.nv.volumes.find((v) => state.layerMeta.get(v.id)?.isDktAtlas);
+  const found = state.nv.volumes.find((v) => {
+    const m = state.layerMeta.get(v.id);
+    return m?.isAtlas || m?.isDktAtlas;
+  });
   if (found) {
     state.activeDktVolId = found.id;
+    state.activeAtlasVolId = found.id;
     return found;
   }
   return null;
 }
 
-// Sample the integer DKT / Destrieux label at a 3D RAS coordinate [x, y, z] and resolve via FreeSurferColorLUT
+function lookupAtlasRegionAtRAS(vol, ras) {
+  if (!vol || !vol.hdr?.affine) return null;
+  const meta = state.layerMeta.get(vol.id);
+  const srcArr = meta?.rawAtlasVoxels || vol.img;
+  if (!srcArr || !srcArr.length) return null;
+
+  const dims = getVolDims(vol);
+  const nx = dims[1] || 0;
+  const ny = dims[2] || 0;
+  const nz = dims[3] || 0;
+  if (!(nx > 0 && ny > 0 && nz > 0)) return null;
+
+  const invAff = invertMat4(vol.hdr.affine);
+  const ijk = applyMat4Pt(invAff, ras);
+  const i = Math.round(ijk[0]);
+  const j = Math.round(ijk[1]);
+  const k = Math.round(ijk[2]);
+  if (i < 0 || i >= nx || j < 0 || j >= ny || k < 0 || k >= nz) return null;
+
+  const labelId = Math.round(srcArr[i + nx * (j + ny * k)]);
+  if (!labelId || labelId <= 0) return null;
+
+  const isFS = meta ? Boolean(meta.isFreeSurferAtlas) : true;
+  const lutObj = meta?.lut && Object.keys(meta.lut).length > 0 ? meta.lut : isFS ? state.dktLut : {};
+  let entry = lutObj?.[String(labelId)] || null;
+  if (isFS && !isBrainFreeSurferLutEntry(labelId, entry)) return null;
+
+  if (!entry) {
+    const [r, g, b] = generateDeterministicRgb(labelId);
+    const hex = `#${[r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+    entry = { id: labelId, name: `Region ${labelId}`, shortName: `R${labelId}`, title: `Region ${labelId}`, hemisphere: "C", rgb: [r, g, b], hex };
+  }
+
+  const badge = getAtlasBadgeInfo(meta);
+  const shortAtlas = meta?.atlasShortName || getAtlasShortTitle(vol);
+  return {
+    volId: vol.id,
+    atlasId: meta?.atlasId || meta?.atlasType || "atlas",
+    atlasTitle: shortAtlas,
+    atlasBadge: badge.text,
+    atlasBadgeClass: badge.cls,
+    labelId,
+    name: entry.name || entry.title || `Region ${labelId}`,
+    shortName: entry.shortName || entry.name || `Region ${labelId}`,
+    title: entry.title || entry.name || `Region ${labelId}`,
+    hemisphere: entry.hemisphere || "C",
+    rgb: entry.rgb || [56, 189, 248],
+    hex: entry.hex || "#38bdf8",
+    entry,
+    activeOverlay: vol.id === (state.activeAtlasVolId || state.activeDktVolId),
+    ras,
+  };
+}
+
+function lookupAllAtlasesAtRAS(ras) {
+  const vols = getLoadedAtlasVolumes();
+  if (!vols.length || !Array.isArray(ras)) return [];
+  const activeId = state.activeAtlasVolId || state.activeDktVolId;
+  const sorted = [...vols].sort((a, b) => (a.id === activeId ? -1 : b.id === activeId ? 1 : 0));
+  const hits = [];
+  for (const v of sorted) {
+    const hit = lookupAtlasRegionAtRAS(v, ras);
+    if (hit) hits.push(hit);
+  }
+  return hits;
+}
+
+// Backward-compatible primary lookup (used by legacy hover/inspector)
 function lookupDktRegionAtRAS(ras) {
-  const dktVol = getDktVolume();
-  if (!dktVol || !dktVol.hdr?.affine || !dktVol.img) {
+  const activeVol = getDktVolume();
+  if (!activeVol) return null;
+  const hits = lookupAllAtlasesAtRAS(ras);
+  const primary = hits[0] || null;
+  if (!primary) {
+    return { labelId: 0, entry: null, ras, atlasTitle: getAtlasShortTitle(activeVol), hits };
+  }
+  return {
+    labelId: primary.labelId,
+    entry: primary.entry,
+    ras,
+    atlasTitle: primary.atlasTitle,
+    primary,
+    hits,
+  };
+}
+
+async function jumpToAtlasRegion(volId, regionId) {
+  const idx = getVolumeIndexById(volId);
+  if (idx < 0 || !state.nv) return false;
+  const vol = state.nv.volumes[idx];
+  const meta = state.layerMeta.get(volId);
+  if (!meta?.regions) {
+    meta.regions = computeClientAtlasRegions(vol, meta?.lut || state.dktLut);
+  }
+  const region = meta?.regions?.find((r) => Number(r.id) === Number(regionId));
+  if (!region?.centroidRAS) return false;
+
+  const centroid = region.centroidRAS;
+  state.lastCrosshairRAS = [...centroid];
+  if (typeof state.nv.mm2frac === "function" && state.nv.scene?.crosshairPos) {
+    const frac = state.nv.mm2frac(centroid);
+    if (frac && frac.length >= 3) {
+      state.nv.scene.crosshairPos = [frac[0], frac[1], frac[2]];
+    }
+  }
+  state.nv.drawScene?.();
+  updateCrosshairReadout({ mm: centroid });
+  showToast(`Jumped to ${region.shortName || region.name} (${meta.atlasShortName || "Atlas"} #${region.id}) at RAS [${centroid.map((v) => v.toFixed(1)).join(", ")}]`, 2600);
+  return true;
+}
+
+async function setAtlasVisibleRegions(volId, regionIdSetOrNull) {
+  const idx = getVolumeIndexById(volId);
+  if (idx < 0) return;
+  const vol = state.nv.volumes[idx];
+  const meta = state.layerMeta.get(volId);
+  if (!meta) return;
+  meta.visibleRegionIds = regionIdSetOrNull instanceof Set ? new Set(regionIdSetOrNull) : null;
+  await applyAtlasColormapToVolume(vol);
+  state.nv?.updateGLVolume?.();
+  state.nv?.drawScene?.();
+  syncAtlasStudioUI();
+}
+
+async function toggleAtlasRegionVisibility(volId, regionId, checked) {
+  const idx = getVolumeIndexById(volId);
+  if (idx < 0) return;
+  const vol = state.nv.volumes[idx];
+  const meta = state.layerMeta.get(volId);
+  if (!meta) return;
+  if (!meta.regions) {
+    meta.regions = computeClientAtlasRegions(vol, meta.lut || state.dktLut);
+  }
+  const rid = Number(regionId);
+  if (!(meta.visibleRegionIds instanceof Set)) {
+    // Switching from "all visible" to specific subset
+    const allIds = new Set(meta.regions.map((r) => Number(r.id)));
+    if (!checked) allIds.delete(rid);
+    meta.visibleRegionIds = checked ? null : allIds;
+  } else {
+    if (checked) meta.visibleRegionIds.add(rid);
+    else meta.visibleRegionIds.delete(rid);
+    if (meta.regions.length > 0 && meta.visibleRegionIds.size >= meta.regions.length) {
+      meta.visibleRegionIds = null;
+    }
+  }
+  await applyAtlasColormapToVolume(vol);
+  state.nv?.updateGLVolume?.();
+  state.nv?.drawScene?.();
+  syncAtlasStudioUI();
+}
+
+async function copySelectedAtlasRoisToDrawingLayer(volId = null, explicitIds = null) {
+  const targetVol = volId ? state.nv?.volumes?.[getVolumeIndexById(volId)] : getDktVolume();
+  if (!targetVol) {
+    showToast("Load an atlas volume first.");
     return null;
   }
-  const atlasTitle = getAtlasShortTitle(dktVol);
-  const invAff = invertMat4(dktVol.hdr.affine);
-  const rawVal = sampleVolumeAtRAS(dktVol, invAff, ras, true);
-  const labelId = Math.round(rawVal);
-  const entry = state.dktLut?.[String(labelId)] || null;
-  if (!labelId || labelId <= 0 || !isBrainFreeSurferLutEntry(labelId, entry)) {
-    return { labelId: 0, entry: null, ras, atlasTitle };
+  const meta = state.layerMeta.get(targetVol.id);
+  const rawArr = meta?.rawAtlasVoxels || targetVol.img;
+  if (!rawArr || !targetVol.hdr?.affine) return null;
+
+  let targetIds = null;
+  let singleRegionInfo = null;
+  if (Array.isArray(explicitIds) && explicitIds.length > 0) {
+    targetIds = new Set(explicitIds.map(Number));
+  } else if (meta?.visibleRegionIds instanceof Set && meta.visibleRegionIds.size > 0) {
+    targetIds = new Set(meta.visibleRegionIds);
+  } else {
+    const hit = lookupAtlasRegionAtRAS(targetVol, state.lastCrosshairRAS);
+    if (hit && hit.labelId > 0) {
+      targetIds = new Set([hit.labelId]);
+      singleRegionInfo = hit;
+    }
   }
-  return { labelId, entry, ras, atlasTitle };
+
+  if (!targetIds || targetIds.size === 0) {
+    showToast("Isolate/check ROI(s) in Atlas Studio or move crosshair onto an atlas region first.");
+    return null;
+  }
+
+  const dims = getVolDims(targetVol);
+  const nx = dims[1] || 0;
+  const ny = dims[2] || 0;
+  const nz = dims[3] || 0;
+  const vox = new Uint8Array(nx * ny * nz);
+  let count = 0;
+  for (let i = 0; i < vox.length; i++) {
+    const val = Math.round(rawArr[i]);
+    if (targetIds.has(val)) {
+      vox[i] = 1;
+      count++;
+    }
+  }
+  if (count === 0) {
+    showToast("Selected ROI(s) have 0 voxels on this volume grid.");
+    return null;
+  }
+
+  const firstId = Array.from(targetIds)[0];
+  const lutEntry = (meta?.lut || state.dktLut || {})[String(firstId)];
+  const atlasShort = meta?.atlasShortName || "Atlas";
+  const layerName =
+    targetIds.size === 1
+      ? `${atlasShort}_${(singleRegionInfo?.shortName || lutEntry?.shortName || lutEntry?.name || `ROI_${firstId}`).replace(/[^a-zA-Z0-9_-]+/g, "_")}`
+      : `${atlasShort}_${targetIds.size}ROIs`;
+  const colorHex = singleRegionInfo?.hex || lutEntry?.hex || "#f43f5e";
+
+  const created = await createDrawingLayer({
+    name: layerName,
+    mode: "mask",
+    colorHex,
+    opacity: 0.65,
+    visible: true,
+    voxels: vox,
+    explicitDims: [...dims],
+    explicitAffine: cloneMat4(targetVol.hdr.affine),
+  });
+  showToast(`Copied ${targetIds.size} ROI(s) (${count.toLocaleString()} vox) to Drawing Layer "${layerName}" (ready to save as .voi / .nii.gz)!`, 4500);
+  return created;
 }
 
 function syncDktOverlayControlsUI() {
@@ -4111,6 +5510,7 @@ function syncDktOverlayControlsUI() {
   const autoBtn = document.getElementById("btnDktAutoWindow");
   const dktVol = getDktVolume();
   const defaultMax = getAtlasDefaultMaxLabel(dktVol);
+  syncOverlayStyleButtonsUI();
 
   if (!dktVol) {
     if (chk) {
@@ -4118,10 +5518,10 @@ function syncDktOverlayControlsUI() {
       chk.disabled = true;
     }
     if (slider) {
-      slider.value = "35";
+      slider.value = "48";
       slider.disabled = true;
     }
-    if (pctEl) pctEl.textContent = "35%";
+    if (pctEl) pctEl.textContent = "48%";
     if (minInput) {
       minInput.value = "0.5";
       minInput.disabled = true;
@@ -4137,9 +5537,9 @@ function syncDktOverlayControlsUI() {
   }
 
   const meta = state.layerMeta.get(dktVol.id);
-  const isOverlayOn = Boolean(meta ? meta.visible && dktVol.opacity > 0 : dktVol.opacity > 0);
-  const savedAlpha = meta?.savedOpacity > 0 ? meta.savedOpacity : 0.35;
-  const activeAlpha = isOverlayOn ? dktVol.opacity : 0;
+  const isOverlayOn = Boolean(meta ? meta.visible : dktVol.opacity > 0);
+  const savedAlpha = meta?.userAtlasOpacity > 0 ? meta.userAtlasOpacity : meta?.savedOpacity > 0 ? meta.savedOpacity : 0.48;
+  const activeAlpha = isOverlayOn ? (meta?.userAtlasOpacity > 0 ? meta.userAtlasOpacity : dktVol.opacity) : 0;
 
   if (chk) {
     chk.disabled = false;
@@ -4182,7 +5582,7 @@ function resetDktInspectorUI() {
 
   if (swatch) swatch.style.background = "#475569";
   if (titleEl) titleEl.textContent = `${atlasTitle}: Not Loaded`;
-  if (subEl) subEl.textContent = `Click "Generate ${atlasTitle}" above, then hover cursor over brain`;
+  if (subEl) subEl.textContent = `Generate or load an atlas (DKT, THOMAS, Tian, FSL), then hover over brain`;
   if (tooltip) tooltip.hidden = true;
   if (hudPill) hudPill.hidden = true;
   syncDktOverlayControlsUI();
@@ -4201,66 +5601,98 @@ function updateDktReadoutUI(dktInfo, cursorEvent = null) {
     return;
   }
 
-  const { labelId, entry, ras, atlasTitle: infoAtlasTitle } = dktInfo;
-  const activeAtlasTitle = infoAtlasTitle || getAtlasShortTitle(getDktVolume());
-  const rasStr = ras ? `RAS [${ras[0].toFixed(1)}, ${ras[1].toFixed(1)}, ${ras[2].toFixed(1)}] mm` : "";
+  const hits = Array.isArray(dktInfo.hits) ? dktInfo.hits : dktInfo.labelId > 0 && dktInfo.entry ? [
+    {
+      atlasTitle: dktInfo.atlasTitle || getAtlasShortTitle(getDktVolume()),
+      atlasBadge: (dktInfo.atlasTitle || "DKT").toUpperCase(),
+      labelId: dktInfo.labelId,
+      name: dktInfo.entry.name || dktInfo.entry.title,
+      shortName: dktInfo.entry.shortName || dktInfo.entry.title || dktInfo.entry.name,
+      title: dktInfo.entry.title || dktInfo.entry.name,
+      hex: dktInfo.entry.hex || "#38bdf8",
+    },
+  ] : [];
 
-  if (labelId > 0 && entry) {
-    if (swatch) swatch.style.background = entry.hex || "#38bdf8";
-    if (titleEl) titleEl.textContent = entry.title;
-    if (subEl) subEl.textContent = `${entry.name} (${activeAtlasTitle} #${labelId}) · ${rasStr}`;
+  const ras = dktInfo.ras;
+  const rasStr = ras ? `RAS [${ras[0].toFixed(1)}, ${ras[1].toFixed(1)}, ${ras[2].toFixed(1)}] mm` : "";
+  const activeAtlasTitle = dktInfo.atlasTitle || getAtlasShortTitle(getDktVolume());
+
+  if (hits.length > 0) {
+    const primary = hits[0];
+    if (swatch) swatch.style.background = primary.hex || "#38bdf8";
+    if (titleEl) titleEl.textContent = primary.title || primary.name;
+    if (subEl) {
+      const stackedText = hits
+        .map((h) => `${h.atlasBadge}: ${h.shortName || h.title} (#${h.labelId})`)
+        .join(" · ");
+      subEl.textContent = `${stackedText} · ${rasStr}`;
+    }
 
     if (hudPill) {
       hudPill.hidden = false;
-      hudPill.innerHTML = `
-        <span class="dkt-swatch" style="background:${entry.hex || "#38bdf8"};"></span>
-        <span>${entry.title}</span>
-        <span style="color:var(--text-secondary);font-family:var(--font-mono);font-size:10px;">#${labelId}</span>
-      `;
+      hudPill.innerHTML = hits
+        .slice(0, 3)
+        .map(
+          (h, idx) => `
+            <span class="dkt-swatch" style="background:${h.hex || "#38bdf8"};"></span>
+            <span style="${idx === 0 ? "font-weight:700;" : "color:var(--text-secondary);"}">${hits.length > 1 ? `${h.atlasBadge}: ` : ""}${h.shortName || h.title}</span>
+            <span style="color:var(--text-muted);font-family:var(--font-mono);font-size:10px;">#${h.labelId}</span>
+          `
+        )
+        .join(`<span style="color:var(--text-muted);margin:0 2px;">|</span>`);
     }
 
     if (tooltip && cursorEvent && wrapper) {
       const rect = wrapper.getBoundingClientRect();
       const relX = cursorEvent.clientX - rect.left;
       const relY = cursorEvent.clientY - rect.top;
-      const maxX = Math.max(10, rect.width - 295);
-      const maxY = Math.max(10, rect.height - 58);
+      const estH = 38 + hits.length * 18;
+      const maxX = Math.max(10, rect.width - 315);
+      const maxY = Math.max(10, rect.height - estH);
       const tx = Math.min(maxX, Math.max(10, relX + 16));
       const ty = Math.min(maxY, Math.max(10, relY + 16));
 
       tooltip.innerHTML = `
-        <span class="dkt-swatch" style="background:${entry.hex || "#38bdf8"};"></span>
-        <div class="dkt-inspector-text">
-          <div class="dkt-region-title">${entry.title}</div>
-          <div class="dkt-region-sub">${entry.name} (#${labelId}) · ${rasStr}</div>
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:0;width:100%;">
+          ${hits
+            .map(
+              (h) => `
+                <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                  <span class="dkt-swatch" style="background:${h.hex || "#38bdf8"};width:10px;height:10px;"></span>
+                  <span class="atlas-stacked-badge">${h.atlasBadge}</span>
+                  <span class="dkt-region-title" style="flex:1;">${h.shortName || h.title}</span>
+                  <span style="color:var(--text-muted);font-family:var(--font-mono);font-size:10px;">#${h.labelId}</span>
+                </div>
+              `
+            )
+            .join("")}
+          <div class="dkt-region-sub">${rasStr}</div>
         </div>
       `;
       tooltip.style.transform = `translate3d(${Math.round(tx)}px, ${Math.round(ty)}px, 0)`;
       tooltip.hidden = false;
     }
   } else {
-    // Cursor is over background (label 0) while an Atlas is loaded
     if (swatch) swatch.style.background = "#334155";
-    if (titleEl) titleEl.textContent = "Outside Parcellated Brain (Background)";
-    if (subEl) subEl.textContent = `${activeAtlasTitle} Label #0 · ${rasStr} — Hover over cortical/subcortical tissue`;
+    if (titleEl) titleEl.textContent = "Outside Atlas Labels (Background)";
+    if (subEl) subEl.textContent = `${activeAtlasTitle} #0 · ${rasStr}`;
     if (tooltip) tooltip.hidden = true;
     if (hudPill) {
       hudPill.hidden = false;
+      const loadedCnt = getLoadedAtlasVolumes().length;
       hudPill.innerHTML = `
         <span class="dkt-swatch" style="background:#475569;"></span>
-        <span style="color:var(--text-secondary);">${activeAtlasTitle} Active — Hover over brain tissue</span>
+        <span style="color:var(--text-secondary);">${loadedCnt > 1 ? `${loadedCnt} Atlases Loaded` : `${activeAtlasTitle} Active`} — Hover over brain</span>
       `;
     }
   }
 }
 
-// Convert mouse hover position on NiiVue canvas -> 3D RAS world coordinate -> DKT anatomical lookup
+// Convert mouse hover position on NiiVue canvas -> 3D RAS world coordinate -> stacked multi-atlas lookup
 function handleCanvasMouseHover(e) {
   if (!state.nv) return;
-  const dktVol = getDktVolume();
-  if (!dktVol) return;
+  if (getLoadedAtlasVolumes().length === 0) return;
 
-  // Hide tooltip & suppress hover lookup while actively panning 2D slices or painting a stroke
   if (state.zoom2d.isDraggingPan || state.drawing?.isStroking) {
     const tooltip = document.getElementById("dktHoverTooltip");
     if (tooltip) tooltip.hidden = true;
@@ -4279,7 +5711,6 @@ function handleCanvasMouseHover(e) {
 
   let frac = null;
   if (typeof state.nv.canvasPos2frac === "function") {
-    // Try device-scaled canvas coordinates first (standard in NiiVue), then CSS coordinates if needed
     frac = state.nv.canvasPos2frac([cssX * scaleX, cssY * scaleY]);
     if ((!frac || frac[0] < 0) && Math.abs(scaleX - 1) > 0.05) {
       frac = state.nv.canvasPos2frac([cssX, cssY]);
@@ -4316,10 +5747,12 @@ function updateCrosshairReadout(data) {
     badge.textContent = `RAS: ${ras[0].toFixed(1)}, ${ras[1].toFixed(1)}, ${ras[2].toFixed(1)} mm`;
   }
 
-  // Also update DKT anatomical area readout whenever the 3D crosshair moves
-  if (getDktVolume()) {
+  if (getLoadedAtlasVolumes().length > 0) {
     const dktInfo = lookupDktRegionAtRAS(ras);
     updateDktReadoutUI(dktInfo, null);
+  }
+  if (typeof renderAtlasStudioCrosshairFooter === "function") {
+    renderAtlasStudioCrosshairFooter();
   }
 
   const tableEl = document.getElementById("voxelReadoutTable");
@@ -4331,14 +5764,13 @@ function updateCrosshairReadout(data) {
       const invAff = invertMat4(vol.hdr.affine);
       const val = sampleVolumeAtRAS(vol, invAff, ras, Boolean(meta?.isMask));
       const vox = applyMat4Pt(invAff, ras).map((v) => Math.round(v));
-      if (meta?.isDktAtlas) {
-        const lid = Math.round(val);
-        const lutEntry = state.dktLut?.[String(lid)];
-        const dktText = lid > 0 && lutEntry ? `${lutEntry.title} (#${lid})` : `0 (BG)`;
+      if (meta?.isAtlas || meta?.isDktAtlas) {
+        const hit = lookupAtlasRegionAtRAS(vol, ras);
+        const atlasText = hit ? `${hit.shortName || hit.title} (#${hit.labelId})` : `0 (BG)`;
         return `
           <div class="voxel-row">
             <span class="voxel-name" title="${meta?.label || vol.name}">${meta?.label || vol.name}</span>
-            <span class="voxel-val" style="color:${lutEntry?.hex || "#c4b5fd"};">${dktText}</span>
+            <span class="voxel-val" style="color:${hit?.hex || "#94a3b8"};">${atlasText}</span>
           </div>
         `;
       }
@@ -7264,6 +8696,575 @@ function toggleDrawingStudioPopout(forceOpen = null) {
   }
 }
 
+// ============================================================================
+// Floating Brain Atlas Studio Pop-Out (Multi-Atlas, THOMAS/Tian/FSL, ROI Browser)
+// ============================================================================
+function syncAtlasHeaderButton() {
+  const btn = document.getElementById("btnToggleAtlasStudio");
+  if (!btn) return;
+  const pop = state.atlasStudioPopout;
+  const active = Boolean(pop && pop.isOpen() && !pop.isMinimized());
+  btn.classList.toggle("active", active);
+  btn.setAttribute("aria-expanded", String(active));
+}
+
+function renderAtlasStudioCrosshairFooter() {
+  const pop = state.atlasStudioPopout;
+  if (!pop || !pop.isOpen()) return;
+  const listEl = pop.bodyEl.querySelector("#atlasStudioStackedList");
+  const rasEl = pop.bodyEl.querySelector("#atlasStudioRasLabel");
+  if (!listEl) return;
+  const ras = state.lastCrosshairRAS || [0, 0, 0];
+  if (rasEl) {
+    rasEl.textContent = `RAS [${ras[0].toFixed(1)}, ${ras[1].toFixed(1)}, ${ras[2].toFixed(1)}] mm`;
+  }
+  const hits = lookupAllAtlasesAtRAS(ras);
+  if (!hits.length) {
+    listEl.innerHTML = `<div style="color:var(--text-muted);font-size:10.5px;">${
+      getLoadedAtlasVolumes().length ? "Crosshair outside loaded atlas labels." : "No atlas loaded yet."
+    }</div>`;
+    return;
+  }
+  listEl.innerHTML = hits
+    .map(
+      (h) => `
+        <div class="atlas-stacked-row" title="${h.name} (#${h.labelId})">
+          <span class="atlas-region-swatch" style="background:${h.hex};"></span>
+          <span class="atlas-stacked-badge">${h.atlasBadge}</span>
+          <span style="flex:1;min-width:0;color:#f8fafc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h.shortName || h.name}</span>
+          <span style="color:var(--text-muted);font-family:var(--font-mono);font-size:10px;">#${h.labelId}</span>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function buildAtlasStudioDOM(bodyEl) {
+  bodyEl.className = "popout-body atlas-studio-body";
+  bodyEl.innerHTML = `
+    <div class="atlas-studio-section">
+      <div class="atlas-studio-sec-hdr">
+        <span>Loaded Atlases (Single Overlay / Stacked Hover)</span>
+        <div id="atlasStudioStyleGroup" class="atlas-style-group" role="group" aria-label="Overlay Render Style">
+          <button type="button" class="atlas-style-btn active" data-atlas-style="filled">Filled</button>
+          <button type="button" class="atlas-style-btn" data-atlas-style="filled_outline">+Edge</button>
+          <button type="button" class="atlas-style-btn" data-atlas-style="outline">Edge</button>
+        </div>
+      </div>
+      <div id="atlasStudioLoadedList" class="atlas-studio-list"></div>
+    </div>
+
+    <div class="atlas-studio-section">
+      <div class="atlas-studio-sec-hdr">
+        <span>Generate / Warp Atlas</span>
+        <span id="atlasStudioCachePill" class="atlas-cache-pill is-idle" title="Per-T1w MNI152 transform cache status">Cache Idle</span>
+      </div>
+      <div class="atlas-import-grid">
+        <select id="atlasStudioGenSelect" class="select-full" title="Choose catalog atlas"></select>
+        <div class="atlas-import-row">
+          <select id="atlasStudioGenT1" class="select-full" style="flex:1;" title="Target T1w MRI"></select>
+          <select id="atlasStudioGenMode" class="select-full" style="flex:1;" title="Registration / segmentation pipeline">
+            <option value="fnirt_nonlinear">FNIRT Nonlinear (Cached)</option>
+            <option value="flirt_12dof">FLIRT 12-DOF (~2s)</option>
+          </select>
+        </div>
+        <div id="atlasStudioHipsOpts" class="hips-options-box" style="margin-bottom:0;" hidden>
+          <div id="atlasStudioHipsFlagsRow" class="atlas-import-grid">
+            <div class="hips-options-row">
+              <label for="atlasStudioHipsContrast">Contrast:</label>
+              <select id="atlasStudioHipsContrast" class="select-compact" style="flex:1;">
+                <option value="t1" selected>Standard T1w (-t1)</option>
+                <option value="wmn">WMn / FGATIR (Native)</option>
+              </select>
+            </div>
+            <div class="hips-options-row" style="justify-content:space-between;">
+              <label class="hips-check-label">
+                <input type="checkbox" id="atlasStudioHipsForce" />
+                <span>Force Recompute</span>
+              </label>
+              <span id="atlasStudioAutoDmBadge" class="hips-dm-badge" hidden>Auto -dm</span>
+            </div>
+          </div>
+          <div class="hips-options-row">
+            <input id="atlasStudioHipsCustomImage" type="text" class="hips-custom-img-input"
+              placeholder="Custom Docker image (auto-detect if blank)"
+              title="Optional local HIPS-THOMAS image name/tag (e.g. anagrammarian/sthomas:latest)" />
+            <button id="atlasStudioBtnCheckHips" type="button" class="btn-xs" title="Check Docker with custom image">Check</button>
+          </div>
+        </div>
+        <button id="atlasStudioBtnGenerate" type="button" class="btn btn-dkt-seg btn-sm">Generate Atlas in Subject Space</button>
+        <div id="atlasStudioJobProgress" class="hips-job-strip" style="margin-top:2px;" hidden>
+          <div class="hips-job-top">
+            <span id="atlasStudioJobStage" class="hips-job-stage">Running HIPS-THOMAS...</span>
+            <span id="atlasStudioJobElapsed" class="hips-job-elapsed">00:00</span>
+            <button id="atlasStudioBtnCancelJob" type="button" class="btn-xs btn-danger-outline">Cancel</button>
+          </div>
+          <div id="atlasStudioJobLog" class="hips-job-log">Starting container...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="atlas-studio-section">
+      <div class="atlas-studio-sec-hdr">
+        <span>Import HIPS-THOMAS / Custom Atlas + LUT</span>
+      </div>
+      <div class="atlas-import-grid">
+        <div class="atlas-import-row">
+          <label class="btn btn-secondary btn-sm" style="flex:1;justify-content:center;" title="Select single sthomas_LR_labels.nii.gz or both thomasfull_L.nii.gz + thomasfull_R.nii.gz or per-nucleus files">
+            + HIPS-THOMAS Files
+            <input id="atlasStudioHipsInput" type="file" accept=".nii,.nii.gz" multiple hidden />
+          </label>
+          <label class="btn btn-secondary btn-sm" style="flex:1;justify-content:center;" title="Select an entire HIPS-THOMAS output folder (left/ &amp; right/)">
+            + HIPS Folder
+            <input id="atlasStudioHipsFolderInput" type="file" webkitdirectory directory multiple hidden />
+          </label>
+        </div>
+        <div class="atlas-import-row">
+          <label class="btn btn-secondary btn-xs" title="Select custom atlas (.nii, .nii.gz, .mgz)">
+            Atlas NIfTI
+            <input id="atlasStudioCustomNifti" type="file" accept=".nii,.nii.gz,.mgz,.mgh" hidden />
+          </label>
+          <span id="atlasStudioCustomNiftiName" class="atlas-import-fname">None</span>
+          <label class="btn btn-secondary btn-xs" title="Optional LUT (.json, .csv, .tsv, .txt, .ctbl, .xml)">
+            + LUT
+            <input id="atlasStudioCustomLut" type="file" accept=".json,.csv,.tsv,.txt,.ctbl,.xml" hidden />
+          </label>
+          <span id="atlasStudioCustomLutName" class="atlas-import-fname">Auto</span>
+        </div>
+        <div class="atlas-import-row">
+          <select id="atlasStudioCustomSpace" class="select-compact" style="flex:1;">
+            <option value="subject" selected>Space: Subject Native</option>
+            <option value="mni152_fnirt">Space: MNI152 -&gt; Subject (FNIRT)</option>
+            <option value="mni152_flirt">Space: MNI152 -&gt; Subject (FLIRT)</option>
+          </select>
+          <button id="atlasStudioBtnImportCustom" type="button" class="btn btn-primary btn-xs">Import Custom</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="atlas-studio-section">
+      <div class="atlas-studio-sec-hdr">
+        <span id="atlasStudioRegionsTitle">Regions / Nuclei Browser</span>
+        <div style="display:flex;gap:4px;">
+          <button id="atlasStudioBtnAllRois" type="button" class="btn-xs" title="Show all regions">All</button>
+          <button id="atlasStudioBtnClearRois" type="button" class="btn-xs" title="Clear isolation to 0 visible ROIs before isolating one">None</button>
+        </div>
+      </div>
+      <div class="atlas-region-toolbar">
+        <input id="atlasStudioSearch" type="search" class="atlas-search-input" placeholder="Search nuclei / ROI..." />
+        <div class="atlas-hemi-group" role="group" aria-label="Hemisphere filter">
+          <button type="button" class="atlas-hemi-btn active" data-hemi="all">All</button>
+          <button type="button" class="atlas-hemi-btn" data-hemi="L">L</button>
+          <button type="button" class="atlas-hemi-btn" data-hemi="R">R</button>
+        </div>
+      </div>
+      <div id="atlasStudioRegionList" class="atlas-region-list"></div>
+      <button id="atlasStudioBtnCopyToDraw" type="button" class="btn btn-secondary btn-sm"
+        title="Copy isolated ROI(s) (or region under crosshair) into an editable Drawing Layer for .voi / NIfTI export">
+        Copy Selected ROI(s) to Drawing Layer (.voi)
+      </button>
+    </div>
+
+    <div class="atlas-studio-section">
+      <div class="atlas-studio-sec-hdr">
+        <span>Crosshair Stacked Hit</span>
+        <span id="atlasStudioRasLabel" style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);">RAS [0, 0, 0]</span>
+      </div>
+      <div id="atlasStudioStackedList" class="atlas-stacked-list"></div>
+    </div>
+  `;
+
+  bodyEl.querySelector("#atlasStudioStyleGroup")?.addEventListener("click", (e) => {
+    const b = e.target.closest(".atlas-style-btn[data-atlas-style]");
+    if (!b) return;
+    setAtlasOverlayStyle(b.getAttribute("data-atlas-style"));
+  });
+
+  bodyEl.querySelector("#atlasStudioGenSelect")?.addEventListener("change", (e) => {
+    const val = e.target.value;
+    const sidebarSel = document.getElementById("selectAtlasType");
+    if (sidebarSel && Array.from(sidebarSel.options).some((o) => o.value === val)) {
+      sidebarSel.value = val;
+      syncAtlasTypeSelectionUI(false, false);
+    }
+    syncAtlasStudioUI();
+  });
+
+  bodyEl.querySelector("#atlasStudioGenMode")?.addEventListener("change", (e) => {
+    const targetAid = String(bodyEl.querySelector("#atlasStudioGenSelect")?.value || state.selectedAtlasType || "thomas").toLowerCase();
+    const val = e.target.value;
+    if (val) {
+      if (!state.atlasPreferredModeById) state.atlasPreferredModeById = new Map();
+      state.atlasPreferredModeById.set(targetAid, val);
+    }
+    const sideSel = document.getElementById("selectAtlasType");
+    const sideMode = document.getElementById("selectDktMode");
+    if (sideMode && sideSel?.value === targetAid && Array.from(sideMode.options).some((o) => o.value === val && !o.disabled)) {
+      sideMode.value = val;
+      syncAtlasTypeSelectionUI(true, false);
+    } else {
+      syncAtlasStudioUI();
+    }
+  });
+
+  bodyEl.querySelector("#atlasStudioBtnGenerate")?.addEventListener("click", async () => {
+    const aid = bodyEl.querySelector("#atlasStudioGenSelect")?.value || "thomas";
+    const t1Id = bodyEl.querySelector("#atlasStudioGenT1")?.value || state.refVolId;
+    const mode = bodyEl.querySelector("#atlasStudioGenMode")?.value || null;
+    await runAtlasGeneration(aid, mode, t1Id);
+  });
+
+  bodyEl.querySelector("#atlasStudioGenT1")?.addEventListener("change", () => {
+    syncAtlasStudioUI();
+  });
+  bodyEl.querySelector("#atlasStudioHipsContrast")?.addEventListener("change", (e) => {
+    state.atlasStudioState.hipsContrast = e.target.value === "wmn" ? "wmn" : "t1";
+    syncHipsThomasOptionsUI();
+  });
+  bodyEl.querySelector("#atlasStudioHipsForce")?.addEventListener("change", (e) => {
+    state.atlasStudioState.hipsForceRecompute = Boolean(e.target.checked);
+    syncHipsThomasOptionsUI();
+  });
+  bodyEl.querySelector("#atlasStudioHipsCustomImage")?.addEventListener("change", (e) => {
+    const val = String(e.target.value || "").trim();
+    state.atlasStudioState.hipsCustomImage = val;
+    persistHipsCustomImage(val);
+    checkNeuroToolsStatus(true);
+  });
+  bodyEl.querySelector("#atlasStudioBtnCheckHips")?.addEventListener("click", () => {
+    const inp = bodyEl.querySelector("#atlasStudioHipsCustomImage");
+    const val = String(inp?.value || "").trim();
+    state.atlasStudioState.hipsCustomImage = val;
+    persistHipsCustomImage(val);
+    checkNeuroToolsStatus(true);
+  });
+  bodyEl.querySelector("#atlasStudioBtnCancelJob")?.addEventListener("click", () => {
+    cancelActiveAtlasJob();
+  });
+
+  bodyEl.querySelector("#atlasStudioHipsInput")?.addEventListener("change", async (e) => {
+    const files = e.target.files;
+    await importHipsThomasFiles(files);
+    e.target.value = "";
+  });
+  bodyEl.querySelector("#atlasStudioHipsFolderInput")?.addEventListener("change", async (e) => {
+    const files = e.target.files;
+    await importHipsThomasFiles(files);
+    e.target.value = "";
+  });
+
+  bodyEl.querySelector("#atlasStudioCustomNifti")?.addEventListener("change", (e) => {
+    const f = e.target.files?.[0] || null;
+    state.atlasStudioState.customNiftiFile = f;
+    const lbl = bodyEl.querySelector("#atlasStudioCustomNiftiName");
+    if (lbl) lbl.textContent = f ? f.name : "None";
+  });
+  bodyEl.querySelector("#atlasStudioCustomLut")?.addEventListener("change", (e) => {
+    const f = e.target.files?.[0] || null;
+    state.atlasStudioState.customLutFile = f;
+    const lbl = bodyEl.querySelector("#atlasStudioCustomLutName");
+    if (lbl) lbl.textContent = f ? f.name : "Auto";
+  });
+  bodyEl.querySelector("#atlasStudioBtnImportCustom")?.addEventListener("click", async () => {
+    await importCustomAtlasFromFiles({
+      niftiFile: state.atlasStudioState.customNiftiFile,
+      lutFile: state.atlasStudioState.customLutFile,
+      space: bodyEl.querySelector("#atlasStudioCustomSpace")?.value || "subject",
+      refVolId: bodyEl.querySelector("#atlasStudioGenT1")?.value || state.refVolId,
+    });
+  });
+
+  bodyEl.querySelector("#atlasStudioSearch")?.addEventListener("input", (e) => {
+    state.atlasStudioState.search = String(e.target.value || "");
+    syncAtlasStudioUI();
+  });
+
+  bodyEl.querySelectorAll(".atlas-hemi-btn[data-hemi]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.atlasStudioState.hemi = btn.getAttribute("data-hemi") || "all";
+      syncAtlasStudioUI();
+    });
+  });
+
+  bodyEl.querySelector("#atlasStudioBtnAllRois")?.addEventListener("click", async () => {
+    const selVol = getSelectedStudioAtlasVolume();
+    if (selVol) await setAtlasVisibleRegions(selVol.id, null);
+  });
+  bodyEl.querySelector("#atlasStudioBtnClearRois")?.addEventListener("click", async () => {
+    const selVol = getSelectedStudioAtlasVolume();
+    if (selVol) await setAtlasVisibleRegions(selVol.id, new Set());
+  });
+  bodyEl.querySelector("#atlasStudioBtnCopyToDraw")?.addEventListener("click", async () => {
+    const selVol = getSelectedStudioAtlasVolume();
+    if (selVol) await copySelectedAtlasRoisToDrawingLayer(selVol.id);
+  });
+}
+
+function getSelectedStudioAtlasVolume() {
+  const vols = getLoadedAtlasVolumes();
+  if (!vols.length) return null;
+  const wantId = state.atlasStudioState.selectedAtlasVolId || state.activeAtlasVolId || state.activeDktVolId;
+  return vols.find((v) => v.id === wantId) || vols[0];
+}
+
+function syncAtlasStudioUI() {
+  syncOverlayStyleButtonsUI();
+  const pop = state.atlasStudioPopout;
+  if (!pop || !pop.el) return;
+  const bodyEl = pop.bodyEl;
+
+  // 1. Loaded atlases list
+  const loadedList = bodyEl.querySelector("#atlasStudioLoadedList");
+  const loadedVols = getLoadedAtlasVolumes();
+  const activeOverlayId = state.activeAtlasVolId || state.activeDktVolId;
+  const selVol = getSelectedStudioAtlasVolume();
+  if (selVol) state.atlasStudioState.selectedAtlasVolId = selVol.id;
+
+  if (loadedList) {
+    if (!loadedVols.length) {
+      loadedList.innerHTML = `<div class="draw-empty-note">No atlases loaded. Generate THOMAS, Tian, FSL, or DKT below.</div>`;
+    } else {
+      loadedList.innerHTML = "";
+      for (const vol of loadedVols) {
+        const meta = state.layerMeta.get(vol.id);
+        const badge = getAtlasBadgeInfo(meta);
+        const isActive = vol.id === activeOverlayId && Boolean(meta?.visible);
+        const isInspected = selVol && vol.id === selVol.id;
+        const pct = Math.round((meta?.userAtlasOpacity ?? 0.48) * 100);
+        const card = document.createElement("div");
+        card.className = `atlas-loaded-card ${isInspected ? "is-active" : ""}`;
+        card.innerHTML = `
+          <div class="atlas-loaded-top">
+            <input type="checkbox" role="switch" class="vis-switch" ${isActive ? "checked" : ""} title="Show this atlas overlay on slices (others stay loaded for stacked hover)" />
+            <span class="role-badge dkt ${badge.cls}">${badge.text}</span>
+            <span class="atlas-loaded-title" title="${meta?.atlasName || vol.name}">${meta?.atlasShortName || vol.name}</span>
+            <button type="button" class="icon-btn" title="Remove atlas layer">✕</button>
+          </div>
+          <div class="atlas-loaded-controls">
+            <span>α</span>
+            <input type="range" min="0" max="100" value="${pct}" />
+            <span class="opacity-pct">${pct}%</span>
+            <span style="margin-left:auto;">${(meta?.regions || []).length} ROIs</span>
+          </div>
+        `;
+        card.addEventListener("click", (ev) => {
+          if (ev.target.closest("input,button")) return;
+          state.atlasStudioState.selectedAtlasVolId = vol.id;
+          syncAtlasStudioUI();
+        });
+        const chk = card.querySelector('input[type="checkbox"]');
+        chk?.addEventListener("change", (ev) => {
+          state.atlasStudioState.selectedAtlasVolId = vol.id;
+          activateAtlasOverlay(vol.id, Boolean(ev.target.checked));
+        });
+        const rng = card.querySelector('input[type="range"]');
+        rng?.addEventListener("input", async (ev) => {
+          const val = Math.max(0, Math.min(1, parseFloat(ev.target.value) / 100));
+          if (meta) {
+            meta.userAtlasOpacity = val;
+            meta.savedOpacity = val > 0 ? val : meta.savedOpacity;
+            meta.visible = val > 0;
+          }
+          if (val > 0 && vol.id !== (state.activeAtlasVolId || state.activeDktVolId)) {
+            await activateAtlasOverlay(vol.id, true);
+          } else {
+            await applyAtlasColormapToVolume(vol);
+            state.nv?.drawScene?.();
+            syncDktOverlayControlsUI();
+          }
+          const pctSpan = card.querySelector(".opacity-pct");
+          if (pctSpan) pctSpan.textContent = `${Math.round(val * 100)}%`;
+        });
+        const remBtn = card.querySelector("button.icon-btn");
+        remBtn?.addEventListener("click", () => {
+          const vi = getVolumeIndexById(vol.id);
+          if (vi >= 0) {
+            state.nv.removeVolumeByIndex(vi);
+            state.layerMeta.delete(vol.id);
+            if (state.activeDktVolId === vol.id) state.activeDktVolId = null;
+            if (state.activeAtlasVolId === vol.id) state.activeAtlasVolId = null;
+            const remFirst = getLoadedAtlasVolumes()[0];
+            if (remFirst) activateAtlasOverlay(remFirst.id, true);
+            else {
+              resetDktInspectorUI();
+              renderLayerList();
+              syncAtlasStudioUI();
+            }
+          }
+        });
+        loadedList.appendChild(card);
+      }
+    }
+  }
+
+  // 2. Sync Generate selectors & warp cache status
+  const genSel = bodyEl.querySelector("#atlasStudioGenSelect");
+  const sidebarSel = document.getElementById("selectAtlasType");
+  if (genSel && sidebarSel && genSel.options.length !== sidebarSel.options.length) {
+    const prev = genSel.value || sidebarSel.value || "thomas";
+    genSel.innerHTML = sidebarSel.innerHTML;
+    genSel.value = Array.from(genSel.options).some((o) => o.value === prev) ? prev : "thomas";
+  }
+  const genT1 = bodyEl.querySelector("#atlasStudioGenT1");
+  const sideT1 = document.getElementById("selectDktT1Vol");
+  if (genT1 && sideT1) {
+    const prevT1 = genT1.value || sideT1.value;
+    genT1.innerHTML = sideT1.innerHTML;
+    if (prevT1 && Array.from(genT1.options).some((o) => o.value === prevT1)) genT1.value = prevT1;
+  }
+  const genMode = bodyEl.querySelector("#atlasStudioGenMode");
+  const targetStudioAid = String(genSel?.value || state.selectedAtlasType || "thomas").toLowerCase();
+  if (genMode) {
+    const opts = getAtlasPipelineModeOptions(targetStudioAid);
+    genMode.innerHTML = "";
+    for (const o of opts) {
+      const el = document.createElement("option");
+      el.value = o.v;
+      el.textContent = o.l;
+      if (o.disabled) el.disabled = true;
+      genMode.appendChild(el);
+    }
+    genMode.value = resolvePreferredAtlasPipelineMode(targetStudioAid, opts);
+    if (genMode.dataset) genMode.dataset.atlasId = targetStudioAid;
+  }
+  const cachePill = bodyEl.querySelector("#atlasStudioCachePill");
+  if (cachePill) {
+    if (targetStudioAid === "thomas" && genMode?.value === "hips_thomas_docker") {
+      if (state.atlasStudioState.hipsCacheHit === true) {
+        cachePill.textContent = "HIPS Cached (~1s)";
+        cachePill.className = "atlas-cache-pill";
+      } else {
+        cachePill.textContent = "HIPS-THOMAS Ready";
+        cachePill.className = "atlas-cache-pill";
+      }
+    } else if (state.atlasStudioState.warpCacheHit === true) {
+      cachePill.textContent = "Warp Cached (~1s)";
+      cachePill.className = "atlas-cache-pill";
+    } else if (state.atlasStudioState.warpCacheHit === false) {
+      cachePill.textContent = "Warp Ready & Saved";
+      cachePill.className = "atlas-cache-pill";
+    } else {
+      cachePill.textContent = state.neuroToolsStatus?.fnirt?.available ? "FNIRT + Cache Ready" : "FLIRT Ready";
+      cachePill.className = "atlas-cache-pill is-idle";
+    }
+  }
+
+  // Sync Studio HIPS-THOMAS Contrast / Force Recompute / Auto -dm / Custom Docker Image
+  const studioHipsBox = bodyEl.querySelector("#atlasStudioHipsOpts");
+  const studioHipsFlags = bodyEl.querySelector("#atlasStudioHipsFlagsRow");
+  const studioContrast = bodyEl.querySelector("#atlasStudioHipsContrast");
+  const studioForce = bodyEl.querySelector("#atlasStudioHipsForce");
+  const studioDmBadge = bodyEl.querySelector("#atlasStudioAutoDmBadge");
+  const studioCustomImg = bodyEl.querySelector("#atlasStudioHipsCustomImage");
+  if (studioHipsBox) studioHipsBox.hidden = targetStudioAid !== "thomas";
+  if (studioHipsFlags) studioHipsFlags.hidden = genMode?.value !== "hips_thomas_docker";
+  if (studioContrast) studioContrast.value = state.atlasStudioState.hipsContrast || "t1";
+  if (studioForce) studioForce.checked = Boolean(state.atlasStudioState.hipsForceRecompute);
+  if (studioDmBadge) {
+    const stT1Idx = getVolumeIndexById(genT1?.value || state.refVolId);
+    const stT1Vol = stT1Idx >= 0 ? state.nv?.volumes?.[stT1Idx] : null;
+    studioDmBadge.hidden = !(genMode?.value === "hips_thomas_docker" && isTargetVolumeSkullStripped(stT1Vol));
+  }
+  if (studioCustomImg && document.activeElement !== studioCustomImg) {
+    studioCustomImg.value = state.atlasStudioState.hipsCustomImage || "";
+  }
+  renderActiveAtlasJobUI();
+
+  // 3. Hemisphere filter buttons & Regions browser
+  bodyEl.querySelectorAll(".atlas-hemi-btn[data-hemi]").forEach((btn) => {
+    btn.classList.toggle("active", btn.getAttribute("data-hemi") === (state.atlasStudioState.hemi || "all"));
+  });
+
+  const regTitle = bodyEl.querySelector("#atlasStudioRegionsTitle");
+  const regList = bodyEl.querySelector("#atlasStudioRegionList");
+  if (regList) {
+    if (!selVol) {
+      if (regTitle) regTitle.textContent = "Regions / Nuclei Browser";
+      regList.innerHTML = `<div class="draw-empty-note">Select or generate an atlas to browse its ROIs.</div>`;
+    } else {
+      const meta = state.layerMeta.get(selVol.id);
+      if (!meta.regions || meta.regions.length === 0) {
+        meta.regions = computeClientAtlasRegions(selVol, meta.lut || state.dktLut);
+      }
+      const allRegs = meta.regions || [];
+      if (regTitle) {
+        const isoCount = meta.visibleRegionIds instanceof Set ? meta.visibleRegionIds.size : allRegs.length;
+        regTitle.textContent = `${meta.atlasShortName || "Atlas"} ROIs (${isoCount}/${allRegs.length})`;
+      }
+      const q = (state.atlasStudioState.search || "").trim().toLowerCase();
+      const hemiFilter = state.atlasStudioState.hemi || "all";
+      const filtered = allRegs.filter((r) => {
+        if (hemiFilter !== "all" && r.hemisphere !== hemiFilter) return false;
+        if (q && !`${r.name} ${r.shortName} ${r.id}`.toLowerCase().includes(q)) return false;
+        return true;
+      });
+      if (!filtered.length) {
+        regList.innerHTML = `<div class="draw-empty-note">No matching regions (${q || hemiFilter}).</div>`;
+      } else {
+        regList.innerHTML = "";
+        for (const r of filtered.slice(0, 250)) {
+          const isChecked = !(meta.visibleRegionIds instanceof Set) || meta.visibleRegionIds.has(Number(r.id));
+          const row = document.createElement("div");
+          row.className = "atlas-region-row";
+          row.title = `Click to jump crosshair to ${r.name} (#${r.id}, ${r.volumeMm3} mm³)`;
+          row.innerHTML = `
+            <input type="checkbox" ${isChecked ? "checked" : ""} title="Show/isolate ${r.shortName || r.name}" />
+            <span class="atlas-region-swatch" style="background:${r.hex || "#38bdf8"};"></span>
+            <span class="atlas-region-name">${r.name}</span>
+            <span class="atlas-region-meta">#${r.id} · ${Math.round(r.volumeMm3)}mm³</span>
+          `;
+          const cb = row.querySelector('input[type="checkbox"]');
+          cb?.addEventListener("click", (ev) => ev.stopPropagation());
+          cb?.addEventListener("change", (ev) => {
+            toggleAtlasRegionVisibility(selVol.id, r.id, Boolean(ev.target.checked));
+          });
+          row.addEventListener("click", () => {
+            jumpToAtlasRegion(selVol.id, r.id);
+          });
+          regList.appendChild(row);
+        }
+      }
+    }
+  }
+
+  renderAtlasStudioCrosshairFooter();
+}
+
+function openAtlasStudioPopout() {
+  if (!state.atlasStudioPopout) {
+    const wrapRect = document.getElementById("canvasWrapper")?.getBoundingClientRect();
+    const defX = wrapRect ? Math.max(16, Math.round(wrapRect.right - 432)) : undefined;
+    const defY = wrapRect ? Math.max(66, Math.round(wrapRect.top + 16)) : 74;
+    state.atlasStudioPopout = createPopoutWindow({
+      id: "atlas-studio",
+      title: "Brain Atlas Studio",
+      width: 416,
+      height: 640,
+      minWidth: 360,
+      minHeight: 460,
+      x: defX,
+      y: defY,
+      autoOpen: true,
+      onClose: () => syncAtlasHeaderButton(),
+      onMinimize: () => syncAtlasHeaderButton(),
+    });
+    buildAtlasStudioDOM(state.atlasStudioPopout.bodyEl);
+  } else {
+    state.atlasStudioPopout.open();
+  }
+  syncAtlasStudioUI();
+  syncAtlasHeaderButton();
+  return state.atlasStudioPopout;
+}
+
+function toggleAtlasStudioPopout(forceOpen = null) {
+  const existing = state.atlasStudioPopout;
+  const currentlyOpen = Boolean(existing && existing.isOpen() && !existing.isMinimized());
+  const nextOpen = forceOpen !== null ? Boolean(forceOpen) : !currentlyOpen;
+  if (nextOpen) openAtlasStudioPopout();
+  else if (existing) existing.close();
+}
+
 function syncStrokeOverlayCanvasSize() {
   const overlay = document.getElementById("drawStrokeOverlay");
   const nvCanvas = document.getElementById("niivueCanvas");
@@ -7686,6 +9687,17 @@ function setupEventListeners() {
   document.getElementById("btnToggleDrawStudio")?.addEventListener("click", () => {
     toggleDrawingStudioPopout();
   });
+  document.getElementById("btnToggleAtlasStudio")?.addEventListener("click", () => {
+    toggleAtlasStudioPopout();
+  });
+  document.getElementById("btnOpenAtlasStudioSidebar")?.addEventListener("click", () => {
+    openAtlasStudioPopout();
+  });
+  document.getElementById("dktOverlayStyleGroup")?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".atlas-style-btn[data-atlas-style]");
+    if (!btn) return;
+    setAtlasOverlayStyle(btn.getAttribute("data-atlas-style"));
+  });
   document.getElementById("btnPausePaintFromBanner")?.addEventListener("click", () => {
     setDrawingPaintEnabled(false);
   });
@@ -7769,8 +9781,29 @@ function setupEventListeners() {
   document.getElementById("selectAtlasType")?.addEventListener("change", () => {
     syncAtlasTypeSelectionUI(true, true);
   });
-  document.getElementById("selectDktMode")?.addEventListener("change", () => {
+  document.getElementById("selectDktMode")?.addEventListener("change", (e) => {
+    const aid = String(document.getElementById("selectAtlasType")?.value || state.selectedAtlasType || "dkt").toLowerCase();
+    const val = e.target?.value || document.getElementById("selectDktMode")?.value;
+    if (val) {
+      if (!state.atlasPreferredModeById) state.atlasPreferredModeById = new Map();
+      state.atlasPreferredModeById.set(aid, val);
+    }
     syncAtlasTypeSelectionUI(true, false);
+    syncAtlasStudioUI();
+  });
+  document.getElementById("selectDktT1Vol")?.addEventListener("change", () => {
+    syncHipsThomasOptionsUI();
+  });
+  document.getElementById("selectHipsContrast")?.addEventListener("change", (e) => {
+    state.atlasStudioState.hipsContrast = e.target?.value === "wmn" ? "wmn" : "t1";
+    syncAtlasStudioUI();
+  });
+  document.getElementById("chkHipsForceRecompute")?.addEventListener("change", (e) => {
+    state.atlasStudioState.hipsForceRecompute = Boolean(e.target?.checked);
+    syncAtlasStudioUI();
+  });
+  document.getElementById("btnCancelHipsJob")?.addEventListener("click", () => {
+    cancelActiveAtlasJob();
   });
   document.getElementById("btnRunBet")?.addEventListener("click", () => {
     runFslBetSkullStrip();
@@ -7802,25 +9835,28 @@ function setupEventListeners() {
         : `${atlasTitle} segmentation color overlay hidden — interactive cursor hover region lookup remains active!`
     );
   });
-  document.getElementById("sliderDktOverlayOpacity")?.addEventListener("input", (e) => {
+  document.getElementById("sliderDktOverlayOpacity")?.addEventListener("input", async (e) => {
     const dktVol = getDktVolume();
     if (!dktVol) return;
-    const idx = getVolumeIndexById(dktVol.id);
-    if (idx < 0) return;
     const val = Math.max(0, Math.min(1, parseFloat(e.target.value) / 100));
     const meta = state.layerMeta.get(dktVol.id);
     if (meta) {
       meta.visible = val > 0;
+      meta.userAtlasOpacity = val;
       if (val > 0) meta.savedOpacity = val;
     }
-    state.nv.setOpacity(idx, val);
+    await applyAtlasColormapToVolume(dktVol);
     state.nv.drawScene();
     renderLayerList();
+    syncDktOverlayControlsUI();
+    syncAtlasStudioUI();
   });
 
   const handleDktWindowInput = async () => {
     const dktVol = getDktVolume();
     if (!dktVol) return;
+    const dm = state.layerMeta.get(dktVol.id);
+    if (dm) dm.userCustomWindow = true;
     const minEl = document.getElementById("inputDktCalMin");
     const maxEl = document.getElementById("inputDktCalMax");
     const parsedMin = parseFloat(minEl?.value);
@@ -7849,6 +9885,8 @@ function setupEventListeners() {
     if (!dktVol) return;
     const defaultMax = getAtlasDefaultMaxLabel(dktVol);
     const atlasTitle = getAtlasShortTitle(dktVol);
+    const dm = state.layerMeta.get(dktVol.id);
+    if (dm) dm.userCustomWindow = false;
     dktVol.cal_min = 0.5;
     dktVol.cal_max = defaultMax;
     await applyFreeSurferColorLutToVolume(dktVol);
@@ -8246,13 +10284,18 @@ function setupEventListeners() {
       state.layerMeta.delete(volId);
       if (state.refVolId === volId) state.refVolId = null;
       if (state.movVolId === volId) state.movVolId = null;
-      if (state.activeDktVolId === volId) {
+      if (state.activeDktVolId === volId || state.activeAtlasVolId === volId) {
         state.activeDktVolId = null;
-        if (!getDktVolume()) {
-          resetDktInspectorUI();
+        state.activeAtlasVolId = null;
+        const remaining = getLoadedAtlasVolumes()[0] || null;
+        if (remaining) {
+          activateAtlasOverlay(remaining.id, true);
+          return;
         }
+        resetDktInspectorUI();
       }
       renderLayerList();
+      syncAtlasStudioUI();
     }
   });
 
@@ -8322,6 +10365,9 @@ function setupEventListeners() {
     } else if (lowerKey === "d" && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       toggleDrawingStudioPopout();
+    } else if (lowerKey === "a" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      toggleAtlasStudioPopout();
     } else if (lowerKey === "e" && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       if (!state.drawing.paintEnabled) {
@@ -8658,6 +10704,17 @@ window.NeuroCoregDrawing = {
   importFileAsDrawingLayer,
   undoDrawingLayer,
   redoDrawingLayer,
+};
+
+window.NeuroCoregAtlases = {
+  getLoadedAtlasVolumes,
+  lookupAllAtlasesAtRAS,
+  lookupAtlasRegionAtRAS,
+  activateAtlasOverlay,
+  setAtlasOverlayStyle,
+  copySelectedAtlasRoisToDrawingLayer,
+  openAtlasStudioPopout,
+  toggleAtlasStudioPopout,
 };
 
 initApp().catch((err) => {

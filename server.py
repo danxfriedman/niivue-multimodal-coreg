@@ -12,14 +12,22 @@ import io
 import sys
 import glob
 import json
+import time
+import uuid
 import shlex
 import base64
 import shutil
+import colorsys
+import hashlib
+import getpass
 import platform
 import tempfile
+import threading
 import subprocess
+import xml.etree.ElementTree as ET
+from collections import deque
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 import numpy as np
 import nibabel as nib
@@ -101,18 +109,27 @@ def find_freesurfer_dir() -> str:
 
 FSLDIR = find_fsl_dir()
 FLIRT_BIN = find_neuro_binary("flirt", FSLDIR)
+FNIRT_BIN = find_neuro_binary("fnirt", FSLDIR)
+APPLYWARP_BIN = find_neuro_binary("applywarp", FSLDIR)
+INVWARP_BIN = find_neuro_binary("invwarp", FSLDIR)
+CONVERT_XFM_BIN = find_neuro_binary("convert_xfm", FSLDIR)
 BET_BIN = find_neuro_binary("bet", FSLDIR)
 DCM2NIIX_BIN = find_neuro_binary("dcm2niix", FSLDIR)
 FREESURFER_DIR = find_freesurfer_dir()
+ATLASES_DIR = os.path.join(ROOT_DIR, "sample_data", "atlases")
 DKT_LUT_JSON_PATH = os.path.join(ROOT_DIR, "sample_data", "dkt_lut.json")
 MNI_T1_BRAIN_PATH = os.path.join(ROOT_DIR, "sample_data", "nifti", "MNI152_T1_brain_2mm.nii.gz")
+MNI_STD_T1_2MM = os.path.join(FSLDIR, "data", "standard", "MNI152_T1_2mm.nii.gz")
+MNI_STD_T1_1MM = os.path.join(FSLDIR, "data", "standard", "MNI152_T1_1mm.nii.gz")
+MNI_STD_BRAIN_2MM = os.path.join(FSLDIR, "data", "standard", "MNI152_T1_2mm_brain.nii.gz")
+MNI_STD_MASK_2MM = os.path.join(FSLDIR, "data", "standard", "MNI152_T1_2mm_brain_mask_dil.nii.gz")
+FNIRT_T1_CNF = os.path.join(FSLDIR, "etc", "flirtsch", "T1_2_MNI152_2mm.cnf")
 MNI_DKT_ATLAS_PATH = os.path.join(ROOT_DIR, "sample_data", "nifti", "MNI152_DKT_atlas_2mm.nii.gz")
 MNI_DESTRIEUX_ATLAS_PATH = os.path.join(ROOT_DIR, "sample_data", "nifti", "MNI152_Destrieux_atlas_2mm.nii.gz")
 SAMPLE_T1_PATH = os.path.join(ROOT_DIR, "sample_data", "nifti", "sub-01_T1w.nii.gz")
 SAMPLE_FASTSURFER_DKT_PATH = os.path.join(
     ROOT_DIR, "sample_data", "nifti", "sub-01_T1w_FastSurferVINN_DKT.nii.gz"
 )
-import getpass
 
 def _get_user_cache_dir() -> str:
     """Returns a per-user writable cache directory in tempdir or ~/.cache, requiring no admin privileges."""
@@ -135,7 +152,97 @@ def _get_user_cache_dir() -> str:
     return home_cand
 
 
+def _get_hips_thomas_cache_dir() -> str:
+    """Prefers a $HOME/.cache path so Docker Desktop on macOS/Windows can bind-mount work dirs without /var/folders errors."""
+    home_hips = os.path.join(os.path.expanduser("~"), ".cache", "neurocoreg_fastsurfer_cache", "hips_thomas_cache")
+    try:
+        os.makedirs(home_hips, exist_ok=True)
+        if os.access(home_hips, os.W_OK):
+            return home_hips
+    except Exception:
+        pass
+    return os.path.join(FASTSURFER_CACHE_DIR, "hips_thomas_cache")
+
+
 FASTSURFER_CACHE_DIR = _get_user_cache_dir()
+MNI_WARP_CACHE_DIR = os.path.join(FASTSURFER_CACHE_DIR, "mni_warp_cache")
+HIPS_THOMAS_CACHE_DIR = _get_hips_thomas_cache_dir()
+
+ATLAS_JOBS_LOCK = threading.Lock()
+ATLAS_JOBS = {}
+
+THOMAS_THALAMIC_NUCLEI_IDS = frozenset({
+    2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18,
+    102, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 117, 118,
+})
+_THOMAS_VALID_ID_ARRAY = np.array(sorted(THOMAS_THALAMIC_NUCLEI_IDS), dtype=np.int16)
+
+
+def _filter_thomas_thalamic_only(arr: np.ndarray) -> np.ndarray:
+    """Restricts a HIPS-THOMAS label volume strictly to the 28 bilateral thalamic nuclei."""
+    int_arr = np.rint(np.asarray(arr)).astype(np.int16)
+    mask = np.isin(int_arr, _THOMAS_VALID_ID_ARRAY)
+    return np.where(mask, int_arr, 0).astype(np.int16)
+
+
+def _infer_is_skull_stripped(src_3d: np.ndarray, src_name: str, explicit_flag=None) -> bool:
+    """Determines whether input MRI is already skull-stripped (to enable HIPS-THOMAS -dm)."""
+    if explicit_flag is True:
+        return True
+    if explicit_flag is False:
+        return False
+    low_name = os.path.basename(src_name or "").lower()
+    if re.search(r"(_brain|\bbet\b|skull[_-]?strip)", low_name):
+        return True
+    try:
+        if src_3d.size > 0 and float(np.mean(src_3d <= 0)) >= 0.72:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _stop_hips_container(docker_bin: str, container_name: str):
+    """Best-effort immediate stop/removal of a running HIPS-THOMAS Docker container."""
+    if not docker_bin or not container_name:
+        return
+    try:
+        subprocess.run([docker_bin, "rm", "-f", container_name], capture_output=True, text=True, timeout=8.0)
+    except Exception:
+        pass
+
+
+def _parse_hips_stage_from_log(line: str, current_stage: str) -> str:
+    """Maps hipsthomas.sh verbose stdout lines to user-friendly pipeline stage descriptions."""
+    low = (line or "").lower()
+    if any(tok in low for tok in ("synth", "hips", "polynomial")):
+        return "Synthesizing WMn contrast (HIPS)..."
+    if "crop" in low:
+        return "Cropping thalamic ROI..."
+    if any(tok in low for tok in ("ants", "registr", "warp")):
+        return "Registering multi-atlas templates (ANTs)..."
+    if any(tok in low for tok in ("joint", "fusion", "picsl", "label")):
+        return "Running joint label fusion..."
+    if "right" in low:
+        return "Segmenting right thalamic nuclei..."
+    if "left" in low:
+        return "Segmenting left thalamic nuclei..."
+    if any(tok in low for tok in ("vol", "done", "finish")):
+        return "Finalizing thalamic parcellation..."
+    return current_stage
+
+
+def _prune_atlas_jobs(max_age_sec: float = 900.0):
+    now = time.time()
+    with ATLAS_JOBS_LOCK:
+        stale = [
+            jid
+            for jid, j in ATLAS_JOBS.items()
+            if j.get("status") in ("done", "error", "cancelled")
+            and (now - float(j.get("finishedAt") or now)) > max_age_sec
+        ]
+        for jid in stale:
+            ATLAS_JOBS.pop(jid, None)
 
 
 def normalize_user_path(raw_path: str) -> str:
@@ -151,7 +258,8 @@ def normalize_user_path(raw_path: str) -> str:
         parsed_uri = urlparse(p)
         if IS_WINDOWS and parsed_uri.netloc:
             # file://server/share/folder -> \\server\share\folder
-            p = f"\\\\{parsed_uri.netloc}{unquote(parsed_uri.path).replace('/', '\\')}"
+            unc_path = unquote(parsed_uri.path).replace("/", "\\")
+            p = f"\\\\{parsed_uri.netloc}{unc_path}"
         else:
             p = unquote(parsed_uri.path)
             if IS_WINDOWS and re.match(r"^/[a-zA-Z]:", p):
@@ -648,6 +756,1150 @@ def load_dkt_lut() -> dict:
     return {}
 
 
+NON_BRAIN_FREESURFER_IDS = np.array(
+    [
+        0, 1, 6, 24, 29, 30, 40, 45, 61, 62, 80, 81, 82, 85, 98,
+        *range(118, 155), 165, 166, 167, 168, 224,
+        *range(256, 267), 701, *range(901, 932),
+        1000, 1001, 1100, 2000, 2001, 2100, 11100, 12100,
+    ],
+    dtype=np.int16,
+)
+
+
+def write_int16_label_nifti_bytes(
+    data_3d: np.ndarray,
+    affine_4x4: np.ndarray,
+    descrip: str = "",
+    sform_code: int = 1,
+) -> tuple:
+    """
+    Encodes a 3D integer label volume as int16 NIfTI-1 (.nii.gz) with NII_INTENT_LABEL (1002),
+    scl_slope=1.0, scl_inter=0.0, cal_min=0, cal_max=max_label. Returns (nii_gz_bytes, max_label).
+    """
+    arr = np.rint(np.asarray(data_3d)).astype(np.int16)
+    arr[arr < 0] = 0
+    aff = np.asarray(affine_4x4, dtype=np.float64)
+    if aff.shape != (4, 4) or not np.all(np.isfinite(aff)) or abs(np.linalg.det(aff[:3, :3])) < 1e-10:
+        aff = np.eye(4, dtype=np.float64)
+    max_val = int(arr.max()) if arr.size > 0 else 0
+    img = nib.Nifti1Image(arr, aff)
+    hdr = img.header
+    hdr.set_data_dtype(np.int16)
+    hdr.set_intent(1002, (), "Label")
+    hdr.set_slope_inter(1.0, 0.0)
+    hdr["cal_min"] = 0.0
+    hdr["cal_max"] = float(max(max_val, 1))
+    if descrip:
+        hdr["descrip"] = descrip.encode("ascii", "ignore")[:79]
+    img.set_sform(aff, code=sform_code)
+    img.set_qform(aff, code=sform_code)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = os.path.join(tmpdir, "label_atlas.nii.gz")
+        nib.save(img, tmp_path)
+        with open(tmp_path, "rb") as f:
+            return f.read(), max_val
+
+
+def generate_distinct_lut_rgb(label_id: int, hemi: str = "C") -> list:
+    """Deterministic golden-angle HSV RGB triplet for unlabeled or fallback atlas entries."""
+    idx = max(1, int(abs(label_id)))
+    hue = ((idx * 0.618033988749895) + (0.04 if hemi == "R" else 0.0)) % 1.0
+    sat = 0.72 + 0.14 * ((idx % 3) / 2.0)
+    val = 0.88 if hemi != "R" else 0.94
+    r, g, b = colorsys.hsv_to_rgb(hue, sat, val)
+    return [int(round(r * 255)), int(round(g * 255)), int(round(b * 255))]
+
+
+def _infer_hemi_from_label(name: str, rid: int = 0, atlas_id: str = "") -> str:
+    s = str(name or "").strip()
+    low = s.lower()
+    if atlas_id == "thomas":
+        if 1 <= rid < 100:
+            return "L"
+        if 100 < rid < 200:
+            return "R"
+    if (
+        low.startswith("left ")
+        or low.startswith("left-")
+        or low.startswith("l-")
+        or low.startswith("lh.")
+        or low.startswith("ctx-lh-")
+        or low.endswith("-lh")
+        or low.endswith("_l")
+        or low.endswith(" l")
+        or " left " in low
+    ):
+        return "L"
+    if (
+        low.startswith("right ")
+        or low.startswith("right-")
+        or low.startswith("r-")
+        or low.startswith("rh.")
+        or low.startswith("ctx-rh-")
+        or low.endswith("-rh")
+        or low.endswith("_r")
+        or low.endswith(" r")
+        or " right " in low
+    ):
+        return "R"
+    return "C"
+
+
+def _normalize_lut_entry(rid: int, name: str, rgb=None, short_name=None, hemi=None, atlas_id: str = "") -> dict:
+    clean_name = str(name or f"Region {rid}").strip() or f"Region {rid}"
+    inferred_hemi = hemi or _infer_hemi_from_label(clean_name, rid=rid, atlas_id=atlas_id)
+    if rgb is not None and len(rgb) >= 3:
+        r, g, b = [max(0, min(255, int(round(float(c))))) for c in rgb[:3]]
+    else:
+        r, g, b = generate_distinct_lut_rgb(rid, hemi=inferred_hemi)
+    sname = str(short_name or clean_name).strip() or clean_name
+    return {
+        "id": int(rid),
+        "name": clean_name,
+        "shortName": sname,
+        "title": clean_name,
+        "hemisphere": inferred_hemi,
+        "rgb": [r, g, b],
+        "hex": f"#{r:02x}{g:02x}{b:02x}",
+    }
+
+
+def parse_lut_text(text: str, filename: str = "", atlas_id: str = "") -> dict:
+    """
+    Parses an atlas LUT string in any standard format:
+      - JSON ({ labels: [...] } or { "id": { id, name, rgb/r/g/b, ... } })
+      - FSL Atlas XML (<atlas> with <type>Probabilistic</type> (0->1) or <type>Label</type>)
+      - FreeSurfer / 3D Slicer CTBL / ITK-SNAP whitespace tables (id name R G B [A])
+      - CSV / TSV (id,name[,r,g,b[,a]])
+      - Plain 1-label-per-line TXT (1..N)
+    Returns dict mapping str(id) -> normalized entry dict.
+    """
+    out = {}
+    if not text or not isinstance(text, str):
+        return out
+    stripped = text.strip()
+    lower_fn = (filename or "").lower()
+
+    # 1. JSON
+    if stripped.startswith("{") or lower_fn.endswith(".json"):
+        try:
+            obj = json.loads(stripped)
+            if isinstance(obj, dict) and isinstance(obj.get("labels"), list):
+                for item in obj["labels"]:
+                    if not isinstance(item, dict) or "id" not in item:
+                        continue
+                    rid = int(item["id"])
+                    if rid <= 0:
+                        continue
+                    rgb = item.get("rgb")
+                    if rgb is None and all(k in item for k in ("r", "g", "b")):
+                        rgb = [item["r"], item["g"], item["b"]]
+                    out[str(rid)] = _normalize_lut_entry(
+                        rid,
+                        item.get("name") or item.get("title") or f"Region {rid}",
+                        rgb=rgb,
+                        short_name=item.get("shortName") or item.get("abbr"),
+                        hemi=item.get("hemisphere"),
+                        atlas_id=atlas_id,
+                    )
+                return out
+            if isinstance(obj, dict):
+                for k, item in obj.items():
+                    if isinstance(item, dict):
+                        rid = int(item.get("id", k)) if str(item.get("id", k)).lstrip("-").isdigit() else None
+                        if rid is None or rid <= 0:
+                            continue
+                        rgb = item.get("rgb")
+                        if rgb is None and all(c in item for c in ("r", "g", "b")):
+                            rgb = [item["r"], item["g"], item["b"]]
+                        out[str(rid)] = _normalize_lut_entry(
+                            rid,
+                            item.get("name") or item.get("title") or f"Region {rid}",
+                            rgb=rgb,
+                            short_name=item.get("shortName"),
+                            hemi=item.get("hemisphere"),
+                            atlas_id=atlas_id,
+                        )
+                    elif str(k).lstrip("-").isdigit():
+                        rid = int(k)
+                        if rid > 0:
+                            out[str(rid)] = _normalize_lut_entry(rid, str(item), atlas_id=atlas_id)
+                if out:
+                    return out
+        except Exception:
+            pass
+
+    # 2. FSL Atlas XML
+    if stripped.startswith("<") and "<atlas" in stripped.lower() or lower_fn.endswith(".xml"):
+        try:
+            root = ET.fromstring(stripped)
+            atlas_kind = (root.findtext("./header/type") or "").strip().lower()
+            # FSL Probabilistic -maxprob-thr*- files map XML index k -> voxel k + 1
+            # FSL Label files (e.g., JHU-labels.xml) map index k directly -> voxel k (0 = Unclassified)
+            offset = 1 if atlas_kind == "probabilistic" else 0
+            for lbl in root.findall(".//label"):
+                raw_idx = lbl.attrib.get("index")
+                if raw_idx is None or not str(raw_idx).strip().lstrip("-").isdigit():
+                    continue
+                rid = int(str(raw_idx).strip()) + offset
+                if rid <= 0:
+                    continue
+                name = (lbl.text or "").strip() or f"Region {rid}"
+                out[str(rid)] = _normalize_lut_entry(rid, name, atlas_id=atlas_id)
+            if out:
+                return out
+        except Exception:
+            pass
+
+    # 3. CSV / TSV / FreeSurfer / Slicer CTBL / 1-line-per-label TXT
+    lines = [
+        ln.strip()
+        for ln in text.splitlines()
+        if ln.strip() and not ln.strip().startswith("#") and not ln.strip().startswith("//")
+    ]
+    for idx_line, ln in enumerate(lines, start=1):
+        # CSV/TSV detection
+        if "," in ln or "\t" in ln:
+            cols = [c.strip().strip('"').strip("'") for c in re.split(r"\t|,", ln)]
+            if idx_line == 1 and cols and not cols[0].lstrip("-").isdigit():
+                # Header row like "id,name,r,g,b"
+                continue
+            if cols and cols[0].lstrip("-").isdigit():
+                rid = int(cols[0])
+                if rid <= 0:
+                    continue
+                rname = cols[1] if len(cols) > 1 and cols[1] else f"Region {rid}"
+                rgb = None
+                if len(cols) >= 5 and all(re.match(r"^\d+(\.\d+)?$", c) for c in cols[2:5]):
+                    vals = [float(c) for c in cols[2:5]]
+                    if max(vals) <= 1.0 and any(0 < v < 1.0 for v in vals):
+                        vals = [v * 255.0 for v in vals]
+                    rgb = vals
+                out[str(rid)] = _normalize_lut_entry(rid, rname, rgb=rgb, atlas_id=atlas_id)
+                continue
+
+        # Whitespace-separated ("id name R G B [A]" or "id R G B ... label" or "id name")
+        parts = ln.split()
+        if parts and parts[0].lstrip("-").isdigit():
+            rid = int(parts[0])
+            if rid <= 0:
+                continue
+            # Check FreeSurfer/Slicer format: id name R G B A [mesh]
+            if (
+                len(parts) >= 5
+                and parts[-1].lstrip("+-").isdigit()
+                and parts[-2].isdigit()
+                and parts[-3].isdigit()
+                and parts[-4].isdigit()
+            ):
+                # Trailing R G B A or R G B?
+                if len(parts) >= 6 and all(p.isdigit() for p in parts[2:5]):
+                    rname = parts[1]
+                    rgb = [int(parts[2]), int(parts[3]), int(parts[4])]
+                else:
+                    rname = " ".join(parts[1:-4]) or f"Region {rid}"
+                    rgb = [int(parts[-4]), int(parts[-3]), int(parts[-2])]
+            elif len(parts) >= 5 and all(p.isdigit() for p in parts[2:5]):
+                rname = parts[1]
+                rgb = [int(parts[2]), int(parts[3]), int(parts[4])]
+            else:
+                rname = " ".join(parts[1:]) or f"Region {rid}"
+                rgb = None
+            out[str(rid)] = _normalize_lut_entry(rid, rname, rgb=rgb, atlas_id=atlas_id)
+        else:
+            # Plain 1-name-per-line file (e.g. Tian_Subcortex_S*_label.txt)
+            # Re-index sequentially over data lines
+            rid = len(out) + 1
+            out[str(rid)] = _normalize_lut_entry(rid, ln, atlas_id=atlas_id)
+
+    return out
+
+
+def discover_fsl_atlases() -> list:
+    """Discovers high-value MNI152 clinical atlases bundled in local FSL installation."""
+    atlases_root = os.path.join(FSLDIR, "data", "atlases")
+    if not os.path.isdir(atlases_root):
+        return []
+
+    specs = [
+        {
+            "id": "fsl_ho_cort",
+            "name": "Harvard-Oxford Cortical (thr25)",
+            "shortName": "HO-Cort",
+            "description": "48 bilateral/cortical MNI152 regions from FSL Harvard-Oxford max-prob thr25.",
+            "xml": "HarvardOxford-Cortical.xml",
+            "niftis": [
+                "HarvardOxford/HarvardOxford-cort-maxprob-thr25-1mm.nii.gz",
+                "HarvardOxford/HarvardOxford-cort-maxprob-thr25-2mm.nii.gz",
+            ],
+        },
+        {
+            "id": "fsl_ho_sub",
+            "name": "Harvard-Oxford Subcortical (thr25)",
+            "shortName": "HO-Sub",
+            "description": "21 subcortical & ventricular structures from FSL Harvard-Oxford max-prob thr25.",
+            "xml": "HarvardOxford-Subcortical.xml",
+            "niftis": [
+                "HarvardOxford/HarvardOxford-sub-maxprob-thr25-1mm.nii.gz",
+                "HarvardOxford/HarvardOxford-sub-maxprob-thr25-2mm.nii.gz",
+            ],
+        },
+        {
+            "id": "fsl_jhu_wm",
+            "name": "JHU ICBM-DTI-81 White Matter Labels",
+            "shortName": "JHU-WM",
+            "description": "48 stereotactic white-matter tract labels (corpus callosum, internal capsule, cingulum, UF).",
+            "xml": "JHU-labels.xml",
+            "niftis": [
+                "JHU/JHU-ICBM-labels-1mm.nii.gz",
+                "JHU/JHU-ICBM-labels-2mm.nii.gz",
+            ],
+        },
+        {
+            "id": "fsl_cerebellum",
+            "name": "Cerebellar Atlas (Diedrichsen FNIRT)",
+            "shortName": "Cereb",
+            "description": "28 cerebellar lobules & vermis compartments aligned to MNI152 via FNIRT.",
+            "xml": "Cerebellum_MNIfnirt.xml",
+            "niftis": [
+                "Cerebellum/Cerebellum-MNIfnirt-maxprob-thr25-1mm.nii.gz",
+                "Cerebellum/Cerebellum-MNIfnirt-maxprob-thr25-2mm.nii.gz",
+            ],
+        },
+        {
+            "id": "fsl_stn",
+            "name": "Subthalamic Nucleus Atlas (0.5mm)",
+            "shortName": "STN",
+            "description": "High-resolution 0.5mm bilateral subthalamic nucleus MNI152 probability atlas.",
+            "xml": "STN.xml",
+            "niftis": [
+                "STN/STN-maxprob-thr25-0.5mm.nii.gz",
+            ],
+        },
+    ]
+
+    found = []
+    for sp in specs:
+        xml_path = os.path.join(atlases_root, sp["xml"])
+        nii_path = next(
+            (os.path.join(atlases_root, rel) for rel in sp["niftis"] if os.path.isfile(os.path.join(atlases_root, rel))),
+            None,
+        )
+        if not (os.path.isfile(xml_path) and nii_path):
+            continue
+        reg_count = 0
+        try:
+            with open(xml_path, "r", encoding="utf-8", errors="replace") as xf:
+                reg_count = len(parse_lut_text(xf.read(), filename=xml_path, atlas_id=sp["id"]))
+        except Exception:
+            pass
+        found.append({
+            "id": sp["id"],
+            "name": sp["name"],
+            "shortName": sp["shortName"],
+            "category": "fsl",
+            "badge": "FSL",
+            "description": sp["description"],
+            "space": "MNI152NLin6Asym",
+            "regionCount": reg_count,
+            "defaultMode": "fnirt_nonlinear",
+            "supportedModes": ["fnirt_nonlinear", "flirt_12dof"],
+            "available": True,
+            "isFreeSurferAtlas": False,
+            "niftiPath": nii_path,
+            "lutPath": xml_path,
+            "citation": "FSL Atlases",
+        })
+    return found
+
+
+HIPS_THOMAS_EXTENDED_LUT = {
+    1: ("Whole Thalamus (Remainder)", "THAL"),
+    26: ("Nucleus Accumbens (Acc)", "Acc"),
+    27: ("Caudate (Cau)", "Cau"),
+    28: ("Claustrum (Cla)", "Cla"),
+    29: ("Globus Pallidus External (GPe)", "GPe"),
+    30: ("Globus Pallidus Internal (GPi)", "GPi"),
+    31: ("Putamen (Put)", "Put"),
+    32: ("Red Nucleus (RN)", "RN"),
+    33: ("Globus Pallidus (GP)", "GP"),
+    34: ("Amygdala (Amy)", "Amy"),
+}
+
+
+def _enrich_hips_thomas_lut(lut: dict, label_ids) -> dict:
+    """Fills missing extended HIPS-THOMAS / s-THOMAS IDs (1, 26..34 and R=+100) before generic fallback."""
+    out = dict(lut or {})
+    for raw_id in label_ids:
+        rid = int(raw_id)
+        if rid <= 0 or str(rid) in out:
+            continue
+        base_id = rid - 100 if 100 < rid < 200 else rid
+        hemi = "R" if 100 < rid < 200 else "L"
+        side_word = "Right" if hemi == "R" else "Left"
+        if base_id in HIPS_THOMAS_EXTENDED_LUT:
+            base_name, base_short = HIPS_THOMAS_EXTENDED_LUT[base_id]
+            out[str(rid)] = _normalize_lut_entry(
+                rid,
+                f"{side_word} {base_name}",
+                short_name=f"{hemi}-{base_short}",
+                hemi=hemi,
+                atlas_id="thomas",
+            )
+    return out
+
+
+def _find_container_binary() -> str:
+    """Locates local Docker (or Podman fallback) CLI executable across macOS, Linux, and Windows."""
+    candidates = [
+        shutil.which("docker"),
+        "/Applications/Docker.app/Contents/Resources/bin/docker",
+        "/usr/local/bin/docker",
+        "/opt/homebrew/bin/docker",
+    ]
+    if IS_WINDOWS:
+        prog_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+        prog_w6432 = os.environ.get("ProgramW6432", r"C:\Program Files")
+        candidates.extend([
+            os.path.join(prog_files, "Docker", "Docker", "resources", "bin", "docker.exe"),
+            os.path.join(prog_w6432, "Docker", "Docker", "resources", "bin", "docker.exe"),
+        ])
+    candidates.append(shutil.which("podman"))
+    for cand in candidates:
+        if not cand or not os.path.isfile(cand):
+            continue
+        if IS_WINDOWS or os.access(cand, os.X_OK):
+            return cand
+    return ""
+
+
+def detect_hips_thomas_docker(custom_image: str = "") -> dict:
+    """Detects native HIPS-THOMAS CLI, explicit custom image override, or local Docker container."""
+    user_custom_img = str(custom_image or "").strip()
+    if not user_custom_img:
+        native_cli = shutil.which("hipsthomas.sh") or shutil.which("hips_thomas.sh")
+        if native_cli and (IS_WINDOWS or os.access(native_cli, os.X_OK)):
+            return {
+                "available": True,
+                "mode": "native",
+                "dockerInstalled": False,
+                "dockerRunning": False,
+                "dockerBin": None,
+                "dockerImage": None,
+                "cliPath": native_cli,
+                "statusLabel": f"HIPS-THOMAS Ready ({os.path.basename(native_cli)})",
+            }
+
+    docker_bin = _find_container_binary()
+    docker_running = False
+    if docker_bin:
+        try:
+            proc = subprocess.run(
+                [docker_bin, "images", "--format", "{{.Repository}}:{{.Tag}}"],
+                capture_output=True,
+                text=True,
+                timeout=4.0,
+            )
+            docker_running = proc.returncode == 0
+            if docker_running:
+                raw_lines = [
+                    ln.strip()
+                    for ln in (proc.stdout or "").splitlines()
+                    if ln.strip() and not ln.strip().startswith("<none>") and not ln.strip().endswith(":<none>")
+                ]
+                env_img = os.environ.get("HIPS_THOMAS_DOCKER_IMAGE", "").strip()
+                hit = None
+
+                if user_custom_img:
+                    c_low = user_custom_img.lower()
+                    for ln in raw_lines:
+                        norm = ln[len("docker.io/"):] if ln.startswith("docker.io/") else ln
+                        if ln.lower() == c_low or norm.lower() == c_low or norm.lower().startswith(c_low + ":"):
+                            hit = ln
+                            break
+                    if not hit and re.match(r"^[a-zA-Z0-9._/@:-]+$", user_custom_img):
+                        try:
+                            insp = subprocess.run(
+                                [docker_bin, "image", "inspect", user_custom_img],
+                                capture_output=True,
+                                text=True,
+                                timeout=3.0,
+                            )
+                            if insp.returncode == 0:
+                                hit = user_custom_img
+                        except Exception:
+                            pass
+                    if not hit:
+                        return {
+                            "available": False,
+                            "mode": "template_only",
+                            "dockerInstalled": True,
+                            "dockerRunning": True,
+                            "dockerBin": docker_bin,
+                            "dockerImage": None,
+                            "cliPath": None,
+                            "statusLabel": f"Custom image '{user_custom_img}' not found locally — FNIRT/FLIRT backup ready",
+                        }
+                else:
+                    if env_img:
+                        env_low = env_img.lower()
+                        for ln in raw_lines:
+                            norm = ln[len("docker.io/"):] if ln.startswith("docker.io/") else ln
+                            if ln.lower() == env_low or norm.lower() == env_low or norm.lower().startswith(env_low + ":"):
+                                hit = ln
+                                break
+                    if not hit:
+                        for cand_repo in ("anagrammarian/sthomas", "anagrammarian/thomasmerged", "thalamicseg/hipsthomasdocker"):
+                            for ln in raw_lines:
+                                norm = (ln[len("docker.io/"):] if ln.startswith("docker.io/") else ln).lower()
+                                if norm == cand_repo or norm.startswith(cand_repo + ":"):
+                                    hit = ln
+                                    break
+                            if hit:
+                                break
+                    if not hit:
+                        for ln in raw_lines:
+                            norm = ln[len("docker.io/"):] if ln.startswith("docker.io/") else ln
+                            if re.search(r"(^|/)(hips?[-_]?thomas|sthomas|thomasmerged)(:|$)", norm, flags=re.IGNORECASE):
+                                hit = ln
+                                break
+                if hit:
+                    return {
+                        "available": True,
+                        "mode": "docker",
+                        "dockerInstalled": True,
+                        "dockerRunning": True,
+                        "dockerBin": docker_bin,
+                        "dockerImage": hit,
+                        "cliPath": docker_bin,
+                        "statusLabel": f"HIPS-THOMAS Docker Ready ({hit})",
+                    }
+        except Exception:
+            pass
+
+    if docker_bin and not docker_running:
+        status_msg = "Docker installed (daemon not running) — FNIRT/FLIRT backup ready"
+    elif docker_bin and docker_running:
+        status_msg = "HIPS-THOMAS Docker image not found (docker pull anagrammarian/sthomas) — FNIRT/FLIRT backup ready"
+    else:
+        status_msg = "HIPS-THOMAS Docker not installed — FNIRT/FLIRT backup ready"
+
+    return {
+        "available": False,
+        "mode": "template_only",
+        "dockerInstalled": bool(docker_bin),
+        "dockerRunning": bool(docker_running),
+        "dockerBin": docker_bin or None,
+        "dockerImage": None,
+        "cliPath": None,
+        "statusLabel": status_msg,
+    }
+
+
+def detect_fnirt_tools() -> dict:
+    """Checks availability of FSL FNIRT nonlinear registration binaries and MNI152 standard config."""
+    bins_ok = all(
+        os.path.isfile(p) and os.access(p, os.X_OK)
+        for p in (FLIRT_BIN, FNIRT_BIN, APPLYWARP_BIN, INVWARP_BIN)
+    )
+    tmpl_ok = os.path.isfile(MNI_STD_T1_2MM) and os.path.isfile(FNIRT_T1_CNF)
+    return {
+        "available": bool(bins_ok and tmpl_ok),
+        "flirtAvailable": bool(os.path.isfile(FLIRT_BIN) and os.access(FLIRT_BIN, os.X_OK)),
+        "fnirtBin": FNIRT_BIN if bins_ok else None,
+        "applywarpBin": APPLYWARP_BIN if bins_ok else None,
+        "invwarpBin": INVWARP_BIN if bins_ok else None,
+        "mniTemplateAvailable": bool(tmpl_ok),
+    }
+
+
+def build_atlas_registry(include_paths: bool = False, custom_hips_image: str = "") -> list:
+    """Builds the ordered catalog of all built-in, bundled, and auto-discovered brain atlases."""
+    registry = [
+        {
+            "id": "dkt",
+            "name": "DKT Atlas (aparc.DKTatlas+aseg — 104 Regions)",
+            "shortName": "DKT",
+            "category": "cortical",
+            "badge": "DKT",
+            "description": "FreeSurfer / FastSurfer Desikan-Killiany-Tourville whole-brain cortical + subcortical parcellation.",
+            "space": "subject_or_mni152",
+            "regionCount": 104,
+            "defaultMode": "fastsurfer_vinn",
+            "supportedModes": ["fastsurfer_vinn", "fastsurfer_full", "template_fnirt", "template_flirt"],
+            "available": os.path.isfile(MNI_DKT_ATLAS_PATH) or os.path.isfile(DKT_LUT_JSON_PATH),
+            "isFreeSurferAtlas": True,
+            "niftiPath": MNI_DKT_ATLAS_PATH,
+            "lutPath": DKT_LUT_JSON_PATH,
+            "citation": "Klein & Tourville 2012; Henschel et al. 2020 (FastSurfer)",
+        },
+        {
+            "id": "destrieux",
+            "name": "Destrieux Atlas (aparc.a2009s+aseg — 148 Cortical + Subcortical)",
+            "shortName": "Destrieux",
+            "category": "cortical",
+            "badge": "DESTRIEUX",
+            "description": "FreeSurfer / FastSurfer --fsaparc Destrieux fine sulco-gyral parcellation.",
+            "space": "subject_or_mni152",
+            "regionCount": 148,
+            "defaultMode": "fastsurfer_vinn",
+            "supportedModes": ["fastsurfer_vinn", "template_fnirt", "template_flirt"],
+            "available": os.path.isfile(MNI_DESTRIEUX_ATLAS_PATH) or os.path.isfile(DKT_LUT_JSON_PATH),
+            "isFreeSurferAtlas": True,
+            "niftiPath": MNI_DESTRIEUX_ATLAS_PATH,
+            "lutPath": DKT_LUT_JSON_PATH,
+            "citation": "Destrieux et al. 2010",
+        },
+    ]
+
+    hips_info = detect_hips_thomas_docker(custom_image=custom_hips_image)
+    thomas_nii = os.path.join(ATLASES_DIR, "MNI152_THOMAS_atlas.nii.gz")
+    thomas_lut = os.path.join(ATLASES_DIR, "thomas_lut.json")
+    if hips_info.get("available"):
+        thomas_modes = ["hips_thomas_docker", "fnirt_nonlinear", "flirt_12dof"]
+        thomas_default_mode = "hips_thomas_docker"
+    else:
+        thomas_modes = ["fnirt_nonlinear", "flirt_12dof"]
+        thomas_default_mode = "fnirt_nonlinear"
+    thomas_count = 28
+    if os.path.isfile(thomas_lut):
+        try:
+            with open(thomas_lut, "r", encoding="utf-8") as tf:
+                thomas_count = len(json.load(tf).get("labels", [])) or 28
+        except Exception:
+            pass
+    registry.append({
+        "id": "thomas",
+        "name": f"THOMAS Thalamic Nuclei Atlas ({thomas_count} Bilateral Nuclei)",
+        "shortName": "THOMAS",
+        "category": "thalamic",
+        "badge": "THOMAS",
+        "description": "Thalamus-Optimized Multi-Atlas Segmentation (defaults to HIPS-THOMAS Docker when installed; FNIRT/FLIRT backups): AV, VA, VLa, VLp (VIM), VPL, Pul, LGN, MGN, CM, MD-Pf, Hb, MTT, CL, VPM.",
+        "space": "subject_or_mni152" if hips_info.get("available") else "MNI152NLin6Asym",
+        "regionCount": thomas_count,
+        "defaultMode": thomas_default_mode,
+        "supportedModes": thomas_modes,
+        "available": bool((os.path.isfile(thomas_nii) and os.path.isfile(thomas_lut)) or hips_info.get("available")),
+        "hipsThomasAvailable": bool(hips_info.get("available")),
+        "hipsThomasImage": hips_info.get("dockerImage") or hips_info.get("cliPath"),
+        "hipsThomasStatus": hips_info.get("statusLabel"),
+        "isFreeSurferAtlas": False,
+        "niftiPath": thomas_nii,
+        "lutPath": thomas_lut,
+        "citation": "Su et al. 2019; Saranathan et al. 2021; Vidal et al. 2024 (HIPS-THOMAS)",
+    })
+
+    tian_specs = [
+        (1, 16, "Scale I — Coarse bilateral subcortex (hippocampus, amygdala, thalamus, NAc, GP, putamen, caudate)."),
+        (2, 32, "Scale II — Subdivided hippocampus head/body/tail, thalamus a/p, GP, putamen, caudate."),
+        (3, 50, "Scale III — Fine amygdala nuclei, thalamic divisions (VP/VA/DA/DP), striatum subregions."),
+        (4, 54, "Scale IV — Finest Melbourne 3T subcortical parcellation (54 bilateral ROIs)."),
+    ]
+    for scale, roi_cnt, desc in tian_specs:
+        nii_p = os.path.join(ATLASES_DIR, f"Tian_Subcortex_S{scale}_3T.nii.gz")
+        lut_p = os.path.join(ATLASES_DIR, f"tian_s{scale}_lut.json")
+        actual_cnt = roi_cnt
+        if os.path.isfile(lut_p):
+            try:
+                with open(lut_p, "r", encoding="utf-8") as tf:
+                    actual_cnt = len(json.load(tf).get("labels", [])) or roi_cnt
+            except Exception:
+                pass
+        registry.append({
+            "id": f"tian_s{scale}",
+            "name": f"Tian Melbourne Subcortex Scale {['I', 'II', 'III', 'IV'][scale - 1]} ({actual_cnt} ROIs)",
+            "shortName": f"Tian S{scale}",
+            "category": "subcortical",
+            "badge": f"TIAN S{scale}",
+            "description": desc,
+            "space": "MNI152NLin6Asym",
+            "regionCount": actual_cnt,
+            "defaultMode": "fnirt_nonlinear",
+            "supportedModes": ["fnirt_nonlinear", "flirt_12dof"],
+            "available": os.path.isfile(nii_p) and os.path.isfile(lut_p),
+            "isFreeSurferAtlas": False,
+            "niftiPath": nii_p,
+            "lutPath": lut_p,
+            "citation": "Tian et al. 2020 (Nature Neuroscience)",
+        })
+
+    registry.extend(discover_fsl_atlases())
+
+    if include_paths:
+        return registry
+    clean = []
+    for item in registry:
+        copy = dict(item)
+        copy.pop("niftiPath", None)
+        copy.pop("lutPath", None)
+        clean.append(copy)
+    return clean
+
+
+def load_atlas_lut(atlas_id: str) -> dict:
+    """Loads and normalizes the lookup table for any catalog atlas ID."""
+    aid = str(atlas_id or "dkt").strip().lower()
+    if aid in ("dkt", "destrieux", "aparc.a2009s"):
+        return load_dkt_lut()
+    reg = build_atlas_registry(include_paths=True)
+    entry = next((item for item in reg if item["id"] == aid), None)
+    if not entry or not entry.get("lutPath") or not os.path.isfile(entry["lutPath"]):
+        return {}
+    try:
+        with open(entry["lutPath"], "r", encoding="utf-8", errors="replace") as f:
+            return parse_lut_text(f.read(), filename=entry["lutPath"], atlas_id=aid)
+    except Exception:
+        return {}
+
+
+def compute_atlas_region_stats(data_3d: np.ndarray, affine: np.ndarray, lut: dict) -> list:
+    """
+    Fast vectorized extraction of per-region voxel counts, volumes (mm^3),
+    world RAS centroids, and LUT labels/colors for all positive labels in data_3d.
+    """
+    arr = np.rint(np.asarray(data_3d)).astype(np.int32)
+    nz_mask = arr > 0
+    nz_count = int(np.count_nonzero(nz_mask))
+    if nz_count == 0:
+        return []
+
+    aff = np.asarray(affine, dtype=np.float64)
+    vox_vol_mm3 = abs(float(np.linalg.det(aff[:3, :3]))) or 1.0
+
+    # Flatten coordinates for single-pass grouping
+    ii, jj, kk = np.nonzero(nz_mask)
+    vals = arr[ii, jj, kk]
+    order = np.argsort(vals, kind="mergesort")
+    s_vals = vals[order]
+    s_i = ii[order].astype(np.float64)
+    s_j = jj[order].astype(np.float64)
+    s_k = kk[order].astype(np.float64)
+
+    uniq_ids, start_idx, counts = np.unique(s_vals, return_index=True, return_counts=True)
+    sum_i = np.add.reduceat(s_i, start_idx)
+    sum_j = np.add.reduceat(s_j, start_idx)
+    sum_k = np.add.reduceat(s_k, start_idx)
+
+    lut_map = lut if isinstance(lut, dict) else {}
+    regions = []
+    for idx_u, rid_raw in enumerate(uniq_ids):
+        rid = int(rid_raw)
+        cnt = int(counts[idx_u])
+        if cnt <= 0:
+            continue
+        mean_ijk = np.array([sum_i[idx_u] / cnt, sum_j[idx_u] / cnt, sum_k[idx_u] / cnt, 1.0], dtype=np.float64)
+        c_ras = (aff @ mean_ijk)[:3]
+        entry = lut_map.get(str(rid))
+        if isinstance(entry, dict):
+            name = entry.get("name") or entry.get("title") or f"Region {rid}"
+            short_name = entry.get("shortName") or entry.get("abbr") or name
+            hemi = entry.get("hemisphere") or _infer_hemi_from_label(name, rid=rid)
+            rgb = entry.get("rgb") or generate_distinct_lut_rgb(rid, hemi=hemi)
+            hex_col = entry.get("hex") or f"#{int(rgb[0]):02x}{int(rgb[1]):02x}{int(rgb[2]):02x}"
+        else:
+            norm_e = _normalize_lut_entry(rid, f"Region {rid}")
+            name = norm_e["name"]
+            short_name = norm_e["shortName"]
+            hemi = norm_e["hemisphere"]
+            rgb = norm_e["rgb"]
+            hex_col = norm_e["hex"]
+
+        regions.append({
+            "id": rid,
+            "name": name,
+            "shortName": short_name,
+            "hemisphere": hemi,
+            "voxelCount": cnt,
+            "volumeMm3": round(cnt * vox_vol_mm3, 2),
+            "centroidRAS": [round(float(c_ras[0]), 2), round(float(c_ras[1]), 2), round(float(c_ras[2]), 2)],
+            "rgb": [int(c) for c in rgb[:3]],
+            "hex": hex_col,
+        })
+    return regions
+
+
+def _get_scipy_9dof_fallback(t1_3d, t1_aff, src_img, sub_brain_path, mni_brain_path, cache_dir):
+    """Cached pure-Python SciPy 9-DOF MNI152 -> Subject transform when FSL is absent/fails."""
+    cached_aff_npy = os.path.join(cache_dir, "mni2sub_scipy9dof.npy")
+    if os.path.isfile(cached_aff_npy):
+        return np.load(cached_aff_npy), True
+    sub_brain_img = nib.load(sub_brain_path) if os.path.isfile(sub_brain_path) else src_img
+    mni_brain_img = nib.load(mni_brain_path)
+    _, _, new_mni_aff = optimize_multimodal_registration(sub_brain_img, mni_brain_img, dof=9)
+    # new_mni_aff maps MNI voxel -> Subject World RAS; save inverse world transform
+    os.makedirs(cache_dir, exist_ok=True)
+    np.save(cached_aff_npy, new_mni_aff)
+    return new_mni_aff, False
+
+
+def compute_or_load_mni_to_subject_warp(
+    in_t1_path: str,
+    t1_3d: np.ndarray,
+    target_aff: np.ndarray,
+    src_img: nib.Nifti1Image,
+    reg_mode: str,
+    tmpdir: str,
+    src_name: str = "",
+    brain_mask_bool=None,
+) -> dict:
+    """
+    Computes (or loads from SHA-256 disk cache) the MNI152NLin6Asym -> Subject T1w spatial transform:
+      - 'fnirt_nonlinear': FSL FLIRT 12-DOF + FNIRT nonlinear + invwarp (cached ~1s reuse)
+      - 'flirt_12dof': FSL FLIRT 12-DOF linear brain-to-brain affine (cached)
+      - automatic fallback to flirt_12dof -> SciPy 9-DOF if FNIRT/FLIRT binaries are unavailable.
+    Returns dict describing mode used, cache status, and transform file paths.
+    """
+    req_mode = "fnirt_nonlinear" if reg_mode in ("fnirt_nonlinear", "template_fnirt", "mni152_fnirt", "fnirt") else "flirt_12dof"
+    os.makedirs(MNI_WARP_CACHE_DIR, exist_ok=True)
+    h = hashlib.sha256()
+    h.update(b"neurocoreg_mni_warp_v1:")
+    h.update(t1_3d.astype(np.float32).tobytes())
+    h.update(np.round(target_aff, 4).astype(np.float64).tobytes())
+    t1_hash = h.hexdigest()[:16]
+    cache_dir = os.path.join(MNI_WARP_CACHE_DIR, t1_hash)
+    os.makedirs(cache_dir, exist_ok=True)
+
+    fsl_env = os.environ.copy()
+    fsl_env["FSLDIR"] = FSLDIR
+    fsl_env["FSLOUTPUTTYPE"] = "NIFTI_GZ"
+
+    cached_warp = os.path.join(cache_dir, "mni2sub_warp.nii.gz")
+    cached_aff_mat = os.path.join(cache_dir, "mni2sub_affine.mat")
+    fnirt_info = detect_fnirt_tools()
+
+    # 1. Nonlinear FNIRT + invwarp path
+    if req_mode == "fnirt_nonlinear" and fnirt_info["available"]:
+        if os.path.isfile(cached_warp) and os.path.getsize(cached_warp) > 1024:
+            return {
+                "mode": "fnirt_nonlinear",
+                "requestedMode": req_mode,
+                "warpCacheHit": True,
+                "cacheKey": t1_hash,
+                "warpPath": cached_warp,
+                "matPath": cached_aff_mat if os.path.isfile(cached_aff_mat) else None,
+                "refMniPath": MNI_STD_T1_2MM,
+            }
+
+        try:
+            sub2mni_mat = os.path.join(tmpdir, "sub2mni.mat")
+            sub2mni_warp = os.path.join(tmpdir, "sub2mni_warp.nii.gz")
+            mni2sub_warp_tmp = os.path.join(tmpdir, "mni2sub_warp.nii.gz")
+            mni2sub_mat_tmp = os.path.join(tmpdir, "mni2sub_affine.mat")
+
+            # Use brain-extracted FLIRT linear initialization if possible for sharp affine seed
+            sub_for_aff = in_t1_path
+            mni_for_aff = MNI_STD_T1_2MM
+            if os.path.isfile(MNI_STD_BRAIN_2MM):
+                sub_brain_tmp = os.path.join(tmpdir, "sub_brain_fnirt_init.nii.gz")
+                if brain_mask_bool is not None:
+                    b_arr = np.where(brain_mask_bool, t1_3d, 0.0).astype(np.float32)
+                    b_nii = nib.Nifti1Image(b_arr, target_aff)
+                    b_nii.set_sform(target_aff, code=1)
+                    b_nii.set_qform(target_aff, code=1)
+                    nib.save(b_nii, sub_brain_tmp)
+                    sub_for_aff = sub_brain_tmp
+                    mni_for_aff = MNI_STD_BRAIN_2MM
+                elif os.path.isfile(BET_BIN) and os.access(BET_BIN, os.X_OK) and "_brain" not in src_name.lower():
+                    bet_p = os.path.join(tmpdir, "sub_brain_fnirt_init")
+                    subprocess.run(
+                        [BET_BIN, in_t1_path, bet_p, "-f", "0.45"],
+                        env=fsl_env,
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                    )
+                    if os.path.isfile(f"{bet_p}.nii.gz"):
+                        sub_for_aff = f"{bet_p}.nii.gz"
+                        mni_for_aff = MNI_STD_BRAIN_2MM
+
+            subprocess.run(
+                [
+                    FLIRT_BIN,
+                    "-in", sub_for_aff,
+                    "-ref", mni_for_aff,
+                    "-omat", sub2mni_mat,
+                    "-dof", "12",
+                    "-cost", "corratio",
+                    "-searchrx", "-30", "30",
+                    "-searchry", "-30", "30",
+                    "-searchrz", "-30", "30",
+                ],
+                env=fsl_env,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=90,
+            )
+
+            fnirt_cmd = [
+                FNIRT_BIN,
+                f"--in={in_t1_path}",
+                f"--ref={MNI_STD_T1_2MM}",
+                f"--aff={sub2mni_mat}",
+                f"--config={FNIRT_T1_CNF}",
+                f"--cout={sub2mni_warp}",
+            ]
+            subprocess.run(fnirt_cmd, env=fsl_env, check=True, capture_output=True, text=True, timeout=240)
+
+            subprocess.run(
+                [
+                    INVWARP_BIN,
+                    f"--warp={sub2mni_warp}",
+                    f"--ref={in_t1_path}",
+                    f"--out={mni2sub_warp_tmp}",
+                ],
+                env=fsl_env,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+
+            if os.path.isfile(mni2sub_warp_tmp):
+                if os.path.isfile(CONVERT_XFM_BIN) and os.access(CONVERT_XFM_BIN, os.X_OK):
+                    subprocess.run(
+                        [CONVERT_XFM_BIN, "-omat", mni2sub_mat_tmp, "-inverse", sub2mni_mat],
+                        env=fsl_env,
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                    )
+                    if os.path.isfile(mni2sub_mat_tmp):
+                        shutil.copyfile(mni2sub_mat_tmp, cached_aff_mat)
+                shutil.copyfile(mni2sub_warp_tmp, cached_warp)
+                return {
+                    "mode": "fnirt_nonlinear",
+                    "requestedMode": req_mode,
+                    "warpCacheHit": False,
+                    "cacheKey": t1_hash,
+                    "warpPath": cached_warp,
+                    "matPath": cached_aff_mat if os.path.isfile(cached_aff_mat) else None,
+                    "refMniPath": MNI_STD_T1_2MM,
+                }
+        except Exception as fnirt_err:
+            print(f"FNIRT nonlinear warp fallback to FLIRT 12-DOF: {fnirt_err}", flush=True)
+
+    # 2. Fast FSL FLIRT 12-DOF linear path
+    ref_mni_brain = MNI_T1_BRAIN_PATH if os.path.isfile(MNI_T1_BRAIN_PATH) else (
+        MNI_STD_BRAIN_2MM if os.path.isfile(MNI_STD_BRAIN_2MM) else MNI_STD_T1_2MM
+    )
+    if os.path.isfile(FLIRT_BIN) and os.access(FLIRT_BIN, os.X_OK) and os.path.isfile(ref_mni_brain):
+        if os.path.isfile(cached_aff_mat) and os.path.getsize(cached_aff_mat) > 16:
+            return {
+                "mode": "flirt_12dof",
+                "requestedMode": req_mode,
+                "warpCacheHit": True,
+                "cacheKey": t1_hash,
+                "matPath": cached_aff_mat,
+                "refMniPath": ref_mni_brain,
+            }
+
+        sub_brain_path = os.path.join(tmpdir, "sub_brain_flirt.nii.gz")
+        if brain_mask_bool is not None:
+            b_arr = np.where(brain_mask_bool, t1_3d, 0.0).astype(np.float32)
+            b_nii = nib.Nifti1Image(b_arr, target_aff)
+            b_nii.set_sform(target_aff, code=1)
+            b_nii.set_qform(target_aff, code=1)
+            nib.save(b_nii, sub_brain_path)
+        elif "_brain" in src_name.lower():
+            sub_brain_path = in_t1_path
+        elif os.path.isfile(BET_BIN) and os.access(BET_BIN, os.X_OK):
+            bet_prefix = os.path.join(tmpdir, "sub_brain_bet")
+            subprocess.run(
+                [BET_BIN, in_t1_path, bet_prefix, "-f", "0.5"],
+                env=fsl_env,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if os.path.isfile(f"{bet_prefix}.nii.gz"):
+                sub_brain_path = f"{bet_prefix}.nii.gz"
+            else:
+                sub_brain_path = in_t1_path
+        else:
+            zooms = list(src_img.header.get_zooms())
+            while len(zooms) < 3:
+                zooms.append(1.0)
+            brain_arr, _ = scipy_morphological_skull_strip(t1_3d, zooms[:3], frac=0.5)
+            b_nii = nib.Nifti1Image(brain_arr, target_aff)
+            b_nii.set_sform(target_aff, code=1)
+            b_nii.set_qform(target_aff, code=1)
+            nib.save(b_nii, sub_brain_path)
+
+        mni2sub_tmp = os.path.join(tmpdir, "mni2sub.mat")
+        subprocess.run(
+            [
+                FLIRT_BIN,
+                "-in", ref_mni_brain,
+                "-ref", sub_brain_path,
+                "-omat", mni2sub_tmp,
+                "-bins", "256",
+                "-cost", "corratio",
+                "-searchrx", "-30", "30",
+                "-searchry", "-30", "30",
+                "-searchrz", "-30", "30",
+                "-dof", "12",
+            ],
+            env=fsl_env,
+            capture_output=True,
+            text=True,
+            timeout=90,
+        )
+        if os.path.isfile(mni2sub_tmp):
+            shutil.copyfile(mni2sub_tmp, cached_aff_mat)
+            return {
+                "mode": "flirt_12dof",
+                "requestedMode": req_mode,
+                "warpCacheHit": False,
+                "cacheKey": t1_hash,
+                "matPath": cached_aff_mat,
+                "refMniPath": ref_mni_brain,
+            }
+
+    # 3. Pure-Python SciPy 9-DOF fallback
+    sub_brain_path = os.path.join(tmpdir, "sub_brain_scipy.nii.gz")
+    if not os.path.isfile(sub_brain_path):
+        zooms = list(src_img.header.get_zooms())
+        while len(zooms) < 3:
+            zooms.append(1.0)
+        brain_arr, _ = scipy_morphological_skull_strip(t1_3d, zooms[:3], frac=0.5)
+        nib.save(nib.Nifti1Image(brain_arr, target_aff), sub_brain_path)
+    new_mni_aff, scipy_hit = _get_scipy_9dof_fallback(t1_3d, target_aff, src_img, sub_brain_path, ref_mni_brain, cache_dir)
+    return {
+        "mode": "scipy_affine",
+        "requestedMode": req_mode,
+        "warpCacheHit": scipy_hit,
+        "cacheKey": t1_hash,
+        "scipyNewMniAff": new_mni_aff,
+        "refMniPath": ref_mni_brain,
+    }
+
+
+def warp_mni_label_volume_to_subject(
+    atlas_nifti_path: str,
+    warp_bundle: dict,
+    in_t1_path: str,
+    t1_3d: np.ndarray,
+    target_aff: np.ndarray,
+    tmpdir: str,
+) -> tuple:
+    """
+    Warps any MNI152 label volume (0.5mm/1mm/2mm, LAS or RAS) onto Subject T1w space with
+    exact nearest-neighbour interpolation, returning (int16_data_3d, engine_note).
+    """
+    fsl_env = os.environ.copy()
+    fsl_env["FSLDIR"] = FSLDIR
+    fsl_env["FSLOUTPUTTYPE"] = "NIFTI_GZ"
+
+    atlas_img = nib.load(atlas_nifti_path)
+    atlas_data = np.rint(get_clean_3d_data(atlas_img)).astype(np.int16)
+    atlas_aff = get_best_affine(atlas_img)
+    t1_img = nib.load(in_t1_path)
+
+    # Ensure 3D clean int16 NIfTI input with valid affine
+    clean_atlas_path = os.path.join(tmpdir, "clean_mni_atlas.nii.gz")
+    clean_img = nib.Nifti1Image(atlas_data, atlas_aff)
+    clean_img.set_sform(atlas_aff, code=int(atlas_img.header["sform_code"]) or 4)
+    clean_img.set_qform(atlas_aff, code=int(atlas_img.header["qform_code"]) or 4)
+    nib.save(clean_img, clean_atlas_path)
+
+    out_warped_path = os.path.join(tmpdir, "warped_subject_atlas.nii.gz")
+
+    if warp_bundle["mode"] == "fnirt_nonlinear":
+        # applywarp requires --in FOV/origin compatible with FSL standard space; resample onto MNI152_1mm first if custom RAS/offset
+        apply_in_path = clean_atlas_path
+        if os.path.isfile(MNI_STD_T1_1MM):
+            mni1_img = nib.load(MNI_STD_T1_1MM)
+            same_origin = (
+                np.linalg.det(atlas_aff[:3, :3]) < 0
+                and np.allclose(atlas_aff[:3, 3], mni1_img.affine[:3, 3], atol=1.5)
+            )
+            if not same_origin:
+                vox2atlas = safe_inv4x4(atlas_aff) @ mni1_img.affine
+                std_arr = affine_transform(
+                    atlas_data,
+                    vox2atlas[:3, :3],
+                    offset=vox2atlas[:3, 3],
+                    output_shape=mni1_img.shape[:3],
+                    order=0,
+                    mode="constant",
+                    cval=0,
+                ).astype(np.int16)
+                apply_in_path = os.path.join(tmpdir, "atlas_on_mni1mm.nii.gz")
+                std_nii = nib.Nifti1Image(std_arr, mni1_img.affine)
+                std_nii.set_sform(mni1_img.affine, code=4)
+                std_nii.set_qform(mni1_img.affine, code=4)
+                nib.save(std_nii, apply_in_path)
+
+        subprocess.run(
+            [
+                APPLYWARP_BIN,
+                f"--ref={in_t1_path}",
+                f"--in={apply_in_path}",
+                f"--warp={warp_bundle['warpPath']}",
+                f"--out={out_warped_path}",
+                "--interp=nn",
+            ],
+            env=fsl_env,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        warped_data = np.rint(get_clean_3d_data(nib.load(out_warped_path))).astype(np.int16)
+        warped_data[warped_data < 0] = 0
+        return warped_data, "FSL FNIRT Nonlinear MNI152 -> Subject"
+
+    if warp_bundle["mode"] == "flirt_12dof":
+        # Convert MNI_ref->Sub FLIRT .mat through World RAS so 0.5mm/1mm/2mm and RAS/LAS atlases align identically
+        ref_mni_img = nib.load(warp_bundle["refMniPath"])
+        mni_mat = np.loadtxt(warp_bundle["matPath"], dtype=np.float64)
+        w_ras = flirt_mat_to_world_ras(mni_mat, ref_img=t1_img, mov_img=ref_mni_img)
+        atlas_mat = world_ras_to_flirt_mat(w_ras, ref_img=t1_img, mov_img=clean_img)
+        atlas_mat_path = os.path.join(tmpdir, "atlas_mni2sub.mat")
+        np.savetxt(atlas_mat_path, atlas_mat, fmt="%.8f")
+
+        subprocess.run(
+            [
+                FLIRT_BIN,
+                "-in", clean_atlas_path,
+                "-ref", in_t1_path,
+                "-applyxfm",
+                "-init", atlas_mat_path,
+                "-interp", "nearestneighbour",
+                "-out", out_warped_path,
+            ],
+            env=fsl_env,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=90,
+        )
+        warped_data = np.rint(get_clean_3d_data(nib.load(out_warped_path))).astype(np.int16)
+        warped_data[warped_data < 0] = 0
+        return warped_data, "FSL FLIRT 12-DOF Affine MNI152 -> Subject"
+
+    # Pure-Python SciPy 9-DOF fallback
+    new_mni_aff = warp_bundle["scipyNewMniAff"]
+    ref_mni_aff = get_best_affine(nib.load(warp_bundle["refMniPath"]))
+    # W_ras maps MNI World RAS -> Subject World RAS
+    w_ras = new_mni_aff @ safe_inv4x4(ref_mni_aff)
+    # Atlas voxel -> Subject voxel = inv(target_aff) @ W_ras @ atlas_aff; inverse is Subject voxel -> Atlas voxel
+    sub_vox_to_atlas_vox = safe_inv4x4(atlas_aff) @ safe_inv4x4(w_ras) @ target_aff
+    warped_data = affine_transform(
+        atlas_data,
+        sub_vox_to_atlas_vox[:3, :3],
+        offset=sub_vox_to_atlas_vox[:3, 3],
+        output_shape=t1_3d.shape[:3],
+        order=0,
+        mode="constant",
+        cval=0,
+    ).astype(np.int16)
+    warped_data[warped_data < 0] = 0
+    return warped_data, "SciPy 9-DOF Template Affine MNI152 -> Subject"
+
+
 def find_fastsurfer_installation():
     """
     Searches /Applications (e.g. /Applications/FastSurfer2.7.0.dev0) and standard paths for a
@@ -856,7 +2108,447 @@ def build_fastsurfer_macos_env(fs_install: dict) -> dict:
     return env
 
 
-def detect_neuro_tools() -> dict:
+def _decode_optional_brain_mask(body: dict, expected_shape: tuple, target_aff: np.ndarray, tmpdir: str):
+    """Decodes and aligns body['brainMaskBase64'] to target_aff/expected_shape if present; else None."""
+    if not body.get("brainMaskBase64"):
+        return None
+    try:
+        bm_bytes = base64.b64decode(body["brainMaskBase64"])
+        bm_ext = ".nii.gz" if bm_bytes[:2] == b"\x1f\x8b" else ".nii"
+        bm_path = os.path.join(tmpdir, f"user_brain_mask{bm_ext}")
+        with open(bm_path, "wb") as bmf:
+            bmf.write(bm_bytes)
+        bm_img = nib.load(bm_path)
+        bm_3d = get_clean_3d_data(bm_img, dtype=np.float32)
+        bm_aff = (
+            np.asarray(body["brainMaskAffine"], dtype=np.float64)
+            if body.get("brainMaskAffine") is not None
+            else get_best_affine(bm_img)
+        )
+        if bm_3d.shape[:3] == expected_shape and np.allclose(bm_aff, target_aff, atol=1e-2):
+            return bm_3d > 0
+        vox2bm = safe_inv4x4(bm_aff) @ target_aff
+        warped_bm = affine_transform(
+            (bm_3d > 0).astype(np.float32),
+            vox2bm[:3, :3],
+            offset=vox2bm[:3, 3],
+            output_shape=expected_shape,
+            order=0,
+            mode="constant",
+            cval=0.0,
+        )
+        return warped_bm > 0.5
+    except Exception as bm_err:
+        print(f"Warning reading brainMaskBase64: {bm_err}", flush=True)
+        return None
+
+
+def _assemble_hips_thomas_from_paths(
+    path_pairs: list,
+    tmpdir: str,
+    ref_shape: tuple = None,
+    ref_aff: np.ndarray = None,
+) -> tuple:
+    """
+    Merges HIPS-THOMAS NIfTI outputs into a single int16 volume (Left = id, Right = id + 100).
+    Priority order (ignores EXTRAS/temp/tempr/qc subdirectories unless nothing else exists):
+      1) Full-size L/R merged pair (thomasfull_L + thomasfull_R, canonical IDs, + optional CL_L/R)
+      2) Cropped L/R merged pair (thomas_L + thomas_R, resampled onto subject T1 grid)
+      3) Folder / multi-file individual nucleus masks (e.g. left/2-AV.nii.gz, right/6-VLP.nii.gz)
+      4) Composite sthomas_LR_labels.nii.gz (fallback only when Priorities 1-3 are absent)
+    Returns (merged_int16, affine, note) or (None, None, error_msg).
+    """
+    if not path_pairs:
+        return None, None, "No HIPS-THOMAS files supplied."
+
+    skip_dirs = {"extras", "temp", "tempr", "qc"}
+    filtered_pairs = []
+    for rel, full in path_pairs:
+        norm_rel = rel.replace("\\", "/").strip("/")
+        parent_parts = [seg.lower() for seg in norm_rel.split("/")[:-1]]
+        if any(seg in skip_dirs for seg in parent_parts):
+            continue
+        filtered_pairs.append((rel, full))
+    effective_pairs = filtered_pairs if filtered_pairs else list(path_pairs)
+
+    def _resample_to_ref(data_arr, src_aff, dst_shape, dst_aff):
+        if data_arr.shape[:3] == dst_shape and np.allclose(src_aff, dst_aff, atol=1e-2):
+            return np.rint(data_arr).astype(np.int16)
+        v2v = safe_inv4x4(src_aff) @ dst_aff
+        out = affine_transform(
+            np.rint(data_arr).astype(np.int16),
+            v2v[:3, :3],
+            offset=v2v[:3, 3],
+            output_shape=dst_shape,
+            order=0,
+            mode="constant",
+            cval=0,
+        )
+        return np.rint(out).astype(np.int16)
+
+    # 1 & 2. L/R merged pairs — strictly prefer full-size thomasfull_L/R over cropped thomas_L/R
+    left_merged = None
+    right_merged = None
+    pair_label = "thomasfull L+R pair merge"
+    left_full = next(((rel, full) for rel, full in effective_pairs if re.search(r"thomasfull[_-]?l\.nii", os.path.basename(rel).lower())), None)
+    right_full = next(((rel, full) for rel, full in effective_pairs if re.search(r"thomasfull[_-]?r\.nii", os.path.basename(rel).lower())), None)
+    if left_full or right_full:
+        left_merged = left_full
+        right_merged = right_full
+    else:
+        pair_label = "thomas L+R pair merge"
+        left_merged = next(((rel, full) for rel, full in effective_pairs if re.search(r"(^|[_-])thomas[_-]?l\.nii", os.path.basename(rel).lower())), None)
+        right_merged = next(((rel, full) for rel, full in effective_pairs if re.search(r"(^|[_-])thomas[_-]?r\.nii", os.path.basename(rel).lower())), None)
+
+    if left_merged or right_merged:
+        base_pair = left_merged or right_merged
+        base_img = nib.load(base_pair[1])
+        base_aff = ref_aff if ref_aff is not None else get_best_affine(base_img)
+        base_shape = ref_shape if ref_shape is not None else base_img.shape[:3]
+        merged = np.zeros(base_shape, dtype=np.int16)
+
+        l_arr = np.zeros(base_shape, dtype=np.int16)
+        r_arr = np.zeros(base_shape, dtype=np.int16)
+        if left_merged:
+            li = nib.load(left_merged[1])
+            l_arr = _resample_to_ref(get_clean_3d_data(li), get_best_affine(li), base_shape, base_aff)
+            l_arr[l_arr < 0] = 0
+        if right_merged:
+            ri = nib.load(right_merged[1])
+            r_arr = _resample_to_ref(get_clean_3d_data(ri), get_best_affine(ri), base_shape, base_aff)
+            r_arr[r_arr < 0] = 0
+
+        only_l = (l_arr > 0) & (r_arr == 0)
+        only_r = (r_arr > 0) & (l_arr == 0)
+        both = (l_arr > 0) & (r_arr > 0)
+        merged[only_l] = l_arr[only_l]
+        merged[only_r] = np.where(r_arr[only_r] < 100, r_arr[only_r] + 100, r_arr[only_r])
+        if np.any(both):
+            ijk = np.argwhere(both)
+            xyz = nib.affines.apply_affine(base_aff, ijk)
+            for idx_pt, (ii, jj, kk) in enumerate(ijk):
+                if float(xyz[idx_pt, 0]) >= 0.0:
+                    rv = int(r_arr[ii, jj, kk])
+                    merged[ii, jj, kk] = rv + 100 if rv < 100 else rv
+                else:
+                    merged[ii, jj, kk] = int(l_arr[ii, jj, kk])
+
+        # Overlay separate top-level CL_L / CL_R if 17 / 117 are not already included
+        cl_l_hit = next(((rel, full) for rel, full in effective_pairs if re.search(r"^cl[_-]?l\.nii", os.path.basename(rel).lower())), None)
+        cl_r_hit = next(((rel, full) for rel, full in effective_pairs if re.search(r"^cl[_-]?r\.nii", os.path.basename(rel).lower())), None)
+        if cl_l_hit and not np.any(merged == 17):
+            cli = nib.load(cl_l_hit[1])
+            cl_arr = _resample_to_ref(get_clean_3d_data(cli) > 0.5, get_best_affine(cli), base_shape, base_aff)
+            merged[(cl_arr > 0) & (merged == 0)] = 17
+        if cl_r_hit and not np.any(merged == 117):
+            cri = nib.load(cl_r_hit[1])
+            cr_arr = _resample_to_ref(get_clean_3d_data(cri) > 0.5, get_best_affine(cri), base_shape, base_aff)
+            merged[(cr_arr > 0) & (merged == 0)] = 117
+
+        return _filter_thomas_thalamic_only(merged), base_aff, pair_label
+
+    # 3. Per-nucleus mask files (e.g. left/2-AV.nii.gz, right/6-VLP.nii.gz)
+    nuc_name_to_id = {
+        "av": 2, "va": 4, "vla": 5, "vlp": 6, "vim": 6, "vpl": 7,
+        "pul": 8, "lgn": 9, "mgn": 10, "cm": 11, "md": 12, "md-pf": 12, "hb": 13,
+        "mtt": 14, "cl": 17, "vpm": 18,
+    }
+    mask_specs = []
+    for rel, full in effective_pairs:
+        norm_rel = rel.replace("\\", "/").lower()
+        bn = os.path.basename(norm_rel)
+        if "sthomas_lr_labels" in bn:
+            continue
+        base = strip_neuro_ext(bn)
+        if base in ("crop", "t1", "wmn", "orig", "mask", "brain", "t1_input"):
+            continue
+        m_num = re.match(r"^(\d+)[_-]", base)
+        nid = int(m_num.group(1)) if m_num else None
+        if nid is None:
+            for k, val in nuc_name_to_id.items():
+                if re.search(rf"(^|[_-]){re.escape(k)}($|[_-])", base):
+                    nid = val
+                    break
+        if nid is None or nid <= 0:
+            continue
+        if "/right/" in f"/{norm_rel}" or base.endswith("_r") or base.endswith("-rh") or base.startswith("r_"):
+            hemi = "R"
+        elif "/left/" in f"/{norm_rel}" or base.endswith("_l") or base.endswith("-lh") or base.startswith("l_"):
+            hemi = "L"
+        else:
+            hemi = "L"
+        final_id = nid + 100 if (hemi == "R" and nid < 100) else nid
+        if final_id not in THOMAS_THALAMIC_NUCLEI_IDS:
+            continue
+        mask_specs.append((1, final_id, full))
+
+    if mask_specs:
+        mask_specs.sort(key=lambda x: (x[0], x[1]))
+        first_img = nib.load(mask_specs[0][2])
+        base_aff = ref_aff if ref_aff is not None else get_best_affine(first_img)
+        base_shape = ref_shape if ref_shape is not None else first_img.shape[:3]
+        merged = np.zeros(base_shape, dtype=np.int16)
+        for _, final_id, full_p in mask_specs:
+            mi = nib.load(full_p)
+            m_arr = _resample_to_ref(get_clean_3d_data(mi) > 0.5, get_best_affine(mi), base_shape, base_aff)
+            merged[m_arr > 0] = final_id
+        return _filter_thomas_thalamic_only(merged), base_aff, f"{len(mask_specs)} thalamic masks"
+
+    # 4. Composite sthomas_LR_labels.nii.gz fallback (if none of Priorities 1-3 were found)
+    lr_hit = next(
+        ((rel, full) for rel, full in effective_pairs if "sthomas_lr_labels" in os.path.basename(rel).lower()),
+        None,
+    )
+    if lr_hit:
+        img = nib.load(lr_hit[1])
+        aff = get_best_affine(img)
+        data = np.rint(get_clean_3d_data(img)).astype(np.int16)
+        data[data < 0] = 0
+        if ref_shape is not None and ref_aff is not None:
+            data = _resample_to_ref(data, aff, ref_shape, ref_aff)
+            aff = ref_aff
+        if np.max(data) > 100 and np.any(np.isin(data, _THOMAS_VALID_ID_ARRAY)):
+            data = _filter_thomas_thalamic_only(data)
+        return data, aff, "sthomas_LR_labels"
+
+    return None, None, "Could not match HIPS-THOMAS thomasfull L/R, per-nucleus masks, or sthomas_LR_labels."
+
+
+def run_hips_thomas_segmentation(
+    in_t1_path: str,
+    src_3d: np.ndarray,
+    target_aff: np.ndarray,
+    hips_info: dict,
+    tmpdir: str,
+    contrast: str = "t1",
+    use_denoise_mask: bool = False,
+    force_recompute: bool = False,
+    job_state: dict = None,
+) -> tuple:
+    """
+    Runs HIPS-THOMAS container (`anagrammarian/sthomas`, `thomasmerged`, or native `hipsthomas.sh`)
+    with streaming stdout stage/log updates, cancellation via `docker rm -f`, strict 28-nuclei
+    thalamic filtering, and SHA-256 caching per (volume, affine, image, contrast, dm).
+    Returns 5-tuple (assembled_int16, engine_label, cache_hit, error_msg, cancelled).
+    """
+    if job_state is not None and job_state.get("cancelRequested"):
+        return None, None, False, "Cancelled by user", True
+    if not hips_info or not hips_info.get("available"):
+        return None, None, False, (hips_info or {}).get("statusLabel") or "HIPS-THOMAS is not available.", False
+
+    os.makedirs(HIPS_THOMAS_CACHE_DIR, exist_ok=True)
+    contrast_norm = "wmn" if str(contrast or "").strip().lower() == "wmn" else "t1"
+    dm_flag = bool(use_denoise_mask)
+    img_id = hips_info.get("dockerImage") or hips_info.get("cliPath") or "native"
+
+    h = hashlib.sha256()
+    h.update(np.ascontiguousarray(src_3d, dtype=np.float32).tobytes())
+    h.update(np.round(np.asarray(target_aff, dtype=np.float64), 3).tobytes())
+    h.update(str(img_id).encode("utf-8"))
+    h.update(contrast_norm.encode("utf-8"))
+    h.update(b"dm1" if dm_flag else b"dm0")
+    h.update(b"thalamic_only_v1")
+    cache_key = h.hexdigest()[:20]
+
+    cache_nii = os.path.join(HIPS_THOMAS_CACHE_DIR, f"hips_{cache_key}.nii.gz")
+    cache_meta = os.path.join(HIPS_THOMAS_CACHE_DIR, f"hips_{cache_key}.json")
+
+    if not force_recompute and os.path.isfile(cache_nii) and os.path.isfile(cache_meta):
+        try:
+            c_img = nib.load(cache_nii)
+            c_data = _filter_thomas_thalamic_only(get_clean_3d_data(c_img))
+            if c_data.shape[:3] == tuple(src_3d.shape[:3]) and int(np.count_nonzero(c_data > 0)) > 0:
+                with open(cache_meta, "r", encoding="utf-8") as mf:
+                    meta_obj = json.load(mf)
+                engine_lbl = meta_obj.get("engineLabel") or f"HIPS-THOMAS ({img_id})"
+                if job_state is not None:
+                    with ATLAS_JOBS_LOCK:
+                        job_state["stage"] = "Loaded from HIPS-THOMAS cache"
+                return c_data, engine_lbl, True, None, False
+        except Exception as cache_err:
+            print(f"[NeuroCoreg] HIPS-THOMAS cache read warning: {cache_err}", flush=True)
+
+    work_dir = os.path.join(HIPS_THOMAS_CACHE_DIR, f"work_{uuid.uuid4().hex[:10]}")
+    os.makedirs(work_dir, exist_ok=True)
+    container_name = f"neurocoreg_hips_{uuid.uuid4().hex[:8]}"
+    docker_bin = hips_info.get("dockerBin")
+    is_native = hips_info.get("mode") == "native"
+
+    try:
+        hips_in = os.path.join(work_dir, "t1_input.nii.gz")
+        shutil.copyfile(in_t1_path, hips_in)
+
+        hips_flags = ["-v"]
+        if contrast_norm != "wmn":
+            hips_flags.append("-t1")
+        if dm_flag:
+            hips_flags.append("-dm")
+
+        if is_native:
+            cmd = [hips_info["cliPath"]] + hips_flags + ["-i", "t1_input.nii.gz"]
+            run_cwd = work_dir
+        else:
+            host_mount = os.path.realpath(work_dir)
+            cmd = [
+                docker_bin,
+                "run",
+                "--rm",
+                "--name",
+                container_name,
+                "-v",
+                f"{host_mount}:/data",
+                "-w",
+                "/data",
+            ]
+            if not IS_MAC and not IS_WINDOWS and hasattr(os, "getuid") and hasattr(os, "getgid"):
+                cmd.extend(["--user", f"{os.getuid()}:{os.getgid()}"])
+            cmd.extend([hips_info["dockerImage"], "hipsthomas.sh"] + hips_flags + ["-i", "t1_input.nii.gz"])
+            run_cwd = None
+
+        if job_state is not None:
+            with ATLAS_JOBS_LOCK:
+                job_state["containerName"] = None if is_native else container_name
+                job_state["dockerBin"] = None if is_native else docker_bin
+                job_state["stage"] = f"Launching HIPS-THOMAS ({img_id})..."
+
+        print(f"[NeuroCoreg] Starting HIPS-THOMAS ({img_id}, contrast={contrast_norm}, dm={dm_flag})...", flush=True)
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                cwd=run_cwd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+        except Exception as run_err:
+            print(f"[NeuroCoreg] HIPS-THOMAS launch error: {run_err}", flush=True)
+            return None, None, False, f"HIPS-THOMAS launch failed: {run_err}", False
+
+        if job_state is not None:
+            with ATLAS_JOBS_LOCK:
+                job_state["proc"] = proc
+
+        timed_out = {"flag": False}
+
+        def _on_timeout():
+            timed_out["flag"] = True
+            if not is_native:
+                _stop_hips_container(docker_bin, container_name)
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+
+        timer = threading.Timer(2400.0, _on_timeout)
+        timer.daemon = True
+        timer.start()
+        last_lines = deque(maxlen=25)
+        try:
+            if proc.stdout is not None:
+                for raw_line in proc.stdout:
+                    if job_state is not None and job_state.get("cancelRequested"):
+                        break
+                    clean_ln = raw_line.rstrip("\r\n").strip()[:200]
+                    if not clean_ln:
+                        continue
+                    last_lines.append(clean_ln)
+                    if job_state is not None:
+                        with ATLAS_JOBS_LOCK:
+                            job_state["logTail"] = list(last_lines)
+                            job_state["stage"] = _parse_hips_stage_from_log(
+                                clean_ln, job_state.get("stage") or "Running HIPS-THOMAS..."
+                            )
+            rc = proc.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            try:
+                proc.kill()
+                rc = proc.wait(timeout=5)
+            except Exception:
+                rc = -1
+        finally:
+            timer.cancel()
+            if job_state is not None:
+                with ATLAS_JOBS_LOCK:
+                    job_state["proc"] = None
+
+        if job_state is not None and job_state.get("cancelRequested"):
+            if not is_native:
+                _stop_hips_container(docker_bin, container_name)
+            print("[NeuroCoreg] HIPS-THOMAS job cancelled by user.", flush=True)
+            return None, None, False, "Cancelled by user", True
+
+        if timed_out["flag"]:
+            print("[NeuroCoreg] HIPS-THOMAS container timed out after 2400s.", flush=True)
+            return None, None, False, "HIPS-THOMAS container timed out after 40 minutes.", False
+
+        if rc != 0:
+            tail_msg = last_lines[-1][:220] if last_lines else f"exit code {rc}"
+            print(f"[NeuroCoreg] HIPS-THOMAS exited rc={rc}: {tail_msg}", flush=True)
+            return None, None, False, f"HIPS-THOMAS error ({tail_msg})", False
+
+        skip_walk_dirs = {"extras", "temp", "tempr", "qc"}
+        found_files = []
+        for r_dir, d_names, fnames in os.walk(work_dir):
+            d_names[:] = [dn for dn in d_names if dn.lower() not in skip_walk_dirs]
+            for fn in fnames:
+                low_fn = fn.lower()
+                if low_fn.endswith((".nii", ".nii.gz")) and low_fn != "t1_input.nii.gz":
+                    full_p = os.path.join(r_dir, fn)
+                    rel_p = os.path.relpath(full_p, work_dir)
+                    found_files.append((rel_p, full_p))
+
+        if not found_files:
+            return None, None, False, "HIPS-THOMAS completed but produced no label NIfTI files.", False
+
+        assembled, _, msg_note = _assemble_hips_thomas_from_paths(
+            found_files, tmpdir, ref_shape=src_3d.shape[:3], ref_aff=target_aff
+        )
+        if assembled is None:
+            return None, None, False, msg_note or "Could not parse HIPS-THOMAS outputs.", False
+
+        assembled = _filter_thomas_thalamic_only(assembled)
+        if int(np.count_nonzero(assembled > 0)) == 0:
+            return None, None, False, "HIPS-THOMAS produced 0 thalamic nuclei voxels.", False
+
+        engine_label = (
+            f"HIPS-THOMAS Docker ({img_id}) — {msg_note}"
+            if not is_native
+            else f"HIPS-THOMAS CLI ({os.path.basename(img_id)}) — {msg_note}"
+        )
+        print(f"[NeuroCoreg] Completed {engine_label}", flush=True)
+
+        # Atomic cache save
+        try:
+            cache_bytes, _ = write_int16_label_nifti_bytes(
+                assembled, target_aff, descrip="HIPS-THOMAS cached parcellation", sform_code=1
+            )
+            tmp_nii = f"{cache_nii}.{uuid.uuid4().hex[:6]}.tmp"
+            with open(tmp_nii, "wb") as cf:
+                cf.write(cache_bytes)
+            os.replace(tmp_nii, cache_nii)
+
+            tmp_meta = f"{cache_meta}.{uuid.uuid4().hex[:6]}.tmp"
+            with open(tmp_meta, "w", encoding="utf-8") as mf:
+                json.dump(
+                    {
+                        "engineLabel": engine_label,
+                        "image": img_id,
+                        "contrast": contrast_norm,
+                        "dm": dm_flag,
+                    },
+                    mf,
+                )
+            os.replace(tmp_meta, cache_meta)
+        except Exception as save_err:
+            print(f"[NeuroCoreg] HIPS-THOMAS cache write warning: {save_err}", flush=True)
+
+        return assembled, engine_label, False, None, False
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
+
+
+def detect_neuro_tools(custom_hips_image: str = "") -> dict:
     """
     Checks availability of local neuroimaging tools across macOS, Linux, and Windows:
       1. FSL BET (or pure-Python SciPy 3D morphological skull stripping fallback)
@@ -943,12 +2635,19 @@ def detect_neuro_tools() -> dict:
             "statusLabel": "FastSurfer Not Found — Template DKT Atlas Ready",
         }
 
+    fnirt_info = detect_fnirt_tools()
+    hips_info = detect_hips_thomas_docker(custom_image=custom_hips_image)
+    atlas_reg = build_atlas_registry(include_paths=False, custom_hips_image=custom_hips_image)
+
     return {
         "fslBet": {
             "available": True,
             "nativeCli": bet_cli_ok,
             "path": BET_BIN if bet_cli_ok else "SciPy 3D Morphological BET Fallback",
         },
+        "fnirt": fnirt_info,
+        "hipsThomas": hips_info,
+        "atlasCount": len(atlas_reg),
         "fastsurfer": fs_status,
         "fsLicense": fs_lic_info,
     }
@@ -1282,9 +2981,38 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
             self._send_json(200, payload)
             return
         if parsed.path == "/api/neuro-tools-status":
-            status = detect_neuro_tools()
+            qs = parse_qs(parsed.query or "")
+            hips_img_q = (qs.get("hipsImage") or [""])[0].strip()
+            status = detect_neuro_tools(custom_hips_image=hips_img_q)
             status["dktLut"] = load_dkt_lut()
+            status["atlases"] = build_atlas_registry(include_paths=False, custom_hips_image=hips_img_q)
+            status["capabilities"] = {
+                "atlasJob": True,
+                "hipsThomasAsync": True,
+                "hipsThomasThalamicOnly": True,
+            }
             self._send_json(200, status)
+            return
+        if parsed.path == "/api/atlases":
+            qs = parse_qs(parsed.query or "")
+            hips_img_q = (qs.get("hipsImage") or [""])[0].strip()
+            fnirt_info = detect_fnirt_tools()
+            payload = {
+                "atlases": build_atlas_registry(include_paths=False, custom_hips_image=hips_img_q),
+                "fnirtAvailable": fnirt_info["available"],
+                "flirtAvailable": fnirt_info["flirtAvailable"],
+                "hipsThomas": detect_hips_thomas_docker(custom_image=hips_img_q),
+                "warpCacheDir": MNI_WARP_CACHE_DIR,
+            }
+            lut_req = (qs.get("lut") or [""])[0].strip().lower()
+            if lut_req:
+                payload["lutId"] = lut_req
+                payload["lut"] = load_atlas_lut(lut_req)
+            self._send_json(200, payload)
+            return
+        if parsed.path.startswith("/api/atlas-job/"):
+            job_id = parsed.path[len("/api/atlas-job/"):].strip().strip("/")
+            self._handle_atlas_job_status(job_id)
             return
         super().do_GET()
 
@@ -1315,6 +3043,15 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
             self._handle_skull_strip_bet(body)
         elif parsed.path == "/api/dkt-segment":
             self._handle_dkt_segment(body)
+        elif parsed.path == "/api/atlas-generate":
+            self._handle_atlas_generate(body)
+        elif parsed.path == "/api/atlas-job":
+            self._handle_atlas_job_start(body)
+        elif parsed.path.startswith("/api/atlas-job/") and parsed.path.endswith("/cancel"):
+            job_id = parsed.path[len("/api/atlas-job/"):-len("/cancel")].strip("/")
+            self._handle_atlas_job_cancel(job_id)
+        elif parsed.path == "/api/atlas-import":
+            self._handle_atlas_import(body)
         elif parsed.path == "/api/set-fs-license":
             self._handle_set_fs_license(body)
         elif parsed.path == "/api/convert-volume":
@@ -2225,26 +3962,22 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
             self._send_json(500, {"valid": False, "error": str(e)})
 
     def _handle_dkt_segment(self, body):
+        status, payload = self._run_dkt_segment_core(body)
+        self._send_json(status, payload)
+
+    def _run_dkt_segment_core(self, body) -> tuple:
         """
         Runs whole-brain Desikan-Killiany-Tourville (DKT, aparc.DKTatlas+aseg) or Destrieux (aparc.a2009s+aseg)
         cortical + subcortical segmentation:
-          - Supports atlasType:
-              * 'dkt' (default): Desikan-Killiany-Tourville (aparc.DKTatlas+aseg, 104 regions, max ID 2035)
-              * 'destrieux': Destrieux sulco-gyral atlas (aparc.a2009s+aseg, 148 cortical + subcortical, max ID 12175)
-                Runs FastSurfer with `--fsaparc` and WITHOUT `--seg_only` when FastSurfer is available,
-                and reverts to MNI152 template registration only when FastSurfer is unavailable (or when
-                template_flirt mode is explicitly selected).
-          - Supports dktMode:
-              * 'fastsurfer_vinn' (default): FastSurferVINN (--seg_only for DKT; --fsaparc without --seg_only for Destrieux)
-              * 'fastsurfer_full': Full FastSurfer (+ CerebNet, HypVINN, CC)
-              * 'template_flirt': Quick MNI152 -> Subject template registration (via FSL FLIRT or SciPy 9-DOF affine fallback)
+          - Supports atlasType: 'dkt' | 'destrieux'
+          - Supports dktMode: 'fastsurfer_vinn' | 'fastsurfer_full' | 'template_fnirt' | 'template_flirt'
         """
         try:
             src_bytes = base64.b64decode(body["sourceBase64"])
             src_name = body.get("sourceName") or "T1w.nii.gz"
             curr_affine = body.get("currentAffine")
-            dkt_mode = body.get("dktMode") or "fastsurfer_vinn"
-            raw_atlas_type = str(body.get("atlasType") or "dkt").strip().lower()
+            dkt_mode = body.get("dktMode") or body.get("mode") or "fastsurfer_vinn"
+            raw_atlas_type = str(body.get("atlasType") or body.get("atlasId") or "dkt").strip().lower()
             is_destrieux = raw_atlas_type in ("destrieux", "a2009s", "aparc.a2009s")
             atlas_type = "destrieux" if is_destrieux else "dkt"
             atlas_short = "Destrieux" if is_destrieux else "DKT"
@@ -2255,6 +3988,8 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
             tools_info = detect_neuro_tools()
             fs_info = tools_info["fastsurfer"]
             dkt_lut = load_dkt_lut()
+            warp_cache_hit = False
+            reg_mode_used = dkt_mode
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 src_ext = ".nii.gz" if src_bytes[:2] == b"\x1f\x8b" else ".nii"
@@ -2475,160 +4210,66 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                     except Exception as fs_err:
                         print(f"FastSurfer execution warning (falling back to template {atlas_short}): {fs_err}", flush=True)
 
-                # 2. Fast Template Atlas Registration (FSL FLIRT or Pure-Python SciPy 9-DOF fallback)
+                # Decode optional explicit brain mask first so both FNIRT/FLIRT seed and final masking reuse it
+                brain_mask_bool = _decode_optional_brain_mask(body, src_3d.shape[:3], target_aff, tmpdir)
+
+                # 2. Template Atlas Registration (FNIRT Nonlinear, FLIRT 12-DOF, or SciPy 9-DOF fallback) with Warp Cache
                 if not os.path.exists(out_dkt_path):
                     template_atlas_path = MNI_DESTRIEUX_ATLAS_PATH if is_destrieux else MNI_DKT_ATLAS_PATH
                     if not (os.path.exists(template_atlas_path) and os.path.exists(MNI_T1_BRAIN_PATH)):
-                        self._send_json(500, {
+                        return 500, {
                             "error": f"Neither FastSurfer nor the MNI152 {atlas_short} Atlas template was found on disk."
-                        })
-                        return
+                        }
 
-                    # Skull-strip subject T1w first if it isn't already skull-stripped for sharper template registration
-                    sub_brain_path = os.path.join(tmpdir, "sub_brain.nii.gz")
-                    if "_brain" in src_name.lower():
-                        sub_brain_path = in_t1_path
-                    elif os.path.exists(BET_BIN) and os.access(BET_BIN, os.X_OK):
-                        env = os.environ.copy()
-                        env["FSLDIR"] = FSLDIR
-                        env["FSLOUTPUTTYPE"] = "NIFTI_GZ"
-                        bet_prefix = os.path.join(tmpdir, "sub_brain")
-                        subprocess.run(
-                            [BET_BIN, in_t1_path, bet_prefix, "-f", "0.5"],
-                            env=env,
-                            capture_output=True,
-                            text=True,
-                            timeout=60,
-                        )
-                        if not os.path.exists(sub_brain_path):
-                            sub_brain_path = in_t1_path
-                    else:
-                        zooms = list(src_img.header.get_zooms())
-                        while len(zooms) < 3:
-                            zooms.append(1.0)
-                        brain_arr, _ = scipy_morphological_skull_strip(src_3d, zooms[:3], frac=0.5)
-                        nib.save(nib.Nifti1Image(brain_arr, target_aff), sub_brain_path)
-
-                    flirt_ok = False
-                    if os.path.exists(FLIRT_BIN) and os.access(FLIRT_BIN, os.X_OK):
-                        env = os.environ.copy()
-                        env["FSLDIR"] = FSLDIR
-                        env["FSLOUTPUTTYPE"] = "NIFTI_GZ"
-                        mni2sub_mat = os.path.join(tmpdir, "mni2sub.mat")
-                        flirt_reg_cmd = [
-                            FLIRT_BIN,
-                            "-in", MNI_T1_BRAIN_PATH,
-                            "-ref", sub_brain_path,
-                            "-omat", mni2sub_mat,
-                            "-bins", "256",
-                            "-cost", "corratio",
-                            "-searchrx", "-30", "30",
-                            "-searchry", "-30", "30",
-                            "-searchrz", "-30", "30",
-                            "-dof", "12",
-                        ]
-                        subprocess.run(flirt_reg_cmd, env=env, capture_output=True, text=True, timeout=90)
-                        if os.path.exists(mni2sub_mat):
-                            flirt_apply_cmd = [
-                                FLIRT_BIN,
-                                "-in", template_atlas_path,
-                                "-ref", in_t1_path,
-                                "-applyxfm",
-                                "-init", mni2sub_mat,
-                                "-out", out_dkt_path,
-                                "-interp", "nearestneighbour",
-                            ]
-                            subprocess.run(flirt_apply_cmd, env=env, capture_output=True, text=True, timeout=60)
-                            if os.path.exists(out_dkt_path):
-                                flirt_ok = True
-                                engine_used = (
-                                    "FSL FLIRT 12-DOF + FreeSurfer Destrieux Atlas (aparc.a2009s+aseg)"
-                                    if is_destrieux
-                                    else "FSL FLIRT 12-DOF + FreeSurfer DKT Atlas (aparc.DKTatlas+aseg)"
-                                )
-
-                    if not flirt_ok:
-                        # Pure-Python SciPy 9-DOF MNI152 -> Subject Registration Fallback
-                        sub_brain_img = nib.load(sub_brain_path)
-                        mni_brain_img = nib.load(MNI_T1_BRAIN_PATH)
-                        mni_dkt_img = nib.load(template_atlas_path)
-                        _, _, new_mni_aff = optimize_multimodal_registration(sub_brain_img, mni_brain_img, dof=9)
-                        vox_to_mni = safe_inv4x4(new_mni_aff) @ target_aff
-                        dkt_mni_data = np.rint(get_clean_3d_data(mni_dkt_img)).astype(np.int16)
-                        warped_dkt = affine_transform(
-                            dkt_mni_data,
-                            vox_to_mni[:3, :3],
-                            offset=vox_to_mni[:3, 3],
-                            output_shape=src_3d.shape[:3],
-                            order=0,
-                            mode="constant",
-                            cval=0,
-                        ).astype(np.int16)
-                        clean_dkt_nii = nib.Nifti1Image(warped_dkt, target_aff)
-                        clean_dkt_nii.set_sform(target_aff, code=1)
-                        clean_dkt_nii.set_qform(target_aff, code=1)
-                        nib.save(clean_dkt_nii, out_dkt_path)
-                        engine_used = (
-                            "SciPy 9-DOF Template Registration + FreeSurfer Destrieux Atlas (aparc.a2009s+aseg)"
-                            if is_destrieux
-                            else "SciPy 9-DOF Template Registration + FreeSurfer DKT Atlas"
-                        )
-                    else:
-                        # Ensure clean integer int16 labels & exact subject sform/qform affine
-                        dkt_raw_img = nib.load(out_dkt_path)
-                        dkt_int_data = np.rint(get_clean_3d_data(dkt_raw_img)).astype(np.int16)
-                        clean_dkt_nii = nib.Nifti1Image(dkt_int_data, target_aff)
-                        clean_dkt_nii.set_sform(target_aff, code=1)
-                        clean_dkt_nii.set_qform(target_aff, code=1)
-                        nib.save(clean_dkt_nii, out_dkt_path)
+                    req_template_mode = (
+                        "fnirt_nonlinear"
+                        if dkt_mode in ("template_fnirt", "fnirt_nonlinear", "fnirt")
+                        else "flirt_12dof"
+                    )
+                    warp_bundle = compute_or_load_mni_to_subject_warp(
+                        in_t1_path,
+                        src_3d,
+                        target_aff,
+                        src_img,
+                        req_template_mode,
+                        tmpdir,
+                        src_name=src_name,
+                        brain_mask_bool=brain_mask_bool,
+                    )
+                    warped_dkt, engine_base = warp_mni_label_volume_to_subject(
+                        template_atlas_path,
+                        warp_bundle,
+                        in_t1_path,
+                        src_3d,
+                        target_aff,
+                        tmpdir,
+                    )
+                    warp_cache_hit = bool(warp_bundle.get("warpCacheHit", False))
+                    reg_mode_used = warp_bundle.get("mode", req_template_mode)
+                    atlas_desc = (
+                        "FreeSurfer Destrieux Atlas (aparc.a2009s+aseg)"
+                        if is_destrieux
+                        else "FreeSurfer DKT Atlas (aparc.DKTatlas+aseg)"
+                    )
+                    engine_used = f"{engine_base} + {atlas_desc}"
+                    clean_dkt_nii = nib.Nifti1Image(warped_dkt, target_aff)
+                    clean_dkt_nii.set_sform(target_aff, code=1)
+                    clean_dkt_nii.set_qform(target_aff, code=1)
+                    nib.save(clean_dkt_nii, out_dkt_path)
 
                 # 3. Mask the Atlas with the Subject's Brain Mask so all voxels outside the brain are 0
                 final_img = nib.load(out_dkt_path)
                 unmasked_data = np.rint(get_clean_3d_data(final_img)).astype(np.int16)
-
-                # Save an unmasked copy so the frontend can dynamically re-mask when BET is re-run with a new -f
-                unmasked_path = os.path.join(tmpdir, "unmasked_dkt.nii.gz")
-                unmasked_nii = nib.Nifti1Image(unmasked_data, target_aff)
-                unmasked_nii.set_sform(target_aff, code=1)
-                unmasked_nii.set_qform(target_aff, code=1)
-                nib.save(unmasked_nii, unmasked_path)
-                with open(unmasked_path, "rb") as uf:
-                    unmasked_b64 = base64.b64encode(uf.read()).decode("ascii")
-
-                brain_mask_bool = None
-                if body.get("brainMaskBase64"):
-                    try:
-                        bm_bytes = base64.b64decode(body["brainMaskBase64"])
-                        bm_ext = ".nii.gz" if bm_bytes[:2] == b"\x1f\x8b" else ".nii"
-                        bm_path = os.path.join(tmpdir, f"user_brain_mask{bm_ext}")
-                        with open(bm_path, "wb") as bmf:
-                            bmf.write(bm_bytes)
-                        bm_img = nib.load(bm_path)
-                        bm_3d = get_clean_3d_data(bm_img, dtype=np.float32)
-                        bm_aff = (
-                            np.asarray(body["brainMaskAffine"], dtype=np.float64)
-                            if body.get("brainMaskAffine") is not None
-                            else get_best_affine(bm_img)
-                        )
-                        if bm_3d.shape[:3] == unmasked_data.shape[:3] and np.allclose(bm_aff, target_aff, atol=1e-2):
-                            brain_mask_bool = bm_3d > 0
-                        else:
-                            vox2bm = safe_inv4x4(bm_aff) @ target_aff
-                            warped_bm = affine_transform(
-                                (bm_3d > 0).astype(np.float32),
-                                vox2bm[:3, :3],
-                                offset=vox2bm[:3, 3],
-                                output_shape=unmasked_data.shape[:3],
-                                order=0,
-                                mode="constant",
-                                cval=0.0,
-                            )
-                            brain_mask_bool = warped_bm > 0.5
-                    except Exception as bm_err:
-                        print(f"Warning reading brainMaskBase64: {bm_err}", flush=True)
+                unmasked_bytes, _ = write_int16_label_nifti_bytes(
+                    unmasked_data,
+                    target_aff,
+                    descrip=f"{atlas_short} Atlas (Unmasked)",
+                    sform_code=1,
+                )
+                unmasked_b64 = base64.b64encode(unmasked_bytes).decode("ascii")
 
                 if brain_mask_bool is None:
-                    sub_brain_cand = os.path.join(tmpdir, "sub_brain.nii.gz")
+                    sub_brain_cand = os.path.join(tmpdir, "sub_brain_bet.nii.gz")
                     if "_brain" in src_name.lower():
                         brain_mask_bool = src_3d > 0
                     elif os.path.exists(sub_brain_cand):
@@ -2659,42 +4300,501 @@ class MultimodalHandler(SimpleHTTPRequestHandler):
                             _, mask_arr = scipy_morphological_skull_strip(src_3d, zooms[:3], frac=bet_frac)
                             brain_mask_bool = mask_arr > 0
 
-                # Zero out non-brain / exterior / skull / extraventricular CSF / unknown FreeSurfer LUT IDs
-                non_brain_fs_ids = np.array(
-                    [
-                        0, 1, 6, 24, 29, 30, 40, 45, 61, 62, 80, 81, 82, 85, 98,
-                        *range(118, 155), 165, 166, 167, 168, 224,
-                        *range(256, 267), 701, *range(901, 932),
-                        1000, 1001, 1100, 2000, 2001, 2100, 11100, 12100,
-                    ],
-                    dtype=np.int16,
-                )
-                valid_brain_label_mask = (unmasked_data > 0) & (~np.isin(unmasked_data, non_brain_fs_ids))
+                valid_brain_label_mask = (unmasked_data > 0) & (~np.isin(unmasked_data, NON_BRAIN_FREESURFER_IDS))
                 masked_data = np.where(brain_mask_bool & valid_brain_label_mask, unmasked_data, 0).astype(np.int16)
-                masked_nii = nib.Nifti1Image(masked_data, target_aff)
-                masked_nii.set_sform(target_aff, code=1)
-                masked_nii.set_qform(target_aff, code=1)
-                nib.save(masked_nii, out_dkt_path)
+                masked_bytes, max_lbl = write_int16_label_nifti_bytes(
+                    masked_data,
+                    target_aff,
+                    descrip=f"{atlas_short} Atlas (Brain-Masked)",
+                    sform_code=1,
+                )
+                out_b64 = base64.b64encode(masked_bytes).decode("ascii")
 
-                unique_labels = [int(x) for x in np.unique(masked_data) if int(x) != 0]
-
-                with open(out_dkt_path, "rb") as df:
-                    out_b64 = base64.b64encode(df.read()).decode("ascii")
-
-                self._send_json(200, {
+                regions = compute_atlas_region_stats(masked_data, target_aff, dkt_lut)
+                return 200, {
+                    "ok": True,
+                    "atlasId": atlas_type,
+                    "atlasName": f"{atlas_short} Atlas",
+                    "shortName": atlas_short,
+                    "category": "cortical",
+                    "badge": atlas_short.upper(),
+                    "isFreeSurferAtlas": True,
                     "engine": engine_used,
+                    "engineUsed": engine_used,
+                    "regModeUsed": reg_mode_used,
+                    "warpCacheHit": warp_cache_hit,
                     "atlasType": atlas_type,
                     "atlasLabel": f"{atlas_short} Atlas",
                     "maxLutId": 12175 if is_destrieux else 2035,
+                    "maxLabel": max_lbl,
                     "fastsurferDetected": bool(fs_info.get("available")),
                     "fastsurferStatus": fs_info,
                     "fileName": out_filename,
                     "niftiBase64": out_b64,
                     "unmaskedNiftiBase64": unmasked_b64,
                     "brainMasked": True,
-                    "regionCount": len(unique_labels),
+                    "regionCount": len(regions),
+                    "voxelCount": int(np.count_nonzero(masked_data > 0)),
                     "shape": list(masked_data.shape[:3]),
                     "dktLut": dkt_lut,
+                    "lut": dkt_lut,
+                    "regions": regions,
+                }
+        except Exception as e:
+            return 500, {"error": str(e)}
+
+    def _execute_atlas_generate_core(self, body, job_state: dict = None) -> tuple:
+        """
+        Generates/warps any registered catalog atlas (DKT, Destrieux, THOMAS, Tian S1-S4, FSL atlases)
+        into the selected Subject T1w MRI space, returning (http_status, response_dict).
+        """
+        try:
+            atlas_id = str(body.get("atlasId") or body.get("atlasType") or "thomas").strip().lower()
+            if atlas_id in ("dkt", "destrieux", "a2009s", "aparc.a2009s"):
+                return self._run_dkt_segment_core(body)
+
+            custom_hips_image = str(body.get("hipsDockerImage") or "").strip()
+            reg = build_atlas_registry(include_paths=True, custom_hips_image=custom_hips_image)
+            entry = next((item for item in reg if item["id"] == atlas_id), None)
+            if not entry:
+                return 400, {"error": f"Unknown atlasId '{atlas_id}'."}
+            if not entry.get("available"):
+                return 404, {"error": f"Atlas '{entry['name']}' assets are not available on disk."}
+
+            src_bytes = base64.b64decode(body["sourceBase64"])
+            src_name = body.get("sourceName") or "T1w.nii.gz"
+            curr_affine = body.get("currentAffine")
+            raw_mode = str(body.get("mode") or "").strip().lower()
+            if raw_mode in ("", "auto", "default"):
+                req_mode = entry.get("defaultMode") or "fnirt_nonlinear"
+            elif raw_mode in ("hips_thomas", "hipsthomas", "hipthomas", "sthomas", "hips_thomas_docker"):
+                req_mode = "hips_thomas_docker"
+            else:
+                req_mode = raw_mode
+            contrast = "wmn" if str(body.get("contrast") or "t1").strip().lower() == "wmn" else "t1"
+            force_recompute = bool(body.get("forceRecompute", False))
+            is_skull_stripped_arg = body.get("isSkullStripped")
+
+            base_clean = strip_neuro_ext(os.path.basename(src_name)).replace("_brain", "")
+            short_clean = re.sub(r"[^a-zA-Z0-9_-]+", "_", entry["shortName"]).strip("_") or atlas_id
+            out_filename = f"{base_clean}_{short_clean}_atlas.nii.gz"
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                src_ext = ".nii.gz" if src_bytes[:2] == b"\x1f\x8b" else ".nii"
+                raw_in_path = os.path.join(tmpdir, f"raw_in{src_ext}")
+                with open(raw_in_path, "wb") as f:
+                    f.write(src_bytes)
+
+                src_img = nib.load(raw_in_path)
+                target_aff = (
+                    np.asarray(curr_affine, dtype=np.float64)
+                    if curr_affine is not None
+                    else get_best_affine(src_img)
+                )
+                src_3d = get_clean_3d_data(src_img, dtype=np.float32)
+                in_t1_path = os.path.join(tmpdir, "subject_t1.nii.gz")
+                t1_nii = nib.Nifti1Image(src_3d, target_aff)
+                t1_nii.set_sform(target_aff, code=1)
+                t1_nii.set_qform(target_aff, code=1)
+                nib.save(t1_nii, in_t1_path)
+
+                use_dm = _infer_is_skull_stripped(src_3d, src_name, is_skull_stripped_arg)
+                lut = load_atlas_lut(atlas_id)
+                warp_cache_hit = False
+                hips_cache_hit = False
+                fallback_used = False
+                fallback_reason = None
+                reg_mode_used = req_mode
+                engine_used = None
+                warped_data = None
+
+                # Special native/Docker HIPS-THOMAS pipeline (never falls back if cancelled by user)
+                if atlas_id == "thomas" and req_mode == "hips_thomas_docker":
+                    hips_info = detect_hips_thomas_docker(custom_image=custom_hips_image)
+                    if hips_info.get("available"):
+                        assembled, hips_engine, hips_cache_hit, hips_err, cancelled = run_hips_thomas_segmentation(
+                            in_t1_path,
+                            src_3d,
+                            target_aff,
+                            hips_info,
+                            tmpdir,
+                            contrast=contrast,
+                            use_denoise_mask=use_dm,
+                            force_recompute=force_recompute,
+                            job_state=job_state,
+                        )
+                        if cancelled:
+                            return 200, {"ok": False, "cancelled": True, "error": "Cancelled by user"}
+                        if assembled is not None:
+                            warped_data = assembled
+                            reg_mode_used = "hips_thomas_docker"
+                            warp_cache_hit = bool(hips_cache_hit)
+                            engine_used = hips_engine
+                        else:
+                            fallback_used = True
+                            fallback_reason = hips_err or "HIPS-THOMAS container failed"
+                            req_mode = "fnirt_nonlinear"
+                            if job_state is not None:
+                                with ATLAS_JOBS_LOCK:
+                                    job_state["stage"] = "HIPS-THOMAS failed — running FNIRT/FLIRT backup..."
+                    else:
+                        fallback_used = True
+                        fallback_reason = hips_info.get("statusLabel") or "HIPS-THOMAS Docker not available"
+                        req_mode = "fnirt_nonlinear"
+                        if job_state is not None:
+                            with ATLAS_JOBS_LOCK:
+                                job_state["stage"] = "HIPS-THOMAS unavailable — running FNIRT/FLIRT backup..."
+
+                if warped_data is None:
+                    if job_state is not None:
+                        with ATLAS_JOBS_LOCK:
+                            if not job_state.get("stage"):
+                                job_state["stage"] = f"Running {req_mode} registration..."
+                    brain_mask_bool = _decode_optional_brain_mask(body, src_3d.shape[:3], target_aff, tmpdir)
+                    warp_bundle = compute_or_load_mni_to_subject_warp(
+                        in_t1_path,
+                        src_3d,
+                        target_aff,
+                        src_img,
+                        req_mode,
+                        tmpdir,
+                        src_name=src_name,
+                        brain_mask_bool=brain_mask_bool,
+                    )
+                    warped_data, engine_base = warp_mni_label_volume_to_subject(
+                        entry["niftiPath"],
+                        warp_bundle,
+                        in_t1_path,
+                        src_3d,
+                        target_aff,
+                        tmpdir,
+                    )
+                    warp_cache_hit = bool(warp_bundle.get("warpCacheHit", False))
+                    reg_mode_used = warp_bundle.get("mode", req_mode)
+                    engine_used = f"{engine_base} + {entry['name']}"
+
+                if atlas_id == "thomas":
+                    warped_data = _filter_thomas_thalamic_only(warped_data)
+
+                uniq_vals = [int(v) for v in np.unique(warped_data) if int(v) > 0]
+                for v in uniq_vals:
+                    if str(v) not in lut:
+                        lut[str(v)] = _normalize_lut_entry(v, f"Region {v}", atlas_id=atlas_id)
+
+                regions = compute_atlas_region_stats(warped_data, target_aff, lut)
+                nii_bytes, max_lbl = write_int16_label_nifti_bytes(
+                    warped_data,
+                    target_aff,
+                    descrip=f"{entry['shortName']} Atlas ({reg_mode_used})",
+                    sform_code=1,
+                )
+                out_b64 = base64.b64encode(nii_bytes).decode("ascii")
+
+                resp_obj = {
+                    "ok": True,
+                    "atlasId": entry["id"],
+                    "atlasName": entry["name"],
+                    "shortName": entry["shortName"],
+                    "category": entry["category"],
+                    "badge": entry["badge"],
+                    "isFreeSurferAtlas": bool(entry.get("isFreeSurferAtlas", False)),
+                    "fileName": out_filename,
+                    "niftiBase64": out_b64,
+                    "engine": engine_used,
+                    "engineUsed": engine_used,
+                    "regModeUsed": reg_mode_used,
+                    "warpCacheHit": warp_cache_hit,
+                    "hipsCacheHit": hips_cache_hit,
+                    "fallbackUsed": fallback_used,
+                    "fallbackReason": fallback_reason,
+                    "space": "subject",
+                    "lut": lut,
+                    "regions": regions,
+                    "regionCount": len(regions),
+                    "voxelCount": int(np.count_nonzero(warped_data > 0)),
+                    "maxLabel": max_lbl,
+                    "shape": list(warped_data.shape[:3]),
+                }
+                if reg_mode_used == "hips_thomas_docker":
+                    resp_obj["contrastUsed"] = contrast
+                    resp_obj["denoiseMaskUsed"] = use_dm
+                return 200, resp_obj
+        except Exception as e:
+            return 500, {"error": str(e)}
+
+    def _handle_atlas_generate(self, body):
+        status, payload = self._execute_atlas_generate_core(body)
+        self._send_json(status, payload)
+
+    def _handle_atlas_job_start(self, body):
+        """Starts an asynchronous background atlas job (used for HIPS-THOMAS Docker execution)."""
+        _prune_atlas_jobs()
+        if not body.get("sourceBase64"):
+            self._send_json(400, {"error": "Missing sourceBase64 payload."})
+            return
+
+        job_id = uuid.uuid4().hex[:12]
+        job = {
+            "jobId": job_id,
+            "status": "running",
+            "stage": "Starting HIPS-THOMAS...",
+            "logTail": [],
+            "proc": None,
+            "dockerBin": None,
+            "containerName": None,
+            "cancelRequested": False,
+            "createdAt": time.time(),
+            "finishedAt": None,
+            "result": None,
+            "error": None,
+        }
+        with ATLAS_JOBS_LOCK:
+            ATLAS_JOBS[job_id] = job
+
+        def _worker():
+            status, payload = self._execute_atlas_generate_core(body, job_state=job)
+            with ATLAS_JOBS_LOCK:
+                job["finishedAt"] = time.time()
+                if job.get("cancelRequested") or payload.get("cancelled"):
+                    job["status"] = "cancelled"
+                    job["stage"] = "Cancelled by user"
+                    job["error"] = "Cancelled by user"
+                elif status == 200 and payload.get("ok"):
+                    job["status"] = "done"
+                    job["stage"] = "Completed"
+                    job["result"] = payload
+                else:
+                    job["status"] = "error"
+                    job["stage"] = "Failed"
+                    job["error"] = payload.get("error") or f"HTTP {status}"
+
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
+        self._send_json(202, {
+            "ok": True,
+            "jobId": job_id,
+            "status": "running",
+            "stage": job["stage"],
+        })
+
+    def _handle_atlas_job_status(self, job_id: str):
+        with ATLAS_JOBS_LOCK:
+            job = ATLAS_JOBS.get(job_id)
+            if not job:
+                snap = None
+            else:
+                end_t = float(job.get("finishedAt") or time.time())
+                elapsed = max(0.0, end_t - float(job.get("createdAt") or end_t))
+                snap = {
+                    "ok": True,
+                    "jobId": job_id,
+                    "status": job.get("status"),
+                    "stage": job.get("stage"),
+                    "elapsedSec": round(elapsed, 1),
+                    "logTail": list(job.get("logTail") or []),
+                    "containerName": job.get("containerName"),
+                    "cancelRequested": bool(job.get("cancelRequested")),
+                }
+                if job.get("status") == "done":
+                    snap["result"] = job.get("result")
+                elif job.get("status") in ("error", "cancelled"):
+                    snap["error"] = job.get("error")
+        if snap is None:
+            self._send_json(404, {"error": f"Unknown atlas job '{job_id}'."})
+            return
+        self._send_json(200, snap)
+
+    def _handle_atlas_job_cancel(self, job_id: str):
+        docker_bin = None
+        container_name = None
+        proc = None
+        with ATLAS_JOBS_LOCK:
+            job = ATLAS_JOBS.get(job_id)
+            if not job:
+                self._send_json(404, {"error": f"Unknown atlas job '{job_id}'."})
+                return
+            job["cancelRequested"] = True
+            if job.get("status") == "running":
+                job["stage"] = "Cancelling HIPS-THOMAS container..."
+            docker_bin = job.get("dockerBin")
+            container_name = job.get("containerName")
+            proc = job.get("proc")
+
+        if docker_bin and container_name:
+            _stop_hips_container(docker_bin, container_name)
+        if proc is not None:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+
+        self._send_json(200, {"ok": True, "jobId": job_id, "status": "cancelling"})
+
+    def _handle_atlas_import(self, body):
+        """
+        Imports an external/custom atlas NIfTI/MGZ (+ optional LUT JSON/CSV/TSV/TXT/CTBL/XML)
+        in either Subject space or MNI152 space (warped via FNIRT/FLIRT), OR imports pre-computed
+        HIPS-THOMAS outputs (single merged sthomas_LR_labels, L+R pair, or per-nucleus folder).
+        """
+        try:
+            import_kind = str(body.get("importKind") or "custom").strip().lower()
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                if import_kind in ("hips_thomas_pair", "hips_thomas_folder"):
+                    files_payload = body.get("files") or []
+                    if not files_payload:
+                        self._send_json(400, {"error": "No HIPS-THOMAS NIfTI files provided."})
+                        return
+
+                    saved_list = []
+                    for idx, fobj in enumerate(files_payload):
+                        rel_name = (fobj.get("relativePath") or fobj.get("name") or f"file_{idx}.nii.gz").replace("\\", "/")
+                        lower_rel = rel_name.lower()
+                        if not lower_rel.endswith((".nii", ".nii.gz")):
+                            continue
+                        dest_rel = re.sub(r"[^a-zA-Z0-9._/-]", "_", rel_name).lstrip("/")
+                        dest_full = os.path.join(tmpdir, "hips_in", dest_rel)
+                        os.makedirs(os.path.dirname(dest_full), exist_ok=True)
+                        with open(dest_full, "wb") as df:
+                            df.write(base64.b64decode(fobj["dataBase64"]))
+                        saved_list.append((dest_rel, dest_full))
+
+                    if not saved_list:
+                        self._send_json(400, {"error": "No valid .nii/.nii.gz files found in selection."})
+                        return
+
+                    merged, target_aff, merge_note = _assemble_hips_thomas_from_paths(saved_list, tmpdir)
+                    if merged is None:
+                        self._send_json(400, {"error": merge_note or "Could not recognize HIPS-THOMAS label layout."})
+                        return
+
+                    lut = load_atlas_lut("thomas")
+                    uniq_hips = [int(x) for x in np.unique(merged) if int(x) > 0]
+                    lut = _enrich_hips_thomas_lut(lut, uniq_hips)
+                    for v in uniq_hips:
+                        if str(v) not in lut:
+                            lut[str(v)] = _normalize_lut_entry(v, f"Nucleus {v}", atlas_id="thomas")
+
+                    regions = compute_atlas_region_stats(merged, target_aff, lut)
+                    nii_bytes, max_lbl = write_int16_label_nifti_bytes(
+                        merged, target_aff, descrip="Imported HIPS-THOMAS Thalamic Atlas", sform_code=1
+                    )
+                    out_b64 = base64.b64encode(nii_bytes).decode("ascii")
+                    base_fn = strip_neuro_ext(os.path.basename(saved_list[0][0]))
+                    self._send_json(200, {
+                        "ok": True,
+                        "atlasId": "thomas",
+                        "atlasName": "HIPS-THOMAS Thalamic Atlas (Imported)",
+                        "shortName": "THOMAS",
+                        "category": "thalamic",
+                        "badge": "THOMAS",
+                        "isFreeSurferAtlas": False,
+                        "fileName": f"{base_fn}_THOMAS_merged.nii.gz",
+                        "niftiBase64": out_b64,
+                        "engineUsed": f"Imported HIPS-THOMAS ({merge_note})",
+                        "space": "subject",
+                        "lut": lut,
+                        "regions": regions,
+                        "regionCount": len(regions),
+                        "voxelCount": int(np.count_nonzero(merged > 0)),
+                        "maxLabel": max_lbl,
+                        "shape": list(merged.shape[:3]),
+                    })
+                    return
+
+                # Standard custom atlas import (.nii / .nii.gz / .mgz + optional LUT)
+                src_bytes = base64.b64decode(body["niftiBase64"])
+                file_name = body.get("fileName") or "custom_atlas.nii.gz"
+                lut_text = body.get("lutText") or ""
+                lut_filename = body.get("lutFileName") or ""
+                space = str(body.get("space") or "subject").strip().lower()
+
+                atlas_img = load_neuro_image_from_bytes(src_bytes, file_name, tmpdir)
+                atlas_3d = np.rint(get_clean_3d_data(atlas_img)).astype(np.int16)
+                atlas_3d[atlas_3d < 0] = 0
+                out_aff = get_best_affine(atlas_img)
+                out_data = atlas_3d
+                warp_cache_hit = False
+                engine_used = "Direct Subject-Space Custom Atlas Import"
+
+                if space in ("mni152_fnirt", "mni152_flirt") and body.get("refBase64"):
+                    ref_bytes = base64.b64decode(body["refBase64"])
+                    ref_name = body.get("refName") or "T1w.nii.gz"
+                    ref_img = load_neuro_image_from_bytes(ref_bytes, ref_name, tmpdir)
+                    ref_aff = (
+                        np.asarray(body["refAffine"], dtype=np.float64)
+                        if body.get("refAffine") is not None
+                        else get_best_affine(ref_img)
+                    )
+                    ref_3d = get_clean_3d_data(ref_img, dtype=np.float32)
+                    in_t1_path = os.path.join(tmpdir, "ref_subject_t1.nii.gz")
+                    ref_out_img = nib.Nifti1Image(ref_3d, ref_aff)
+                    ref_out_img.set_sform(ref_aff, code=1)
+                    ref_out_img.set_qform(ref_aff, code=1)
+                    nib.save(ref_out_img, in_t1_path)
+
+                    custom_mni_path = os.path.join(tmpdir, "custom_mni_input.nii.gz")
+                    mni_nii = nib.Nifti1Image(atlas_3d, out_aff)
+                    mni_nii.set_sform(out_aff, code=4)
+                    mni_nii.set_qform(out_aff, code=4)
+                    nib.save(mni_nii, custom_mni_path)
+
+                    reg_mode = "fnirt_nonlinear" if space == "mni152_fnirt" else "flirt_12dof"
+                    warp_bundle = compute_or_load_mni_to_subject_warp(
+                        in_t1_path,
+                        ref_3d,
+                        ref_aff,
+                        ref_img,
+                        reg_mode,
+                        tmpdir,
+                        src_name=ref_name,
+                    )
+                    out_data, engine_base = warp_mni_label_volume_to_subject(
+                        custom_mni_path,
+                        warp_bundle,
+                        in_t1_path,
+                        ref_3d,
+                        ref_aff,
+                        tmpdir,
+                    )
+                    out_aff = ref_aff
+                    warp_cache_hit = bool(warp_bundle.get("warpCacheHit", False))
+                    engine_used = f"{engine_base} (Custom MNI152 Import)"
+
+                clean_base = strip_neuro_ext(os.path.basename(file_name))
+                atlas_name = (body.get("atlasName") or clean_base).strip() or "Custom Atlas"
+                short_name = (body.get("shortName") or atlas_name[:18]).strip() or "Custom"
+                atlas_id = f"custom_{re.sub(r'[^a-z0-9_]+', '_', clean_base.lower()).strip('_') or 'atlas'}"
+
+                lut = parse_lut_text(lut_text, filename=lut_filename, atlas_id=atlas_id) if lut_text.strip() else {}
+                for v in [int(x) for x in np.unique(out_data) if int(x) > 0]:
+                    if str(v) not in lut:
+                        lut[str(v)] = _normalize_lut_entry(v, f"Region {v}", atlas_id=atlas_id)
+
+                regions = compute_atlas_region_stats(out_data, out_aff, lut)
+                nii_bytes, max_lbl = write_int16_label_nifti_bytes(
+                    out_data, out_aff, descrip=f"{short_name} Custom Atlas", sform_code=1
+                )
+                out_b64 = base64.b64encode(nii_bytes).decode("ascii")
+                self._send_json(200, {
+                    "ok": True,
+                    "atlasId": atlas_id,
+                    "atlasName": atlas_name,
+                    "shortName": short_name,
+                    "category": "custom",
+                    "badge": "CUSTOM",
+                    "isFreeSurferAtlas": False,
+                    "fileName": f"{clean_base}_label.nii.gz",
+                    "niftiBase64": out_b64,
+                    "engineUsed": engine_used,
+                    "warpCacheHit": warp_cache_hit,
+                    "space": "subject" if space == "subject" else "warped_mni152",
+                    "lut": lut,
+                    "regions": regions,
+                    "regionCount": len(regions),
+                    "voxelCount": int(np.count_nonzero(out_data > 0)),
+                    "maxLabel": max_lbl,
+                    "shape": list(out_data.shape[:3]),
                 })
         except Exception as e:
             self._send_json(500, {"error": str(e)})

@@ -1,0 +1,169 @@
+{
+  "atlasId": "tian_s1",
+  "name": "Tian Melbourne Subcortex Scale 1 (16 ROIs)",
+  "space": "MNI152NLin6Asym",
+  "resolution": "1mm",
+  "source": "https://github.com/yetianmed/subcortex",
+  "labels": [
+    {
+      "id": 1,
+      "name": "HIP-rh",
+      "shortName": "HIP-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 109,
+      "b": 67,
+      "a": 255
+    },
+    {
+      "id": 2,
+      "name": "AMY-rh",
+      "shortName": "AMY-rh",
+      "hemisphere": "R",
+      "r": 50,
+      "g": 60,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 3,
+      "name": "pTHA-rh",
+      "shortName": "pTHA-rh",
+      "hemisphere": "R",
+      "r": 104,
+      "g": 240,
+      "b": 34,
+      "a": 255
+    },
+    {
+      "id": 4,
+      "name": "aTHA-rh",
+      "shortName": "aTHA-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 67,
+      "b": 177,
+      "a": 255
+    },
+    {
+      "id": 5,
+      "name": "NAc-rh",
+      "shortName": "NAc-rh",
+      "hemisphere": "R",
+      "r": 50,
+      "g": 226,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 6,
+      "name": "GP-rh",
+      "shortName": "GP-rh",
+      "hemisphere": "R",
+      "r": 240,
+      "g": 195,
+      "b": 34,
+      "a": 255
+    },
+    {
+      "id": 7,
+      "name": "PUT-rh",
+      "shortName": "PUT-rh",
+      "hemisphere": "R",
+      "r": 152,
+      "g": 67,
+      "b": 240,
+      "a": 255
+    },
+    {
+      "id": 8,
+      "name": "CAU-rh",
+      "shortName": "CAU-rh",
+      "hemisphere": "R",
+      "r": 50,
+      "g": 240,
+      "b": 88,
+      "a": 255
+    },
+    {
+      "id": 9,
+      "name": "HIP-lh",
+      "shortName": "HIP-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 31,
+      "b": 96,
+      "a": 255
+    },
+    {
+      "id": 10,
+      "name": "AMY-lh",
+      "shortName": "AMY-lh",
+      "hemisphere": "L",
+      "r": 63,
+      "g": 164,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 11,
+      "name": "pTHA-lh",
+      "shortName": "pTHA-lh",
+      "hemisphere": "L",
+      "r": 210,
+      "g": 224,
+      "b": 47,
+      "a": 255
+    },
+    {
+      "id": 12,
+      "name": "aTHA-lh",
+      "shortName": "aTHA-lh",
+      "hemisphere": "L",
+      "r": 184,
+      "g": 31,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 13,
+      "name": "NAc-lh",
+      "shortName": "NAc-lh",
+      "hemisphere": "L",
+      "r": 63,
+      "g": 224,
+      "b": 143,
+      "a": 255
+    },
+    {
+      "id": 14,
+      "name": "GP-lh",
+      "shortName": "GP-lh",
+      "hemisphere": "L",
+      "r": 224,
+      "g": 84,
+      "b": 47,
+      "a": 255
+    },
+    {
+      "id": 15,
+      "name": "PUT-lh",
+      "shortName": "PUT-lh",
+      "hemisphere": "L",
+      "r": 31,
+      "g": 48,
+      "b": 224,
+      "a": 255
+    },
+    {
+      "id": 16,
+      "name": "CAU-lh",
+      "shortName": "CAU-lh",
+      "hemisphere": "L",
+      "r": 124,
+      "g": 224,
+      "b": 63,
+      "a": 255
+    }
+  ]
+}

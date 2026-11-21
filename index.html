@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NeuroCoreg — Single-Subject Multimodal Brain Viewer (niivue/mono)</title>
-  <link rel="stylesheet" href="./styles.css?v=12" />
+  <link rel="stylesheet" href="./styles.css?v=14" />
   <script type="importmap">
     {
       "imports": {
@@ -128,6 +128,12 @@
           Draw (<kbd>D</kbd>)
         </button>
 
+        <button id="btnToggleAtlasStudio" class="btn btn-coreg-toggle" aria-expanded="false"
+          title="Open Floating Brain Atlas Studio — THOMAS, Tian, FSL &amp; Custom Atlases (Shortcut: A)">
+          <span class="dot-indicator"></span>
+          Atlas (<kbd>A</kbd>)
+        </button>
+
         <button id="btnToggleCoregPanel" class="btn btn-coreg-toggle" aria-expanded="false" aria-controls="coregPanel"
           title="Toggle Coregistration Studio Panel ON / OFF (Shortcut: C)">
           <span class="dot-indicator"></span>
@@ -208,38 +214,48 @@
           </div>
         </div>
 
-        <!-- Standalone Module 2: FastSurfer & Brain Atlas (DKT / Destrieux) Parcellation — Separately Minimizable (Minimized by Default) -->
+        <!-- Standalone Module 2: Brain Atlases (DKT, Destrieux, THOMAS, Tian, FSL, Custom) — Separately Minimizable -->
         <div id="dktModuleSection" class="panel-section neuro-module-section is-minimized">
           <div id="dktModuleHeader" class="neuro-module-header" role="button" tabindex="0" aria-expanded="false"
-            aria-controls="dktModuleBody" title="Click to expand or minimize FastSurfer &amp; Brain Atlas module">
+            aria-controls="dktModuleBody" title="Click to expand or minimize Brain Atlases module">
             <div class="neuro-module-title-wrap">
               <span class="neuro-module-chevron" aria-hidden="true">▸</span>
-              <h3>FastSurfer &amp; Brain Atlas</h3>
+              <h3>Brain Atlases</h3>
             </div>
             <div class="neuro-module-header-actions">
               <span id="fastsurferStatusBadge" class="tool-mini-badge checking"
-                title="Local FastSurfer status">Checking...</span>
+                title="Local FastSurfer / FNIRT / HIPS-THOMAS status">Checking...</span>
               <button id="btnCheckFastSurfer" type="button" class="btn-xs"
-                title="Check local availability of FSL BET and FastSurfer segmentation">
+                title="Check local availability of FSL BET, FNIRT, FastSurfer, and HIPS-THOMAS">
                 Check
               </button>
               <button id="btnToggleDktModule" type="button" class="icon-btn module-min-btn"
-                aria-label="Toggle FastSurfer &amp; Brain Atlas module"
-                title="Expand / Minimize FastSurfer &amp; Brain Atlas">+</button>
+                aria-label="Toggle Brain Atlases module"
+                title="Expand / Minimize Brain Atlases">+</button>
             </div>
           </div>
 
           <div id="dktModuleBody" class="neuro-module-body" hidden>
             <div id="fastsurferDetailNote" class="neuro-tool-note">
-              Checks /Applications/FastSurfer* (macos_setup_fastsurfer.sh) and runs DKT or Destrieux parcellation for
-              interactive cursor hover.
+              Generate or load multiple brain atlases (DKT, Destrieux, THOMAS thalamus, Tian subcortex, FSL, custom) for stacked cursor hover &amp; ROI isolation.
             </div>
             <div class="form-row" style="margin-bottom:5px;">
               <label for="selectAtlasType">Anatomical Atlas:</label>
               <select id="selectAtlasType" class="select-full"
-                title="Choose between the Desikan-Killiany-Tourville (DKT, aparc.DKTatlas+aseg) or Destrieux (aparc.a2009s+aseg) cortical and subcortical parcellation">
-                <option value="dkt" selected>DKT Atlas (aparc.DKTatlas+aseg — 104 Regions)</option>
-                <option value="destrieux">Destrieux Atlas (aparc.a2009s+aseg — 148 Cortical + Subcortical)</option>
+                title="Choose cortical, thalamic (THOMAS), subcortical (Tian S1-S4), or local FSL brain atlas">
+                <optgroup label="Cortical &amp; Whole-Brain">
+                  <option value="dkt" selected>DKT Atlas (aparc.DKTatlas+aseg — 104 Regions)</option>
+                  <option value="destrieux">Destrieux Atlas (aparc.a2009s+aseg — 148 Cortical + Subcortical)</option>
+                </optgroup>
+                <optgroup label="Thalamic Nuclei">
+                  <option value="thomas">THOMAS Thalamic Nuclei Atlas (28 Bilateral Nuclei)</option>
+                </optgroup>
+                <optgroup label="Subcortical Parcellations (Tian)">
+                  <option value="tian_s1">Tian Melbourne Subcortex Scale I (16 ROIs)</option>
+                  <option value="tian_s2">Tian Melbourne Subcortex Scale II (32 ROIs)</option>
+                  <option value="tian_s3">Tian Melbourne Subcortex Scale III (50 ROIs)</option>
+                  <option value="tian_s4">Tian Melbourne Subcortex Scale IV (54 ROIs)</option>
+                </optgroup>
               </select>
             </div>
             <div id="destrieuxSlowWarning" class="atlas-slow-warning" hidden>
@@ -262,34 +278,75 @@
             <div class="form-row" style="margin-bottom:5px;">
               <label id="lblSelectDktMode" for="selectDktMode">Atlas Pipeline Mode:</label>
               <select id="selectDktMode" class="select-full"
-                title="Choose between FastSurferVINN, Full FastSurfer, or Quick MNI152 Template Registration">
+                title="Choose between FastSurferVINN, HIPS-THOMAS Docker, FNIRT Nonlinear, or FLIRT Affine">
                 <option value="fastsurfer_vinn" selected>FastSurferVINN DKT-Only (Fast, Recommended)</option>
                 <option value="fastsurfer_full">Full FastSurfer (--seg_only + Cereb/HypVINN)</option>
+                <option value="template_fnirt">MNI152 Nonlinear FNIRT (Cached)</option>
                 <option value="template_flirt">Quick Template DKT (FSL FLIRT ~2s)</option>
               </select>
             </div>
+            <div id="hipsThomasOptionsRow" class="hips-options-box" hidden>
+              <div class="hips-options-row">
+                <label for="selectHipsContrast">MRI Contrast:</label>
+                <select id="selectHipsContrast" class="select-compact" style="flex:1;"
+                  title="Standard T1w runs HIPS WMn synthesis (-t1); choose WMn/FGATIR for native white-matter-nulled acquisitions">
+                  <option value="t1" selected>Standard T1w (-t1)</option>
+                  <option value="wmn">WMn / FGATIR (Native)</option>
+                </select>
+              </div>
+              <div class="hips-options-row" style="justify-content:space-between;">
+                <label class="hips-check-label" title="Bypass cached HIPS-THOMAS parcellation and re-run container">
+                  <input type="checkbox" id="chkHipsForceRecompute" />
+                  <span>Force Recompute</span>
+                </label>
+                <span id="hipsAutoDmBadge" class="hips-dm-badge" hidden
+                  title="Target volume appears skull-stripped/BET; automatically passes -dm to hipsthomas.sh">Auto -dm</span>
+              </div>
+            </div>
             <div class="neuro-bet-controls">
               <button id="btnRunDktAtlas" class="btn btn-dkt-seg btn-sm" style="flex:1;"
-                title="Segment selected T1w MRI into the selected anatomical atlas (DKT or Destrieux) and enable interactive hover display">
+                title="Generate selected atlas in Target T1w space and enable interactive stacked hover display">
                 Generate DKT Atlas
               </button>
               <label id="lblLoadDktWrap" class="btn btn-secondary btn-sm" for="dktFileInput"
-                title="Load an existing FastSurfer / FreeSurfer aparc.DKTatlas+aseg or aparc.a2009s+aseg (.mgz or .nii.gz) segmentation file">
-                <span id="lblLoadDktBtn">Load DKT</span>
+                title="Load an existing segmentation file (.nii, .nii.gz, .mgz)">
+                <span id="lblLoadDktBtn">Load</span>
                 <input id="dktFileInput" type="file" accept=".nii,.nii.gz,.mgz" hidden />
               </label>
+              <button id="btnOpenAtlasStudioSidebar" type="button" class="btn btn-secondary btn-sm"
+                title="Open Brain Atlas Studio pop-out to search ROIs, isolate nuclei, import HIPS-THOMAS/custom LUTs (Shortcut: A)">
+                Studio (<kbd>A</kbd>)
+              </button>
+            </div>
+            <div id="hipsJobProgressStrip" class="hips-job-strip" hidden>
+              <div class="hips-job-top">
+                <span id="hipsJobStageText" class="hips-job-stage">Running HIPS-THOMAS...</span>
+                <span id="hipsJobElapsed" class="hips-job-elapsed">00:00</span>
+                <button id="btnCancelHipsJob" type="button" class="btn-xs btn-danger-outline"
+                  title="Stop & remove running HIPS-THOMAS Docker container">Cancel</button>
+              </div>
+              <div id="hipsJobLogTail" class="hips-job-log">Starting container...</div>
             </div>
             <!-- Segmentation Color Overlay Toggle + Inline Opacity Slider (keeps cursor hover active when OFF) -->
             <div id="dktOverlayControlRow" class="dkt-overlay-toggle-row">
               <label class="vis-switch-label" for="chkDktColorOverlay"
-                title="Toggle atlas segmentation color overlay ON / OFF on the brain slices (cursor hover region readout remains active even when color overlay is OFF)">
+                title="Toggle active atlas color overlay ON / OFF on slices (stacked hover lookup stays active for all loaded atlases)">
                 <input type="checkbox" role="switch" class="vis-switch" id="chkDktColorOverlay" checked disabled />
                 <span class="dkt-overlay-label">Color Overlay</span>
               </label>
               <div class="dkt-overlay-slider-wrap">
                 <input type="range" id="sliderDktOverlayOpacity" min="0" max="100" value="35" disabled
-                  title="Adjust atlas segmentation color overlay opacity" />
+                  title="Adjust active atlas color overlay opacity" />
                 <span id="valDktOverlayOpacity" class="opacity-pct">35%</span>
+              </div>
+            </div>
+            <!-- Overlay Style Toggle (Filled / +Edge / Edge Only) -->
+            <div id="dktOverlayStyleRow" class="atlas-style-row">
+              <span class="dkt-window-label">Style:</span>
+              <div id="dktOverlayStyleGroup" class="atlas-style-group" role="group" aria-label="Atlas Overlay Render Style">
+                <button type="button" class="atlas-style-btn active" data-atlas-style="filled" title="Solid semi-transparent label fill">Filled</button>
+                <button type="button" class="atlas-style-btn" data-atlas-style="filled_outline" title="Semi-transparent fill with crisp label borders">+Edge</button>
+                <button type="button" class="atlas-style-btn" data-atlas-style="outline" title="Crisp ROI outlines only (shows anatomy underneath)">Edge</button>
               </div>
             </div>
             <!-- Atlas Overlay Windowing Adjustment (cal_min / cal_max + Auto Reset) -->
@@ -847,7 +904,7 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=19"></script>
+  <script type="module" src="./app.js?v=23"></script>
 </body>
 
 </html>

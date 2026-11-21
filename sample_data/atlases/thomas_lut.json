@@ -1,0 +1,289 @@
+{
+  "atlasId": "thomas",
+  "name": "THOMAS Thalamic Nuclei Atlas (MNI152)",
+  "space": "MNI152NLin6Asym",
+  "resolution": "1mm",
+  "source": "https://github.com/thalamicseg/thomas_new & https://github.com/thalamicseg/thomas-v0",
+  "labels": [
+    {
+      "id": 2,
+      "name": "Left Anteroventral Nucleus (AV)",
+      "shortName": "L-AV",
+      "hemisphere": "L",
+      "r": 0,
+      "g": 114,
+      "b": 178,
+      "a": 255
+    },
+    {
+      "id": 4,
+      "name": "Left Ventral Anterior Nucleus (VA)",
+      "shortName": "L-VA",
+      "hemisphere": "L",
+      "r": 166,
+      "g": 6,
+      "b": 40,
+      "a": 255
+    },
+    {
+      "id": 5,
+      "name": "Left Ventral Lateral Anterior Nucleus (VLa)",
+      "shortName": "L-VLa",
+      "hemisphere": "L",
+      "r": 0,
+      "g": 158,
+      "b": 115,
+      "a": 255
+    },
+    {
+      "id": 6,
+      "name": "Left Ventral Lateral Posterior / VIM Nucleus (VLp)",
+      "shortName": "L-VLp",
+      "hemisphere": "L",
+      "r": 213,
+      "g": 94,
+      "b": 0,
+      "a": 255
+    },
+    {
+      "id": 7,
+      "name": "Left Ventral Posterolateral Nucleus (VPL)",
+      "shortName": "L-VPL",
+      "hemisphere": "L",
+      "r": 154,
+      "g": 118,
+      "b": 243,
+      "a": 255
+    },
+    {
+      "id": 8,
+      "name": "Left Pulvinar Nucleus (Pul)",
+      "shortName": "L-Pul",
+      "hemisphere": "L",
+      "r": 205,
+      "g": 0,
+      "b": 116,
+      "a": 255
+    },
+    {
+      "id": 9,
+      "name": "Left Lateral Geniculate Nucleus (LGN)",
+      "shortName": "L-LGN",
+      "hemisphere": "L",
+      "r": 255,
+      "g": 199,
+      "b": 158,
+      "a": 255
+    },
+    {
+      "id": 10,
+      "name": "Left Medial Geniculate Nucleus (MGN)",
+      "shortName": "L-MGN",
+      "hemisphere": "L",
+      "r": 208,
+      "g": 181,
+      "b": 59,
+      "a": 255
+    },
+    {
+      "id": 11,
+      "name": "Left Centromedian Nucleus (CM)",
+      "shortName": "L-CM",
+      "hemisphere": "L",
+      "r": 51,
+      "g": 204,
+      "b": 204,
+      "a": 255
+    },
+    {
+      "id": 12,
+      "name": "Left Mediodorsal-Parafascicular Nucleus (MD-Pf)",
+      "shortName": "L-MD-Pf",
+      "hemisphere": "L",
+      "r": 142,
+      "g": 235,
+      "b": 0,
+      "a": 255
+    },
+    {
+      "id": 13,
+      "name": "Left Habenula (Hb)",
+      "shortName": "L-Hb",
+      "hemisphere": "L",
+      "r": 255,
+      "g": 115,
+      "b": 115,
+      "a": 255
+    },
+    {
+      "id": 14,
+      "name": "Left Mammillothalamic Tract (MTT)",
+      "shortName": "L-MTT",
+      "hemisphere": "L",
+      "r": 255,
+      "g": 237,
+      "b": 45,
+      "a": 255
+    },
+    {
+      "id": 17,
+      "name": "Left Central Lateral Nucleus (CL)",
+      "shortName": "L-CL",
+      "hemisphere": "L",
+      "r": 255,
+      "g": 210,
+      "b": 248,
+      "a": 255
+    },
+    {
+      "id": 18,
+      "name": "Left Ventral Posteromedial Nucleus (VPM)",
+      "shortName": "L-VPM",
+      "hemisphere": "L",
+      "r": 164,
+      "g": 206,
+      "b": 159,
+      "a": 255
+    },
+    {
+      "id": 102,
+      "name": "Right Anteroventral Nucleus (AV)",
+      "shortName": "R-AV",
+      "hemisphere": "R",
+      "r": 16,
+      "g": 117,
+      "b": 179,
+      "a": 255
+    },
+    {
+      "id": 104,
+      "name": "Right Ventral Anterior Nucleus (VA)",
+      "shortName": "R-VA",
+      "hemisphere": "R",
+      "r": 169,
+      "g": 18,
+      "b": 48,
+      "a": 255
+    },
+    {
+      "id": 105,
+      "name": "Right Ventral Lateral Anterior Nucleus (VLa)",
+      "shortName": "R-VLa",
+      "hemisphere": "R",
+      "r": 16,
+      "g": 157,
+      "b": 119,
+      "a": 255
+    },
+    {
+      "id": 106,
+      "name": "Right Ventral Lateral Posterior / VIM Nucleus (VLp)",
+      "shortName": "R-VLp",
+      "hemisphere": "R",
+      "r": 212,
+      "g": 98,
+      "b": 10,
+      "a": 255
+    },
+    {
+      "id": 107,
+      "name": "Right Ventral Posterolateral Nucleus (VPL)",
+      "shortName": "R-VPL",
+      "hemisphere": "R",
+      "r": 158,
+      "g": 121,
+      "b": 241,
+      "a": 255
+    },
+    {
+      "id": 108,
+      "name": "Right Pulvinar Nucleus (Pul)",
+      "shortName": "R-Pul",
+      "hemisphere": "R",
+      "r": 205,
+      "g": 12,
+      "b": 120,
+      "a": 255
+    },
+    {
+      "id": 109,
+      "name": "Right Lateral Geniculate Nucleus (LGN)",
+      "shortName": "R-LGN",
+      "hemisphere": "R",
+      "r": 251,
+      "g": 195,
+      "b": 160,
+      "a": 255
+    },
+    {
+      "id": 110,
+      "name": "Right Medial Geniculate Nucleus (MGN)",
+      "shortName": "R-MGN",
+      "hemisphere": "R",
+      "r": 207,
+      "g": 179,
+      "b": 66,
+      "a": 255
+    },
+    {
+      "id": 111,
+      "name": "Right Centromedian Nucleus (CM)",
+      "shortName": "R-CM",
+      "hemisphere": "R",
+      "r": 63,
+      "g": 200,
+      "b": 204,
+      "a": 255
+    },
+    {
+      "id": 112,
+      "name": "Right Mediodorsal-Parafascicular Nucleus (MD-Pf)",
+      "shortName": "R-MD-Pf",
+      "hemisphere": "R",
+      "r": 147,
+      "g": 228,
+      "b": 10,
+      "a": 255
+    },
+    {
+      "id": 113,
+      "name": "Right Habenula (Hb)",
+      "shortName": "R-Hb",
+      "hemisphere": "R",
+      "r": 251,
+      "g": 118,
+      "b": 119,
+      "a": 255
+    },
+    {
+      "id": 114,
+      "name": "Right Mammillothalamic Tract (MTT)",
+      "shortName": "R-MTT",
+      "hemisphere": "R",
+      "r": 251,
+      "g": 230,
+      "b": 53,
+      "a": 255
+    },
+    {
+      "id": 117,
+      "name": "Right Central Lateral Nucleus (CL)",
+      "shortName": "R-CL",
+      "hemisphere": "R",
+      "r": 251,
+      "g": 205,
+      "b": 246,
+      "a": 255
+    },
+    {
+      "id": 118,
+      "name": "Right Ventral Posteromedial Nucleus (VPM)",
+      "shortName": "R-VPM",
+      "hemisphere": "R",
+      "r": 167,
+      "g": 202,
+      "b": 161,
+      "a": 255
+    }
+  ]
+}
